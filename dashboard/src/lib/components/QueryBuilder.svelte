@@ -284,13 +284,19 @@
         ? frequencyToChartData(freq, groupBy)
         : meansToChartData(result as MeansResult | WaveChangeResult, groupBy)}
       <ChartCard
-        title="{queryType === 'frequency' ? 'Frequency' : queryType === 'means' ? 'Means' : `Wave ${fromWave} → ${toWave} Change`} Result"
+        title={
+          queryType === 'frequency'
+            ? 'Frequency Result'
+            : queryType === 'means'
+              ? 'Means Result'
+              : `Wave ${fromWave} → ${toWave} Change Result`
+        }
         type="bar"
         data={chart.data}
         options={chart.options}
         csv={result.csv}
         suppressions={result.suppressions}
-        filename="{queryType}-result"
+        filename={`${queryType}-result`}
       />
     {:catch error}
       <div class="card bg-red-50 border-red-200 text-red-700 text-sm">
