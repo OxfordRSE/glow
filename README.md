@@ -94,7 +94,7 @@ N is counted as **distinct students (uid)**, not rows. Any frequency or means ce
 Query columns are restricted to a whitelist to prevent data leakage:
 
 - **`group_by` / `value_column` (frequency)**: `school`, `yearGroup`, `class`, `sex`, `ethnicity`, `wave`, `d_city`, `d_country`
-- **`value_columns` (means)**: `phq9_1`–`phq9_9`, `d_age`
+- **`value_columns` (means)**: all #BeeWell GM Survey item columns (`bw_wbeing_1`–`bw_wbeing_7`, `bw_emodies_1`–`bw_emodies_10`, etc. — see [beewell_model.toml](https://github.com/OxfordRSE/ib-ox-dummies/blob/main/examples/beewell_model.toml) for the full list), `d_age`
 
 ## Dashboard
 
@@ -179,10 +179,10 @@ Data must be in the format produced by [ib-ox-dummies](https://github.com/Oxford
 - `school`, `yearGroup`, `class` — school structure
 - `sex`, `ethnicity` — demographics
 - `d_age`, `d_city`, `d_country` — derived/custom fields
-- Questionnaire items (e.g. `phq9_1`–`phq9_9`)
+- Questionnaire items from the [#BeeWell GM Survey](https://beewellprogramme.org) (e.g. `bw_wbeing_1`–`bw_wbeing_7` for SWEMWBS wellbeing, `bw_emodies_1`–`bw_emodies_10` for emotional difficulties, and ~120 further items — see [beewell_model.toml](https://github.com/OxfordRSE/ib-ox-dummies/blob/main/examples/beewell_model.toml) for the complete list)
 
 Generate sample data:
 
 ```bash
-ib_ox_dummies --config examples/default_model.toml --seed 42 --output csv > data/data.csv
+ib_ox_dummies --config examples/beewell_model.toml --seed 42 --output csv > data/data.csv
 ```

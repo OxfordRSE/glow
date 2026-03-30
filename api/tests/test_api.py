@@ -63,7 +63,7 @@ def test_get_columns(client):
     cols = response.json()
     assert "uid" in cols
     assert "school" in cols
-    assert "phq9_1" in cols
+    assert "bw_wbeing_1" in cols
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ def test_frequency_query_nonexistent_column(client):
 
 
 def test_means_query_basic(client):
-    payload = {"group_by": ["school"], "value_columns": ["phq9_1"]}
+    payload = {"group_by": ["school"], "value_columns": ["bw_wbeing_1"]}
     response = client.post("/query/means", json=payload)
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
@@ -134,7 +134,7 @@ def test_means_query_basic(client):
 
     df_means = pd.read_csv(io.StringIO(data["csv"]))
     assert "school" in df_means.columns
-    assert "phq9_1" in df_means.columns
+    assert "bw_wbeing_1" in df_means.columns
 
 
 def test_means_query_invalid_value_column(client):
@@ -144,7 +144,7 @@ def test_means_query_invalid_value_column(client):
 
 
 def test_means_query_invalid_group_by(client):
-    payload = {"group_by": ["uid"], "value_columns": ["phq9_1"]}
+    payload = {"group_by": ["uid"], "value_columns": ["bw_wbeing_1"]}
     response = client.post("/query/means", json=payload)
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -155,8 +155,8 @@ def test_means_query_invalid_group_by(client):
 
 
 def test_wave_change_query_basic(client):
-    """Wave 1 → 2 change for phq9_1, no group_by."""
-    payload = {"from_wave": "1", "to_wave": "2", "value_columns": ["phq9_1"]}
+    """Wave 1 → 2 change for bw_wbeing_1, no group_by."""
+    payload = {"from_wave": "1", "to_wave": "2", "value_columns": ["bw_wbeing_1"]}
     response = client.post("/query/wave-change", json=payload)
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
@@ -170,14 +170,14 @@ def test_wave_change_query_with_group_by(client):
     payload = {
         "from_wave": "1",
         "to_wave": "2",
-        "value_columns": ["phq9_1"],
+        "value_columns": ["bw_wbeing_1"],
         "group_by": ["school"],
     }
     response = client.post("/query/wave-change", json=payload)
     assert response.status_code == status.HTTP_200_OK
     df = pd.read_csv(io.StringIO(response.json()["csv"]))
     assert "school" in df.columns
-    assert "phq9_1" in df.columns
+    assert "bw_wbeing_1" in df.columns
 
 
 def test_wave_change_query_invalid_value_column(client):
@@ -190,7 +190,7 @@ def test_wave_change_query_invalid_group_by(client):
     payload = {
         "from_wave": "1",
         "to_wave": "2",
-        "value_columns": ["phq9_1"],
+        "value_columns": ["bw_wbeing_1"],
         "group_by": ["uid"],
     }
     response = client.post("/query/wave-change", json=payload)
@@ -279,20 +279,20 @@ def test_suppression_means_below_min_n(tiny_df):
     from ib_ox_api.suppression import suppress_means_table
 
     means_df, counts_df, suppressions = suppress_means_table(
-        tiny_df, group_cols=["school"], value_cols=["phq9_1"], min_n=5
+        tiny_df, group_cols=["school"], value_cols=["bw_wbeing_1"], min_n=5
     )
-    assert means_df["phq9_1"].isna().all()
-    assert "phq9_1" in suppressions
+    assert means_df["bw_wbeing_1"].isna().all()
+    assert "bw_wbeing_1" in suppressions
 
 
 def test_suppression_means_above_min_n(sample_df):
     from ib_ox_api.suppression import suppress_means_table
 
     means_df, counts_df, suppressions = suppress_means_table(
-        sample_df, group_cols=["school"], value_cols=["phq9_1"], min_n=3
+        sample_df, group_cols=["school"], value_cols=["bw_wbeing_1"], min_n=3
     )
     # Alpha and Beta each have ≥5 students → no suppression
-    assert not means_df["phq9_1"].isna().all()
+    assert not means_df["bw_wbeing_1"].isna().all()
 
 
 # ---------------------------------------------------------------------------
@@ -315,16 +315,16 @@ def test_whitelist_means_rejects_nonwhitelisted():
 
     query = MeansQuery(group_by=["school"], value_columns=["uid"])
     with pytest.raises(ValueError, match="not allowed"):
-        validate_means_query(query, {"uid", "school", "phq9_1"})
+        validate_means_query(query, {"uid", "school", "bw_wbeing_1"})
 
 
 def test_whitelist_means_rejects_missing_column():
     from ib_ox_api.models import MeansQuery
     from ib_ox_api.query import validate_means_query
 
-    query = MeansQuery(group_by=["school"], value_columns=["phq9_1"])
+    query = MeansQuery(group_by=["school"], value_columns=["bw_wbeing_1"])
     with pytest.raises(ValueError, match="does not exist"):
-        validate_means_query(query, {"school"})  # phq9_1 not in df_columns
+        validate_means_query(query, {"school"})  # bw_wbeing_1 not in df_columns
 
 
 def test_user_scope_applied(sample_df):
