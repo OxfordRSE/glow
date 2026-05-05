@@ -12,7 +12,7 @@ from ib_ox_api.database import UserModel, get_db, get_user_by_username, scope_js
 from ib_ox_api.models import TokenData, UserRead, UserScope
 from ib_ox_api.settings import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
