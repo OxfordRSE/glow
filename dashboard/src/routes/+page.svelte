@@ -107,8 +107,7 @@
     <div class="card bg-red-50 border-red-200">
       <p class="text-red-700">{error}</p>
       <p class="text-sm text-gray-500 mt-2">
-        If no data is loaded on the server, charts will be unavailable. Use the
-        <a href="/query" class="text-blue-600 hover:underline">Query Builder</a> to explore data.
+        If no data is loaded on the server, charts will be unavailable. Contact an administrator to ensure the dataset is configured correctly.
       </p>
     </div>
   {:else}
@@ -161,7 +160,6 @@
   <div class="card bg-blue-50 border-blue-200">
     <h2 class="text-blue-900 mb-2">Getting Started</h2>
     <ul class="text-sm text-blue-800 space-y-1 list-disc list-inside">
-      <li>Use the <a href="/query" class="underline font-medium">Query Builder</a> to create custom frequency and means queries.</li>
       <li>Charts support "Show Table" for a tabular view and "↓ CSV" to download data.</li>
       <li>Suppressed cells (small sample sizes) are shown as — to protect privacy.</li>
       {#if $authStore.user?.is_admin}
