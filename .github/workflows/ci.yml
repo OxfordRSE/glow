@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install API test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "./api[test]"
+      - name: Run API tests
+        run: pytest api/tests
+
+  dashboard-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - name: Install dashboard dependencies
+        working-directory: dashboard
+        run: npm ci
+      - name: Run dashboard type checks
+        working-directory: dashboard
+        run: npm run check
+
+  compose-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - name: Install dashboard dependencies
+        working-directory: dashboard
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: dashboard
+        run: npx playwright install --with-deps chromium
+      - name: Bring up compose stack and run API smoke checks
+        run: bash scripts/smoke_compose.sh
+      - name: Run dashboard browser smoke tests
+        working-directory: dashboard
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:5173
+          PLAYWRIGHT_ADMIN_USER: admin
+          PLAYWRIGHT_ADMIN_PASSWORD: admin
+          PLAYWRIGHT_SCOPED_USER: alpha-user
+          PLAYWRIGHT_SCOPED_PASSWORD: alpha-user
+          PLAYWRIGHT_SCOPED_SCHOOL: Alpha
+        run: npm run test:e2e
+      - name: Tear down compose stack
+        if: always()
+        run: docker compose down -v --remove-orphans

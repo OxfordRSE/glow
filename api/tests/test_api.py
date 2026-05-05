@@ -180,6 +180,20 @@ def test_wave_change_query_with_group_by(client):
     assert "bw_wbeing_1" in df.columns
 
 
+def test_wave_change_query_accepts_decimal_like_wave_strings(client):
+    payload = {
+        "from_wave": "1.0",
+        "to_wave": "2.0",
+        "value_columns": ["bw_wbeing_1"],
+        "group_by": ["school"],
+    }
+    response = client.post("/query/wave-change", json=payload)
+    assert response.status_code == status.HTTP_200_OK
+    df = pd.read_csv(io.StringIO(response.json()["csv"]))
+    assert not df.empty
+    assert set(df["school"]) == {"Alpha"}
+
+
 def test_wave_change_query_invalid_value_column(client):
     payload = {"from_wave": "1", "to_wave": "2", "value_columns": ["bad_col"]}
     response = client.post("/query/wave-change", json=payload)
@@ -334,3 +348,89 @@ def test_user_scope_applied(sample_df):
     scope = UserScope(filters={"school": ["Alpha"]})
     filtered = apply_user_scope(sample_df, scope)
     assert set(filtered["school"].unique()) == {"Alpha"}
+
+
+def test_wave_filter_accepts_decimal_like_strings(client):
+    payload = {
+        "group_by": ["school"],
+        "filters": [{"column": "wave", "op": "eq", "value": "1.0"}],
+    }
+    response = client.post("/query/frequency", json=payload)
+    assert response.status_code == status.HTTP_200_OK
+    df = pd.read_csv(io.StringIO(response.json()["csv"]))
+    assert set(df["school"].dropna()) == {"Alpha", "Beta"}
+
+
+# ---------------------------------------------------------------------------
+# Admin CRUD
+# ---------------------------------------------------------------------------
+
+
+def test_admin_list_users(admin_client):
+    response = admin_client.get("/admin/users")
+    assert response.status_code == status.HTTP_200_OK
+    users = response.json()
+    assert len(users) == 1
+    assert users[0]["username"] == "adminuser"
+    assert users[0]["is_admin"] is True
+
+
+def test_admin_create_user(admin_client):
+    payload = {
+        "username": "analyst",
+        "password": "analyst-pass",
+        "scope": {"filters": {"school": ["Alpha"]}},
+        "is_admin": False,
+    }
+    response = admin_client.post("/admin/users", json=payload)
+    assert response.status_code == status.HTTP_201_CREATED
+    user = response.json()
+    assert user["username"] == "analyst"
+    assert user["scope"]["filters"] == {"school": ["Alpha"]}
+
+
+def test_admin_update_user(admin_client):
+    create_response = admin_client.post(
+        "/admin/users",
+        json={
+            "username": "analyst",
+            "password": "analyst-pass",
+            "scope": {"filters": {"school": ["Alpha"]}},
+            "is_admin": False,
+        },
+    )
+    user_id = create_response.json()["id"]
+
+    response = admin_client.put(
+        f"/admin/users/{user_id}",
+        json={
+            "scope": {"filters": {"school": ["Beta"]}},
+            "is_active": False,
+            "is_admin": True,
+        },
+    )
+    assert response.status_code == status.HTTP_200_OK
+    updated = response.json()
+    assert updated["scope"]["filters"] == {"school": ["Beta"]}
+    assert updated["is_active"] is False
+    assert updated["is_admin"] is True
+
+
+def test_admin_delete_user(admin_client):
+    create_response = admin_client.post(
+        "/admin/users",
+        json={
+            "username": "analyst",
+            "password": "analyst-pass",
+            "scope": {"filters": {"school": ["Alpha"]}},
+            "is_admin": False,
+        },
+    )
+    user_id = create_response.json()["id"]
+
+    response = admin_client.delete(f"/admin/users/{user_id}")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    list_response = admin_client.get("/admin/users")
+    usernames = [user["username"] for user in list_response.json()]
+    assert "analyst" not in usernames

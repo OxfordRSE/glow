@@ -16,11 +16,11 @@ import click
 from ib_ox_api.auth import get_password_hash
 from ib_ox_api.database import (
     SessionLocal,
-    create_all,
     create_user,
     delete_user,
     get_user_by_username,
     list_users,
+    run_migrations,
     scope_json_to_dict,
     update_user,
 )
@@ -43,8 +43,8 @@ def db() -> None:
 
 @db.command("init")
 def db_init() -> None:
-    """Initialise the database (create tables)."""
-    create_all()
+    """Initialise the database by applying all migrations."""
+    run_migrations()
     click.echo("Database initialised.")
 
 

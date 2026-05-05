@@ -112,24 +112,30 @@ def suppress_means_table(
 
     # Student counts per group per value column
     # A student may have answered different subsets of questions, so count per value_col separately.
-    groups = df.groupby(group_cols)
-
     means_parts: dict[str, pd.Series] = {}
     counts_parts: dict[str, pd.Series] = {}
 
     for col in value_cols:
         sub = df.dropna(subset=[col])
-        g = sub.groupby(group_cols)
-        counts_parts[col] = g["uid"].nunique()
-        means_parts[col] = g[col].mean()
+        if group_cols:
+            g = sub.groupby(group_cols)
+            counts_parts[col] = g["uid"].nunique()
+            means_parts[col] = g[col].mean()
+        else:
+            counts_parts[col] = pd.Series([sub["uid"].nunique()])
+            means_parts[col] = pd.Series([sub[col].mean()])
 
     # Build DataFrames
     means_df = pd.DataFrame(means_parts)
     counts_df = pd.DataFrame(counts_parts)
 
     # Reset index so group_cols become regular columns
-    means_df = means_df.reset_index()
-    counts_df = counts_df.reset_index()
+    if group_cols:
+        means_df = means_df.reset_index()
+        counts_df = counts_df.reset_index()
+    else:
+        means_df = means_df.reset_index(drop=True)
+        counts_df = counts_df.reset_index(drop=True)
 
     # Suppress cells where count < min_n
     for col in value_cols:
