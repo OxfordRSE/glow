@@ -54,8 +54,16 @@ with urllib.request.urlopen(login_req) as response:
     token = json.loads(response.read().decode())["access_token"]
 
 query_req = urllib.request.Request(
-    base + "/query/frequency",
-    data=json.dumps({"group_by": ["school"], "filters": []}).encode(),
+    base + "/query",
+    data=json.dumps({
+        "steps": [
+            {
+                "type": "aggregate",
+                "group_by": ["school"],
+                "metrics": [{"kind": "count_students"}],
+            }
+        ]
+    }).encode(),
     headers={
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
