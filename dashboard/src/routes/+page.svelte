@@ -9,9 +9,9 @@
   let loading = $state(true);
   let error = $state<string | null>(null);
 
-  let phqBySchool = $state<FrequencyResult | null>(null);
-  let phqBySex = $state<FrequencyResult | null>(null);
-  let phqByWave = $state<FrequencyResult | null>(null);
+  let countBySchool = $state<FrequencyResult | null>(null);
+  let countBySex = $state<FrequencyResult | null>(null);
+  let countByWave = $state<FrequencyResult | null>(null);
 
   onMount(async () => {
     const token = $authStore.token;
@@ -28,23 +28,22 @@
       const hasSchool = cols.includes('school');
       const hasSex = cols.includes('sex');
       const hasWave = cols.includes('wave');
-      const hasPhq = cols.includes('phq9_total') || cols.includes('phq9_1');
 
       // Build overview charts from available columns
       const groupByCols = cols.filter(
-        (c) => !c.startsWith('phq') && !c.startsWith('gad') && c !== 'uid'
+        (c) => !c.startsWith('bw_') && c !== 'uid'
       );
 
       // Chart 1: Count by school (or first available categorical)
       if (hasSchool) {
-        phqBySchool = await queryFrequency(token, { group_by: ['school'], filters: [] });
+        countBySchool = await queryFrequency(token, { group_by: ['school'], filters: [] });
       } else if (groupByCols[0]) {
-        phqBySchool = await queryFrequency(token, { group_by: [groupByCols[0]], filters: [] });
+        countBySchool = await queryFrequency(token, { group_by: [groupByCols[0]], filters: [] });
       }
 
       // Chart 2: Count by sex
       if (hasSex) {
-        phqBySex = await queryFrequency(token, {
+        countBySex = await queryFrequency(token, {
           group_by: hasSex && hasSchool ? ['school', 'sex'] : ['sex'],
           filters: []
         });
@@ -52,7 +51,7 @@
 
       // Chart 3: Count by wave (trend)
       if (hasWave) {
-        phqByWave = await queryFrequency(token, {
+        countByWave = await queryFrequency(token, {
           group_by: hasSchool ? ['wave', 'school'] : ['wave'],
           filters: []
         });
@@ -65,26 +64,26 @@
   });
 
   let schoolChart = $derived(
-    phqBySchool
-      ? frequencyToChartData(phqBySchool, $columnsStore.includes('school') ? ['school'] : [$columnsStore.find((c) => c !== 'uid') ?? ''])
+    countBySchool
+      ? frequencyToChartData(countBySchool, $columnsStore.includes('school') ? ['school'] : [$columnsStore.find((c) => c !== 'uid') ?? ''])
       : null
   );
 
   let sexChart = $derived(
-    phqBySex
+    countBySex
       ? (() => {
           const hasSex = $columnsStore.includes('sex');
           const hasSchool = $columnsStore.includes('school');
           const gb = hasSex && hasSchool ? ['school', 'sex'] : ['sex'];
-          return frequencyToChartData(phqBySex!, gb);
+          return frequencyToChartData(countBySex!, gb);
         })()
       : null
   );
 
   let waveChart = $derived(
-    phqByWave
+    countByWave
       ? frequencyToLineData(
-          phqByWave,
+          countByWave,
           $columnsStore.includes('school') ? ['wave', 'school'] : ['wave'],
           'wave'
         )
@@ -108,8 +107,7 @@
     <div class="card bg-red-50 border-red-200">
       <p class="text-red-700">{error}</p>
       <p class="text-sm text-gray-500 mt-2">
-        If no data is loaded on the server, charts will be unavailable. Use the
-        <a href="/query" class="text-blue-600 hover:underline">Query Builder</a> to explore data.
+        If no data is loaded on the server, charts will be unavailable. Contact an administrator to ensure the dataset is configured correctly.
       </p>
     </div>
   {:else}
@@ -120,8 +118,8 @@
           type="bar"
           data={schoolChart.data}
           options={schoolChart.options}
-          csv={phqBySchool?.csv ?? ''}
-          suppressions={phqBySchool?.suppressions ?? {}}
+          csv={countBySchool?.csv ?? ''}
+          suppressions={countBySchool?.suppressions ?? {}}
         />
       {/if}
 
@@ -131,8 +129,8 @@
           type="bar"
           data={sexChart.data}
           options={sexChart.options}
-          csv={phqBySex?.csv ?? ''}
-          suppressions={phqBySex?.suppressions ?? {}}
+          csv={countBySex?.csv ?? ''}
+          suppressions={countBySex?.suppressions ?? {}}
         />
       {/if}
 
@@ -143,8 +141,8 @@
             type="line"
             data={waveChart.data}
             options={waveChart.options}
-            csv={phqByWave?.csv ?? ''}
-            suppressions={phqByWave?.suppressions ?? {}}
+            csv={countByWave?.csv ?? ''}
+            suppressions={countByWave?.suppressions ?? {}}
           />
         </div>
       {/if}
@@ -162,7 +160,6 @@
   <div class="card bg-blue-50 border-blue-200">
     <h2 class="text-blue-900 mb-2">Getting Started</h2>
     <ul class="text-sm text-blue-800 space-y-1 list-disc list-inside">
-      <li>Use the <a href="/query" class="underline font-medium">Query Builder</a> to create custom frequency and means queries.</li>
       <li>Charts support "Show Table" for a tabular view and "↓ CSV" to download data.</li>
       <li>Suppressed cells (small sample sizes) are shown as — to protect privacy.</li>
       {#if $authStore.user?.is_admin}

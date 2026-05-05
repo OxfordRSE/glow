@@ -20,27 +20,27 @@ from ib_ox_api.settings import settings
 # Sample DataFrame used across tests
 # ---------------------------------------------------------------------------
 
-SAMPLE_CSV = """uid,wave,school,yearGroup,class,sex,ethnicity,d_age,d_city,d_country,phq9_1,phq9_2,phq9_3
-S001,1,Alpha,7,A,M,White,12.5,Oxford,UK,1,2,3
-S002,1,Alpha,7,A,F,White,12.3,Oxford,UK,2,3,1
-S003,1,Alpha,7,B,M,Asian,12.8,Oxford,UK,0,1,2
-S004,1,Alpha,7,B,F,Asian,12.1,Oxford,UK,3,2,0
-S005,1,Alpha,7,C,F,Black,12.4,Oxford,UK,2,2,1
-S006,1,Beta,8,A,M,White,13.0,London,UK,1,1,1
-S007,1,Beta,8,A,F,Black,13.2,London,UK,2,2,2
-S008,1,Beta,8,B,M,White,13.5,London,UK,3,3,3
-S009,1,Beta,8,B,F,Asian,13.1,London,UK,0,0,0
-S010,1,Beta,8,C,F,White,13.4,London,UK,1,0,1
-S001,2,Alpha,7,A,M,White,13.5,Oxford,UK,2,1,3
-S002,2,Alpha,7,A,F,White,13.3,Oxford,UK,1,2,2
-S003,2,Alpha,7,B,M,Asian,13.8,Oxford,UK,1,1,2
-S004,2,Alpha,7,B,F,Asian,13.1,Oxford,UK,2,2,1
-S005,2,Alpha,7,C,F,Black,13.4,Oxford,UK,1,2,1
+SAMPLE_CSV = """uid,wave,school,yearGroup,class,sex,ethnicity,d_age,d_city,d_country,bw_wbeing_1,bw_wbeing_2,bw_wbeing_3
+S001,1,Alpha,7,A,M,White,12.5,Oxford,UK,3,4,2
+S002,1,Alpha,7,A,F,White,12.3,Oxford,UK,4,3,4
+S003,1,Alpha,7,B,M,Asian,12.8,Oxford,UK,2,3,3
+S004,1,Alpha,7,B,F,Asian,12.1,Oxford,UK,4,2,3
+S005,1,Alpha,7,C,F,Black,12.4,Oxford,UK,3,4,3
+S006,1,Beta,8,A,M,White,13.0,London,UK,3,3,3
+S007,1,Beta,8,A,F,Black,13.2,London,UK,4,4,4
+S008,1,Beta,8,B,M,White,13.5,London,UK,2,2,2
+S009,1,Beta,8,B,F,Asian,13.1,London,UK,3,3,3
+S010,1,Beta,8,C,F,White,13.4,London,UK,3,2,3
+S001,2,Alpha,7,A,M,White,13.5,Oxford,UK,4,3,3
+S002,2,Alpha,7,A,F,White,13.3,Oxford,UK,3,4,4
+S003,2,Alpha,7,B,M,Asian,13.8,Oxford,UK,3,3,4
+S004,2,Alpha,7,B,F,Asian,13.1,Oxford,UK,4,3,3
+S005,2,Alpha,7,C,F,Black,13.4,Oxford,UK,3,4,3
 """
 
-TINY_CSV = """uid,wave,school,sex,phq9_1
-S001,1,Alpha,M,1
-S002,1,Alpha,F,2
+TINY_CSV = """uid,wave,school,sex,bw_wbeing_1
+S001,1,Alpha,M,3
+S002,1,Alpha,F,4
 """
 
 

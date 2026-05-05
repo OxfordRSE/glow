@@ -28,19 +28,67 @@ CATEGORICAL_WHITELIST: set[str] = {
     "d_country",
 }
 
+# Questionnaire item columns from the #BeeWell GM Survey model
+# (ib-ox-dummies examples/beewell_model.toml).
+# Each tuple is (column_prefix, number_of_items).
+_BW_QUESTIONNAIRES: list[tuple[str, int]] = [
+    ("bw_migration", 3),
+    ("bw_arrival", 1),
+    ("bw_life_sat", 1),
+    ("bw_wbeing", 7),
+    ("bw_selfest", 5),
+    ("bw_emoreg", 3),
+    ("bw_appear", 1),
+    ("bw_stress", 2),
+    ("bw_coping", 2),
+    ("bw_emodies", 10),
+    ("bw_behav", 6),
+    ("bw_physh", 1),
+    ("bw_sleep", 1),
+    ("bw_physact", 1),
+    ("bw_physdur", 1),
+    ("bw_fruitveg", 1),
+    ("bw_unhealthy", 4),
+    ("bw_freetime", 1),
+    ("bw_socmedia", 1),
+    ("bw_socmtype", 2),
+    ("bw_volunteer", 1),
+    ("bw_activ", 11),
+    ("bw_schoolconn", 1),
+    ("bw_attain", 1),
+    ("bw_staffrel", 4),
+    ("bw_iso", 1),
+    ("bw_isodays", 1),
+    ("bw_isodur", 1),
+    ("bw_schpress", 1),
+    ("bw_homeenv", 1),
+    ("bw_safety", 1),
+    ("bw_localenv", 4),
+    ("bw_beinheard", 1),
+    ("bw_foodsec", 1),
+    ("bw_material", 1),
+    ("bw_future", 7),
+    ("bw_careersed", 1),
+    ("bw_careershlp", 1),
+    ("bw_plans", 8),
+    ("bw_gmacs", 2),
+    ("bw_parentsrel", 4),
+    ("bw_friends", 4),
+    ("bw_lonely", 1),
+    ("bw_discrim", 5),
+    ("bw_discloc", 7),
+    ("bw_bullying", 3),
+    ("bw_support", 1),
+    ("bw_mhcontact", 6),
+    ("bw_kooth", 1),
+]
+
 # Columns allowed in value_columns for means (numeric)
 NUMERIC_WHITELIST: set[str] = {
-    "phq9_1",
-    "phq9_2",
-    "phq9_3",
-    "phq9_4",
-    "phq9_5",
-    "phq9_6",
-    "phq9_7",
-    "phq9_8",
-    "phq9_9",
-    "d_age",
-}
+    f"{prefix}_{i}"
+    for prefix, n_items in _BW_QUESTIONNAIRES
+    for i in range(1, n_items + 1)
+} | {"d_age"}
 
 
 def _df_to_csv(df: pd.DataFrame) -> str:

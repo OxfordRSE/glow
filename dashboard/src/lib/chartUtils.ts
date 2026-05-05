@@ -1,9 +1,17 @@
-import type { FrequencyResult, MeansResult, WaveChangeResult } from './api';
-import { parseCSV } from './csvUtils';
+import type { FrequencyResult, MeansResult, WaveChangeResult } from "./api";
+import { parseCSV } from "./csvUtils";
 
 const PALETTE = [
-  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
-  '#06B6D4', '#F97316', '#84CC16', '#EC4899', '#6366F1'
+  "#3B82F6",
+  "#10B981",
+  "#F59E0B",
+  "#EF4444",
+  "#8B5CF6",
+  "#06B6D4",
+  "#F97316",
+  "#84CC16",
+  "#EC4899",
+  "#6366F1",
 ];
 
 export interface ChartDataset {
@@ -26,20 +34,20 @@ export interface ChartOutput {
   options: Record<string, unknown>;
 }
 
-function baseOptions(yLabel = 'Count'): Record<string, unknown> {
+function baseOptions(yLabel = "Count"): Record<string, unknown> {
   return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { position: 'top' as const },
-      tooltip: { mode: 'index' as const, intersect: false }
+      legend: { position: "top" as const },
+      tooltip: { mode: "index" as const, intersect: false },
     },
     scales: {
       y: {
         beginAtZero: true,
-        title: { display: true, text: yLabel }
-      }
-    }
+        title: { display: true, text: yLabel },
+      },
+    },
   };
 }
 
@@ -50,7 +58,7 @@ function baseOptions(yLabel = 'Count'): Record<string, unknown> {
  */
 export function frequencyToChartData(
   result: FrequencyResult,
-  groupBy: string[]
+  groupBy: string[],
 ): ChartOutput {
   const { headers, rows } = parseCSV(result.csv);
   if (headers.length === 0 || rows.length === 0) {
@@ -61,25 +69,25 @@ export function frequencyToChartData(
   if (groupBy.length <= 1) {
     const labelCol = headers[0];
     const valueCol = headers[headers.length - 1];
-    const labels = rows.map((r) => String(r[0] ?? ''));
+    const labels = rows.map((r) => String(r[0] ?? ""));
     const data = rows.map((r) => {
       const v = r[headers.indexOf(valueCol)];
-      return v === '' || v === undefined ? null : Number(v);
+      return v === "" || v === undefined ? null : Number(v);
     });
     return {
       data: {
         labels,
         datasets: [
           {
-            label: valueCol === 'n' ? 'Count' : valueCol,
+            label: valueCol === "n" ? "Count" : valueCol,
             data,
-            backgroundColor: PALETTE[0] + 'CC',
+            backgroundColor: PALETTE[0] + "CC",
             borderColor: PALETTE[0],
-            borderWidth: 1
-          }
-        ]
+            borderWidth: 1,
+          },
+        ],
       },
-      options: baseOptions()
+      options: baseOptions(),
     };
   }
 
@@ -89,8 +97,10 @@ export function frequencyToChartData(
   const secondIdx = headers.indexOf(secondCol);
 
   // All unique values for x-axis (first col) and series (second col)
-  const xLabels = [...new Set(rows.map((r) => String(r[firstIdx] ?? '')))];
-  const seriesLabels = [...new Set(rows.map((r) => String(r[secondIdx] ?? '')))];
+  const xLabels = [...new Set(rows.map((r) => String(r[firstIdx] ?? "")))];
+  const seriesLabels = [
+    ...new Set(rows.map((r) => String(r[secondIdx] ?? ""))),
+  ];
 
   // Value column = last column not in groupBy
   const valColIdx = headers.length - 1;
@@ -98,24 +108,25 @@ export function frequencyToChartData(
   const datasets: ChartDataset[] = seriesLabels.map((series, si) => {
     const data = xLabels.map((xLabel) => {
       const row = rows.find(
-        (r) => String(r[firstIdx]) === xLabel && String(r[secondIdx]) === series
+        (r) =>
+          String(r[firstIdx]) === xLabel && String(r[secondIdx]) === series,
       );
       if (!row) return null;
       const v = row[valColIdx];
-      return v === '' || v === undefined ? null : Number(v);
+      return v === "" || v === undefined ? null : Number(v);
     });
     return {
       label: series,
       data,
-      backgroundColor: PALETTE[si % PALETTE.length] + 'CC',
+      backgroundColor: PALETTE[si % PALETTE.length] + "CC",
       borderColor: PALETTE[si % PALETTE.length],
-      borderWidth: 1
+      borderWidth: 1,
     };
   });
 
   return {
     data: { labels: xLabels, datasets },
-    options: baseOptions()
+    options: baseOptions(),
   };
 }
 
@@ -126,7 +137,7 @@ export function frequencyToChartData(
 export function frequencyToLineData(
   result: FrequencyResult,
   groupBy: string[],
-  xCol: string
+  xCol: string,
 ): ChartOutput {
   const base = frequencyToChartData(result, groupBy);
   // Convert datasets to line style
@@ -136,14 +147,14 @@ export function frequencyToLineData(
     fill: false,
     backgroundColor: PALETTE[i % PALETTE.length],
     borderColor: PALETTE[i % PALETTE.length],
-    borderWidth: 2
+    borderWidth: 2,
   }));
   const options = {
     ...base.options,
     scales: {
       ...(base.options.scales as Record<string, unknown>),
-      x: { title: { display: true, text: xCol } }
-    }
+      x: { title: { display: true, text: xCol } },
+    },
   };
   return { data: { ...base.data, datasets }, options };
 }
@@ -151,36 +162,39 @@ export function frequencyToLineData(
 /**
  * Convert a MeansResult to a bar-chart dataset.
  */
-export function meansToChartData(result: MeansResult, groupBy: string[]): ChartOutput {
+export function meansToChartData(
+  result: MeansResult,
+  groupBy: string[],
+): ChartOutput {
   const { headers, rows } = parseCSV(result.csv);
   if (headers.length === 0 || rows.length === 0) {
-    return { data: { labels: [], datasets: [] }, options: baseOptions('Mean') };
+    return { data: { labels: [], datasets: [] }, options: baseOptions("Mean") };
   }
 
   // First column(s) are group-by, rest are value columns
   const groupCount = groupBy.length;
   const valueHeaders = headers.slice(groupCount);
   const labels = rows.map((r) =>
-    groupBy.map((_, gi) => String(r[gi] ?? '')).join(' / ')
+    groupBy.map((_, gi) => String(r[gi] ?? "")).join(" / "),
   );
 
   const datasets: ChartDataset[] = valueHeaders.map((vh, vi) => {
     const data = rows.map((r) => {
       const v = r[groupCount + vi];
-      return v === '' || v === undefined ? null : Number(v);
+      return v === "" || v === undefined ? null : Number(v);
     });
     return {
       label: vh,
       data,
-      backgroundColor: PALETTE[vi % PALETTE.length] + 'CC',
+      backgroundColor: PALETTE[vi % PALETTE.length] + "CC",
       borderColor: PALETTE[vi % PALETTE.length],
-      borderWidth: 1
+      borderWidth: 1,
     };
   });
 
   return {
     data: { labels, datasets },
-    options: baseOptions('Mean')
+    options: baseOptions("Mean"),
   };
 }
 
@@ -189,7 +203,7 @@ export function meansToChartData(result: MeansResult, groupBy: string[]): ChartO
  */
 export function waveChangeToChartData(
   result: WaveChangeResult,
-  groupBy: string[]
+  groupBy: string[],
 ): ChartOutput {
   return meansToChartData(result as MeansResult, groupBy);
 }
