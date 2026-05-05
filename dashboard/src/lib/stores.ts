@@ -1,5 +1,5 @@
-import { writable, derived } from 'svelte/store';
-import type { User } from './api';
+import { writable, derived } from "svelte/store";
+import type { User } from "./api";
 
 interface AuthState {
   token: string | null;
@@ -7,8 +7,11 @@ interface AuthState {
 }
 
 function createAuthStore() {
-  const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('auth') : null;
-  const initial: AuthState = stored ? (JSON.parse(stored) as AuthState) : { token: null, user: null };
+  const stored =
+    typeof localStorage !== "undefined" ? localStorage.getItem("auth") : null;
+  const initial: AuthState = stored
+    ? (JSON.parse(stored) as AuthState)
+    : { token: null, user: null };
 
   const { subscribe, set, update } = writable<AuthState>(initial);
 
@@ -17,18 +20,21 @@ function createAuthStore() {
     login(token: string, user: User) {
       const state = { token, user };
       set(state);
-      localStorage.setItem('auth', JSON.stringify(state));
+      localStorage.setItem("auth", JSON.stringify(state));
     },
     logout() {
       set({ token: null, user: null });
-      localStorage.removeItem('auth');
+      localStorage.removeItem("auth");
     },
-    update
+    update,
   };
 }
 
 export const authStore = createAuthStore();
 
-export const isAdmin = derived(authStore, ($auth) => $auth.user?.is_admin ?? false);
+export const isAdmin = derived(
+  authStore,
+  ($auth) => $auth.user?.is_admin ?? false,
+);
 
 export const columnsStore = writable<string[]>([]);
