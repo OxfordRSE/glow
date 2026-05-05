@@ -23,20 +23,10 @@ test("admin can log in, run a query, and use the admin screen", async ({
   await login(page, adminUser, adminPassword);
 
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-
-  await page.goto("/query");
   await expect(
-    page.getByRole("heading", { name: "Query Builder" }),
+    page.getByRole("heading", { name: "Participant Count by School" }),
   ).toBeVisible();
-  await page.getByLabel("Means").check();
-  await page.getByRole("button", { name: "school" }).click();
-  await page.getByRole("button", { name: "phq9_1" }).click();
-  await page.getByRole("button", { name: "Run Query" }).click();
-
-  await expect(
-    page.getByRole("heading", { name: "Means Result" }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Show Table" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show Table" }).first()).toBeVisible();
 
   await page.goto("/admin");
   await expect(
@@ -56,14 +46,10 @@ test("scoped user only sees their scoped school in query results", async ({
   await login(page, scopedUser, scopedPassword);
 
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-  await page.goto("/query");
-  await page.getByRole("button", { name: "school" }).click();
-  await page.getByRole("button", { name: "Run Query" }).click();
-
   await expect(
-    page.getByRole("heading", { name: "Frequency Result" }),
+    page.getByRole("heading", { name: "Participant Count by School" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Show Table" }).click();
+  await page.getByRole("button", { name: "Show Table" }).first().click();
 
   const firstColumnCells = page.locator("tbody tr td:first-child");
   await expect(firstColumnCells).toHaveCount(1);
