@@ -43,41 +43,76 @@ export interface QueryFilter {
   value: string | number | (string | number)[];
 }
 
-export interface FrequencyQuery {
-  group_by: string[];
-  filters: QueryFilter[];
-  value_column?: string;
+export interface QueryResult {
+  csv: string;
+  count_csv: string;
+  suppressions: Record<string, Record<number, string>>;
+  provenance: string[];
 }
 
-export interface MeansQuery {
-  group_by: string[];
-  value_columns: string[];
-  filters: QueryFilter[];
+export interface QueryCatalog {
+  dimensions: string[];
+  measures: string[];
+  scores: string[];
+  waves: string[];
+  value_suggestions: Record<string, string[]>;
+  step_types: string[];
 }
 
-export interface WaveChangeQuery {
+export type QueryMetricKind = "count_students" | "mean";
+
+export interface QueryMetric {
+  kind: QueryMetricKind;
+  column?: string;
+  as_column?: string;
+}
+
+export interface QueryFilterStep {
+  type: "filter";
+  column: string;
+  op: QueryFilter["op"];
+  value: QueryFilter["value"];
+}
+
+export interface QueryDeriveScoreStep {
+  type: "derive_score";
+  score: "phq9_total";
+}
+
+export interface QueryPairWavesStep {
+  type: "pair_waves";
   from_wave: string;
   to_wave: string;
-  value_columns: string[];
-  group_by?: string[];
-  filters?: QueryFilter[];
+  measures: string[];
 }
 
-export interface FrequencyResult {
-  csv: string;
-  suppressions: Record<string, Record<number, string>>;
+export interface QueryBucketBand {
+  label: string;
+  min_students: number;
+  max_students?: number;
 }
 
-export interface MeansResult {
-  csv: string;
-  count_csv: string;
-  suppressions: Record<string, Record<number, string>>;
+export interface QueryBucketSchoolSizeStep {
+  type: "bucket_school_size";
+  output_column: string;
+  bands: QueryBucketBand[];
 }
 
-export interface WaveChangeResult {
-  csv: string;
-  count_csv: string;
-  suppressions: Record<string, Record<number, string>>;
+export interface QueryAggregateStep {
+  type: "aggregate";
+  group_by: string[];
+  metrics: QueryMetric[];
+}
+
+export type QueryStep =
+  | QueryFilterStep
+  | QueryDeriveScoreStep
+  | QueryPairWavesStep
+  | QueryBucketSchoolSizeStep
+  | QueryAggregateStep;
+
+export interface QueryPlan {
+  steps: QueryStep[];
 }
 
 export interface UserScope {
@@ -138,36 +173,20 @@ export async function getColumns(token: string): Promise<string[]> {
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
-export async function queryFrequency(
-  token: string,
-  query: FrequencyQuery,
-): Promise<FrequencyResult> {
-  return apiFetch<FrequencyResult>("/query/frequency", {
-    method: "POST",
-    headers: { ...authHeaders(token), "Content-Type": "application/json" },
-    body: JSON.stringify(query),
+export async function getQueryCatalog(token: string): Promise<QueryCatalog> {
+  return apiFetch<QueryCatalog>("/query/catalog", {
+    headers: authHeaders(token),
   });
 }
 
-export async function queryMeans(
+export async function query(
   token: string,
-  query: MeansQuery,
-): Promise<MeansResult> {
-  return apiFetch<MeansResult>("/query/means", {
+  plan: QueryPlan,
+): Promise<QueryResult> {
+  return apiFetch<QueryResult>("/query", {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
-    body: JSON.stringify(query),
-  });
-}
-
-export async function queryWaveChange(
-  token: string,
-  query: WaveChangeQuery,
-): Promise<WaveChangeResult> {
-  return apiFetch<WaveChangeResult>("/query/wave-change", {
-    method: "POST",
-    headers: { ...authHeaders(token), "Content-Type": "application/json" },
-    body: JSON.stringify(query),
+    body: JSON.stringify(plan),
   });
 }
 

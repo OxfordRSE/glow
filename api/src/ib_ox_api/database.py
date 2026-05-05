@@ -57,6 +57,8 @@ def run_migrations() -> None:
     """Apply all pending Alembic migrations (used at application startup)."""
     ini_path = _alembic_ini_path()
     cfg = Config(str(ini_path))
+    cfg.set_main_option("script_location", str(ini_path.parent / "alembic"))
+    cfg.set_main_option("prepend_sys_path", str(ini_path.parent / "src"))
     # Override the URL from settings so env vars are respected
     cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
     command.upgrade(cfg, "head")

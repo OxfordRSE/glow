@@ -1,4 +1,4 @@
-import type { FrequencyResult, MeansResult, WaveChangeResult } from "./api";
+import type { QueryResult } from "./api";
 import { parseCSV } from "./csvUtils";
 
 const PALETTE = [
@@ -57,7 +57,7 @@ function baseOptions(yLabel = "Count"): Record<string, unknown> {
  * If groupBy has two columns: grouped bar chart (first col = x-axis, second = series).
  */
 export function frequencyToChartData(
-  result: FrequencyResult,
+  result: { csv: string },
   groupBy: string[],
 ): ChartOutput {
   const { headers, rows } = parseCSV(result.csv);
@@ -79,7 +79,8 @@ export function frequencyToChartData(
         labels,
         datasets: [
           {
-            label: valueCol === "n" ? "Count" : valueCol,
+            label:
+              valueCol === "n" || valueCol === "student_n" ? "Count" : valueCol,
             data,
             backgroundColor: PALETTE[0] + "CC",
             borderColor: PALETTE[0],
@@ -135,7 +136,7 @@ export function frequencyToChartData(
  * xCol = the column to use as the x-axis (e.g. "wave").
  */
 export function frequencyToLineData(
-  result: FrequencyResult,
+  result: { csv: string },
   groupBy: string[],
   xCol: string,
 ): ChartOutput {
@@ -160,10 +161,10 @@ export function frequencyToLineData(
 }
 
 /**
- * Convert a MeansResult to a bar-chart dataset.
+ * Convert a means-like result to a bar-chart dataset.
  */
 export function meansToChartData(
-  result: MeansResult,
+  result: { csv: string },
   groupBy: string[],
 ): ChartOutput {
   const { headers, rows } = parseCSV(result.csv);
@@ -198,12 +199,9 @@ export function meansToChartData(
   };
 }
 
-/**
- * Alias: WaveChangeResult has the same shape as MeansResult for charting.
- */
-export function waveChangeToChartData(
-  result: WaveChangeResult,
+export function queryToChartData(
+  result: QueryResult,
   groupBy: string[],
 ): ChartOutput {
-  return meansToChartData(result as MeansResult, groupBy);
+  return meansToChartData(result, groupBy);
 }

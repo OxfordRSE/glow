@@ -14,6 +14,8 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+    command: uvicorn ib_ox_api.main:app --host 0.0.0.0 --port 8000 --reload
+    working_dir: /app
     environment:
       - IB_OX_DATA_PATH=/data/data.csv
       - IB_OX_MIN_N=5
@@ -25,6 +27,7 @@ services:
       # on the host. Contents are gitignored (see data/.gitignore); only the
       # empty placeholder data/.gitkeep is committed.
       - ./data:/data
+      - ./api:/app
     restart: unless-stopped
     healthcheck:
       test:
@@ -43,8 +46,18 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
+      target: dev
+    command: npm run dev -- --host 0.0.0.0 --port 3000
+    working_dir: /app
+    volumes:
+      - ./dashboard:/app
+      - dashboard_node_modules:/app/node_modules
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
     restart: unless-stopped
     depends_on:
       - api
+
+volumes:
+  dashboard_node_modules:

@@ -1,4 +1,6 @@
 import json
+import logging
+import logging.config
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -21,29 +23,50 @@ from ib_ox_api.database import (
     update_user,
 )
 from ib_ox_api.models import (
-    FrequencyQuery,
-    FrequencyResult,
-    MeansQuery,
-    MeansResult,
+    QueryCatalog,
+    QueryPlan,
+    QueryResult,
     Token,
     UserCreate,
     UserRead,
     UserScope,
     UserUpdate,
-    WaveChangeQuery,
-    WaveChangeResult,
 )
-from ib_ox_api.query import (
-    apply_user_scope,
-    execute_frequency_query,
-    execute_means_query,
-    execute_wave_change_query,
-    validate_frequency_query,
-    validate_means_query,
-    validate_wave_change_query,
-)
+from ib_ox_api.query import apply_user_scope
+from ib_ox_api.query_v2 import build_query_catalog, execute_query
 from ib_ox_api.suppression import count_students
 from ib_ox_api.settings import settings
+
+
+def configure_logging() -> None:
+    logging.config.dictConfig(
+        {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "default": {
+                    "format": "%(asctime)s %(levelname)s [%(name)s] %(message)s",
+                }
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "default",
+                    "stream": "ext://sys.stdout",
+                }
+            },
+            "loggers": {
+                "ib_ox_api": {
+                    "handlers": ["console"],
+                    "level": "INFO",
+                    "propagate": False,
+                }
+            },
+        }
+    )
+
+
+configure_logging()
 
 
 @asynccontextmanager
@@ -98,56 +121,25 @@ def get_columns(current_user: UserRead = Depends(get_current_user)) -> list[str]
     return list(df.columns)
 
 
-@app.post("/query/frequency", response_model=FrequencyResult, tags=["query"])
-def frequency_query(
-    query: FrequencyQuery,
+@app.get("/query/catalog", response_model=QueryCatalog, tags=["query"])
+def query_catalog(
     current_user: UserRead = Depends(get_current_user),
-) -> FrequencyResult:
+) -> QueryCatalog:
     df = datastore.get_dataframe()
-    df_cols = set(df.columns)
+    scoped = apply_user_scope(df, current_user.scope)
+    return build_query_catalog(scoped)
+
+
+@app.post("/query", response_model=QueryResult, tags=["query"])
+def query(
+    plan: QueryPlan,
+    current_user: UserRead = Depends(get_current_user),
+) -> QueryResult:
+    df = datastore.get_dataframe()
     try:
-        validate_frequency_query(query, df_cols)
+        return execute_query(df, plan, current_user.scope, settings.MIN_N)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-
-    return execute_frequency_query(df, query, current_user.scope, settings.MIN_N)
-
-
-@app.post("/query/means", response_model=MeansResult, tags=["query"])
-def means_query(
-    query: MeansQuery,
-    current_user: UserRead = Depends(get_current_user),
-) -> MeansResult:
-    df = datastore.get_dataframe()
-    df_cols = set(df.columns)
-    try:
-        validate_means_query(query, df_cols)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-
-    return execute_means_query(df, query, current_user.scope, settings.MIN_N)
-
-
-@app.post("/query/wave-change", response_model=WaveChangeResult, tags=["query"])
-def wave_change_query(
-    query: WaveChangeQuery,
-    current_user: UserRead = Depends(get_current_user),
-) -> WaveChangeResult:
-    """Compute within-person change between two waves.
-
-    For each student with data in both `from_wave` and `to_wave`, computes the
-    difference `(value at to_wave) - (value at from_wave)` for each value column.
-    The per-student differences are then optionally grouped and averaged.
-    Suppression is applied when fewer than `min_n` students contribute to a cell.
-    """
-    df = datastore.get_dataframe()
-    df_cols = set(df.columns)
-    try:
-        validate_wave_change_query(query, df_cols)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-
-    return execute_wave_change_query(df, query, current_user.scope, settings.MIN_N)
 
 
 def _scope_to_json(scope: UserScope) -> str:

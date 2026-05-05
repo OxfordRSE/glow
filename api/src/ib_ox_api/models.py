@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SuppressionCode(str, Enum):
@@ -30,6 +30,15 @@ class WaveChangeResult(BaseModel):
     csv: str
     count_csv: str
     suppressions: dict[str, dict[int, SuppressionCode]]
+
+
+class QueryResult(BaseModel):
+    """Result of a query plan execution."""
+
+    csv: str
+    count_csv: str
+    suppressions: dict[str, dict[int, SuppressionCode]]
+    provenance: list[str] = Field(default_factory=list)
 
 
 class Token(BaseModel):
@@ -135,3 +144,96 @@ class WaveChangeQuery(BaseModel):
     value_columns: list[str]
     group_by: list[str] = Field(default_factory=list)
     filters: list[Filter] = Field(default_factory=list)
+
+
+class QueryMetricKind(str, Enum):
+    COUNT_STUDENTS = "count_students"
+    MEAN = "mean"
+
+
+class QueryMetric(BaseModel):
+    kind: QueryMetricKind
+    column: Optional[str] = None
+    as_column: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_metric(self) -> "QueryMetric":
+        if self.kind == QueryMetricKind.COUNT_STUDENTS and self.column is not None:
+            raise ValueError("count_students metrics must not specify a column.")
+        if self.kind == QueryMetricKind.MEAN and not self.column:
+            raise ValueError("mean metrics must specify a column.")
+        return self
+
+
+class QueryFilterStep(BaseModel):
+    type: Literal["filter"]
+    column: str
+    op: FilterOp
+    value: str | int | float | list[str | int | float]
+
+
+class QueryDeriveScoreStep(BaseModel):
+    type: Literal["derive_score"]
+    score: Literal["phq9_total"]
+
+
+class QueryPairWavesStep(BaseModel):
+    type: Literal["pair_waves"]
+    from_wave: str
+    to_wave: str
+    measures: list[str]
+
+
+class QueryBucketBand(BaseModel):
+    label: str
+    min_students: int = Field(ge=0)
+    max_students: Optional[int] = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_band(self) -> "QueryBucketBand":
+        if self.max_students is not None and self.max_students < self.min_students:
+            raise ValueError("max_students must be greater than or equal to min_students.")
+        return self
+
+
+class QueryBucketSchoolSizeStep(BaseModel):
+    type: Literal["bucket_school_size"]
+    output_column: str = "school_size_bucket"
+    bands: list[QueryBucketBand]
+
+
+class QueryAggregateStep(BaseModel):
+    type: Literal["aggregate"]
+    group_by: list[str] = Field(default_factory=list)
+    metrics: list[QueryMetric]
+
+
+QueryStep = Annotated[
+    QueryFilterStep
+    | QueryDeriveScoreStep
+    | QueryPairWavesStep
+    | QueryBucketSchoolSizeStep
+    | QueryAggregateStep,
+    Field(discriminator="type"),
+]
+
+
+class QueryPlan(BaseModel):
+    steps: list[QueryStep]
+
+    @model_validator(mode="after")
+    def validate_plan(self) -> "QueryPlan":
+        if not self.steps:
+            raise ValueError("Query plans must contain at least one step.")
+        if self.steps[-1].type != "aggregate":
+            raise ValueError("Query plans must end with an aggregate step.")
+        return self
+
+
+class QueryCatalog(BaseModel):
+    dimensions: list[str]
+    measures: list[str]
+    scores: list[str]
+    waves: list[str]
+    value_suggestions: dict[str, list[str]]
+    step_types: list[str]

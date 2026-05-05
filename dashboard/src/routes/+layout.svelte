@@ -70,6 +70,12 @@
               >
                 Home
               </a>
+              <a
+                href="/query"
+                class="px-3 py-2 rounded-md text-sm font-medium transition-colors {$page.url.pathname.startsWith('/query') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}"
+              >
+                Query
+              </a>
               {#if $isAdmin}
                 <a
                   href="/admin"
@@ -132,6 +138,7 @@
       {#if mobileMenuOpen}
         <div class="md:hidden border-t border-gray-200 px-4 py-3 space-y-1">
           <a href="/" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100" onclick={() => (mobileMenuOpen = false)}>Home</a>
+          <a href="/query" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100" onclick={() => (mobileMenuOpen = false)}>Query</a>
           {#if $isAdmin}
             <a href="/admin" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100" onclick={() => (mobileMenuOpen = false)}>Admin</a>
           {/if}
@@ -152,4 +159,3 @@
     </main>
   </div>
 {/if}
-

@@ -15,6 +15,8 @@ In development, both are served through an nginx proxy:
 
 ## Quick Start (Docker Compose)
 
+`docker-compose.yml` is configured for local development: the API runs with reload enabled, the dashboard runs the Vite dev server, and both services bind-mount the local workspace so edits are reflected without rebuilding the images.
+
 ```bash
 # Set a strong JWT secret
 export IB_OX_SECRET_KEY="your-strong-secret-here"
@@ -22,7 +24,7 @@ export IB_OX_SECRET_KEY="your-strong-secret-here"
 # Place your data file (CSV or Parquet) in a Docker volume or bind-mount
 # The API defaults to /data/data.csv inside the container
 
-# Start everything
+# Start the local development stack
 docker compose up --build
 
 # Create the first admin user (in a separate terminal)
@@ -53,8 +55,8 @@ The dashboard will be available at <http://localhost:5173>.
 | `GET` | `/health` | — | Health check |
 | `POST` | `/auth/login` | — | Login (returns JWT) |
 | `GET` | `/data/columns` | User | List available column names |
-| `POST` | `/query/frequency` | User | Frequency table query |
-| `POST` | `/query/means` | User | Means table query |
+| `GET` | `/query/catalog` | User | Query Builder catalog for safe steps and autocomplete |
+| `POST` | `/query` | User | Query Builder plan execution |
 | `GET` | `/admin/users` | Admin | List users |
 | `POST` | `/admin/users` | Admin | Create user |
 | `PUT` | `/admin/users/{id}` | Admin | Update user |
@@ -87,14 +89,36 @@ ib-ox-api users delete alice
 
 ### Suppression
 
-N is counted as **distinct students (uid)**, not rows. Any frequency or means cell where the contributing student count is less than `IB_OX_MIN_N` is suppressed (set to empty in the CSV output) and recorded in the `suppressions` field of the response.
+N is counted as **distinct students (uid)**, not rows. Any materialized result cell where the contributing student count is less than `IB_OX_MIN_N` is suppressed (set to empty in the CSV output) and recorded in the `suppressions` field of the response.
 
 ### Whitelisted columns
 
 Query columns are restricted to a whitelist to prevent data leakage:
 
-- **`group_by` / `value_column` (frequency)**: `school`, `yearGroup`, `class`, `sex`, `ethnicity`, `wave`, `d_city`, `d_country`
-- **`value_columns` (means)**: all #BeeWell GM Survey item columns (`bw_wbeing_1`–`bw_wbeing_7`, `bw_emodies_1`–`bw_emodies_10`, etc. — see [beewell_model.toml](https://github.com/OxfordRSE/ib-ox-dummies/blob/main/examples/beewell_model.toml) for the full list), `d_age`
+- **Dimensions**: `school`, `yearGroup`, `class`, `sex`, `ethnicity`, `wave`, `d_city`, `d_country`
+- **Measures**: `phq9_1`–`phq9_9`, `d_age`
+- **Derived scores**: currently `phq9_total`
+
+### Query Builder
+
+The query system exposes a safe plan DSL for analytical work over the scoped student-wave table.
+
+Supported plan steps:
+
+- `filter`
+- `derive_score`
+- `pair_waves`
+- `bucket_school_size`
+- `aggregate`
+
+Safety properties:
+
+- `uid` is kept internally for suppression counts but is never a legal public grouping field
+- unsupported columns fail even when they appear late in an otherwise valid plan
+- aggregation is terminal
+- every output metric carries an exact distinct-student count and is suppressed when `N < IB_OX_MIN_N`
+
+Developer documentation and examples live in [docs/query-builder.md](docs/query-builder.md).
 
 ## Dashboard
 
@@ -102,7 +126,7 @@ The SvelteKit dashboard provides:
 
 - **Login** — JWT-based authentication
 - **Home** — pre-built overview charts
-- **Query Builder** — custom frequency and means queries
+- **Query Builder** — a step-based analytical query builder with built-in suppression
 - **Admin** — user CRUD (admin users only)
 
 ## Development

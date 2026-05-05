@@ -1,0 +1,336 @@
+# Query Builder
+
+This document is generated from the executable query examples in `api/src/ib_ox_api/query_examples.py`.
+
+All results below were generated against the shared test fixture dataset with `min_n = 5`.
+
+The query interface is a suppression-aware plan DSL with these steps:
+
+1. `filter`
+2. `derive_score`
+3. `pair_waves`
+4. `bucket_school_size`
+5. `aggregate`
+
+Every plan finishes with `aggregate`, which is the only point where values are materialized.
+
+## Count students by school
+
+Question: How many distinct students are in scope for each school?
+
+Plan:
+
+```json
+{
+  "steps": [
+    {
+      "type": "aggregate",
+      "group_by": [
+        "school"
+      ],
+      "metrics": [
+        {
+          "kind": "count_students"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Values:
+
+| school | student_n |
+| ------ | --------- |
+| Alpha  | 5.0       |
+| Beta   | 5.0       |
+
+Contributing distinct-student counts:
+
+| school | student_n |
+| ------ | --------- |
+| Alpha  | 5.0       |
+| Beta   | 5.0       |
+
+Suppressions: `{}`
+
+Suppression checkpoints:
+- Before step execution, user scope filters are applied and `uid` is retained internally so distinct-student counts can be computed later without making identifiers public.
+- Step 1 `aggregate`: computes the exact distinct-student `N` for every metric cell and blanks cells where `N < 5`.
+
+Execution provenance:
+- Aggregated metrics with suppression based on contributing distinct-student N.
+
+## Mean derived PHQ score by school
+
+Question: What is the mean derived `phq9_total` for each school?
+
+Plan:
+
+```json
+{
+  "steps": [
+    {
+      "type": "derive_score",
+      "score": "phq9_total"
+    },
+    {
+      "type": "aggregate",
+      "group_by": [
+        "school"
+      ],
+      "metrics": [
+        {
+          "kind": "mean",
+          "column": "phq9_total"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Values:
+
+| school | phq9_total |
+| ------ | ---------- |
+| Alpha  | 4.9        |
+| Beta   | 4.0        |
+
+Contributing distinct-student counts:
+
+| school | phq9_total |
+| ------ | ---------- |
+| Alpha  | 5.0        |
+| Beta   | 5.0        |
+
+Suppressions: `{}`
+
+Suppression checkpoints:
+- Before step execution, user scope filters are applied and `uid` is retained internally so distinct-student counts can be computed later without making identifiers public.
+- Step 1 `derive_score`: derives an approved measure on row-level data; suppression still waits for the terminal aggregate.
+- Step 2 `aggregate`: computes the exact distinct-student `N` for every metric cell and blanks cells where `N < 5`.
+
+Execution provenance:
+- Derived phq9_total from available PHQ-9 item columns.
+- Aggregated metrics with suppression based on contributing distinct-student N.
+
+## Mean within-student change after a baseline threshold
+
+Question: Among students whose baseline `phq9_total` is at least 3, what is the mean change from wave 1 to wave 2 by school?
+
+Plan:
+
+```json
+{
+  "steps": [
+    {
+      "type": "derive_score",
+      "score": "phq9_total"
+    },
+    {
+      "type": "pair_waves",
+      "from_wave": "1",
+      "to_wave": "2",
+      "measures": [
+        "phq9_total"
+      ]
+    },
+    {
+      "type": "filter",
+      "column": "baseline_phq9_total",
+      "op": "gte",
+      "value": 3
+    },
+    {
+      "type": "aggregate",
+      "group_by": [
+        "school"
+      ],
+      "metrics": [
+        {
+          "kind": "mean",
+          "column": "change_phq9_total",
+          "as_column": "avg_change"
+        },
+        {
+          "kind": "count_students"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Values:
+
+| school | avg_change | student_n |
+| ------ | ---------- | --------- |
+| Alpha  | -0.2       | 5.0       |
+
+Contributing distinct-student counts:
+
+| school | avg_change | student_n |
+| ------ | ---------- | --------- |
+| Alpha  | 5.0        | 5.0       |
+
+Suppressions: `{}`
+
+Suppression checkpoints:
+- Before step execution, user scope filters are applied and `uid` is retained internally so distinct-student counts can be computed later without making identifiers public.
+- Step 1 `derive_score`: derives an approved measure on row-level data; suppression still waits for the terminal aggregate.
+- Step 2 `pair_waves`: uses hidden `uid` lineage to form matched student pairs and preserves that lineage so the final aggregate can count contributing students exactly.
+- Step 3 `filter`: validates that `baseline_phq9_total` is public at this stage; it narrows the cohort but does not publish a value or apply `min_n` yet.
+- Step 4 `aggregate`: computes the exact distinct-student `N` for every metric cell and blanks cells where `N < 5`.
+
+Execution provenance:
+- Derived phq9_total from available PHQ-9 item columns.
+- Paired waves 1 -> 2 for phq9_total.
+- Filtered baseline_phq9_total gte 3.
+- Aggregated metrics with suppression based on contributing distinct-student N.
+
+## Mean score after school-size bucketing
+
+Question: What is the mean `phq9_total` by year group after bucketing schools by distinct-student participation?
+
+Plan:
+
+```json
+{
+  "steps": [
+    {
+      "type": "derive_score",
+      "score": "phq9_total"
+    },
+    {
+      "type": "bucket_school_size",
+      "output_column": "school_size_bucket",
+      "bands": [
+        {
+          "label": "small",
+          "min_students": 0,
+          "max_students": 4
+        },
+        {
+          "label": "medium",
+          "min_students": 5,
+          "max_students": 9
+        },
+        {
+          "label": "large",
+          "min_students": 10
+        }
+      ]
+    },
+    {
+      "type": "aggregate",
+      "group_by": [
+        "school_size_bucket",
+        "yearGroup"
+      ],
+      "metrics": [
+        {
+          "kind": "mean",
+          "column": "phq9_total"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Values:
+
+| school_size_bucket | yearGroup | phq9_total |
+| ------------------ | --------- | ---------- |
+| medium             | 7         | 4.9        |
+| medium             | 8         | 4.0        |
+
+Contributing distinct-student counts:
+
+| school_size_bucket | yearGroup | phq9_total |
+| ------------------ | --------- | ---------- |
+| medium             | 7         | 5.0        |
+| medium             | 8         | 5.0        |
+
+Suppressions: `{}`
+
+Suppression checkpoints:
+- Before step execution, user scope filters are applied and `uid` is retained internally so distinct-student counts can be computed later without making identifiers public.
+- Step 1 `derive_score`: derives an approved measure on row-level data; suppression still waits for the terminal aggregate.
+- Step 2 `bucket_school_size`: computes distinct-student counts per school to assign bands, but those intermediate counts are not exposed as results and are not themselves suppressed.
+- Step 3 `aggregate`: computes the exact distinct-student `N` for every metric cell and blanks cells where `N < 5`.
+
+Execution provenance:
+- Derived phq9_total from available PHQ-9 item columns.
+- Bucketed schools into school_size_bucket using distinct-student counts.
+- Aggregated metrics with suppression based on contributing distinct-student N.
+
+## Suppressed small longitudinal cohort
+
+Question: How many students had a baseline `phq9_total` above 5 when matched from wave 1 to wave 2, by school?
+
+Plan:
+
+```json
+{
+  "steps": [
+    {
+      "type": "derive_score",
+      "score": "phq9_total"
+    },
+    {
+      "type": "pair_waves",
+      "from_wave": "1",
+      "to_wave": "2",
+      "measures": [
+        "phq9_total"
+      ]
+    },
+    {
+      "type": "filter",
+      "column": "baseline_phq9_total",
+      "op": "gt",
+      "value": 5
+    },
+    {
+      "type": "aggregate",
+      "group_by": [
+        "school"
+      ],
+      "metrics": [
+        {
+          "kind": "count_students"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Values:
+
+| school | student_n |
+| ------ | --------- |
+| Alpha  |           |
+
+Contributing distinct-student counts:
+
+| school | student_n |
+| ------ | --------- |
+| Alpha  |           |
+
+Suppressions: `{"student_n": {"0": "<5"}}`
+
+Suppression checkpoints:
+- Before step execution, user scope filters are applied and `uid` is retained internally so distinct-student counts can be computed later without making identifiers public.
+- Step 1 `derive_score`: derives an approved measure on row-level data; suppression still waits for the terminal aggregate.
+- Step 2 `pair_waves`: uses hidden `uid` lineage to form matched student pairs and preserves that lineage so the final aggregate can count contributing students exactly.
+- Step 3 `filter`: validates that `baseline_phq9_total` is public at this stage; it narrows the cohort but does not publish a value or apply `min_n` yet.
+- Step 4 `aggregate`: computes the exact distinct-student `N` for every metric cell and blanks cells where `N < 5`.
+
+Execution provenance:
+- Derived phq9_total from available PHQ-9 item columns.
+- Paired waves 1 -> 2 for phq9_total.
+- Filtered baseline_phq9_total gt 5.
+- Aggregated metrics with suppression based on contributing distinct-student N.
