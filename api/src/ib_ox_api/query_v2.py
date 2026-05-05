@@ -31,7 +31,7 @@ from ib_ox_api.query import (
 )
 
 SAFE_OUTPUT_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
-DERIVED_SCORE_NAMES = {"phq9_total"}
+DERIVED_SCORE_NAMES = {"bw_wbeing_total"}
 
 
 def build_query_catalog(df: pd.DataFrame) -> QueryCatalog:
@@ -168,33 +168,44 @@ def _apply_filter_step(frame: SuppressionAwareFrame, step: QueryFilterStep) -> S
     return next_frame
 
 
-def _derive_phq9_total(frame: SuppressionAwareFrame) -> SuppressionAwareFrame:
+def _derive_bw_wbeing_total(frame: SuppressionAwareFrame) -> SuppressionAwareFrame:
     _ensure_student_level(frame, "derive_score")
     if frame.row_grain != "student_wave":
-        raise ValueError("phq9_total can only be derived on student-wave data before pair_waves.")
+        raise ValueError(
+            "bw_wbeing_total can only be derived on student-wave data before pair_waves."
+        )
 
-    phq9_columns = [col for col in sorted(frame.df.columns) if re.fullmatch(r"phq9_[1-9]", col)]
-    if not phq9_columns:
-        raise ValueError("Cannot derive phq9_total because no PHQ-9 item columns are present.")
+    bw_wbeing_columns = [
+        col for col in sorted(frame.df.columns) if re.fullmatch(r"bw_wbeing_[1-9]", col)
+    ]
+    if not bw_wbeing_columns:
+        raise ValueError(
+            "Cannot derive bw_wbeing_total because no BeeWell wellbeing item columns are present."
+        )
 
     derived = frame.df.copy()
-    derived["phq9_total"] = derived[phq9_columns].apply(pd.to_numeric, errors="coerce").sum(axis=1)
+    derived["bw_wbeing_total"] = (
+        derived[bw_wbeing_columns].apply(pd.to_numeric, errors="coerce").sum(axis=1)
+    )
     next_frame = SuppressionAwareFrame(
         df=derived,
         row_grain=frame.row_grain,
         public_dimensions=set(frame.public_dimensions),
-        public_measures=set(frame.public_measures) | {"phq9_total"},
+        public_measures=set(frame.public_measures) | {"bw_wbeing_total"},
         provenance=list(frame.provenance),
     )
-    _append_provenance(next_frame, "Derived phq9_total from available PHQ-9 item columns.")
+    _append_provenance(
+        next_frame,
+        "Derived bw_wbeing_total from available BeeWell wellbeing item columns.",
+    )
     return next_frame
 
 
 def _apply_derive_score_step(
     frame: SuppressionAwareFrame, step: QueryDeriveScoreStep
 ) -> SuppressionAwareFrame:
-    if step.score == "phq9_total":
-        return _derive_phq9_total(frame)
+    if step.score == "bw_wbeing_total":
+        return _derive_bw_wbeing_total(frame)
     raise ValueError(f"Unsupported score '{step.score}'.")
 
 

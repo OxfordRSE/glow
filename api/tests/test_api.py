@@ -47,7 +47,7 @@ def test_get_columns(client):
     cols = response.json()
     assert "uid" in cols
     assert "school" in cols
-    assert "phq9_1" in cols
+    assert "bw_wbeing_1" in cols
 
 
 def test_suppression_count_students(sample_df):
@@ -110,19 +110,19 @@ def test_suppression_means_below_min_n(tiny_df):
     from ib_ox_api.suppression import suppress_means_table
 
     means_df, _, suppressions = suppress_means_table(
-        tiny_df, group_cols=["school"], value_cols=["phq9_1"], min_n=5
+        tiny_df, group_cols=["school"], value_cols=["bw_wbeing_1"], min_n=5
     )
-    assert means_df["phq9_1"].isna().all()
-    assert "phq9_1" in suppressions
+    assert means_df["bw_wbeing_1"].isna().all()
+    assert "bw_wbeing_1" in suppressions
 
 
 def test_suppression_means_above_min_n(sample_df):
     from ib_ox_api.suppression import suppress_means_table
 
     means_df, _, suppressions = suppress_means_table(
-        sample_df, group_cols=["school"], value_cols=["phq9_1"], min_n=3
+        sample_df, group_cols=["school"], value_cols=["bw_wbeing_1"], min_n=3
     )
-    assert not means_df["phq9_1"].isna().all()
+    assert not means_df["bw_wbeing_1"].isna().all()
     assert suppressions == {}
 
 

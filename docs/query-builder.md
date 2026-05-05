@@ -61,9 +61,9 @@ Suppression checkpoints:
 Execution provenance:
 - Aggregated metrics with suppression based on contributing distinct-student N.
 
-## Mean derived PHQ score by school
+## Mean derived BeeWell score by school
 
-Question: What is the mean derived `phq9_total` for each school?
+Question: What is the mean derived `bw_wbeing_total` for each school?
 
 Plan:
 
@@ -72,7 +72,7 @@ Plan:
   "steps": [
     {
       "type": "derive_score",
-      "score": "phq9_total"
+      "score": "bw_wbeing_total"
     },
     {
       "type": "aggregate",
@@ -82,7 +82,7 @@ Plan:
       "metrics": [
         {
           "kind": "mean",
-          "column": "phq9_total"
+          "column": "bw_wbeing_total"
         }
       ]
     }
@@ -92,17 +92,17 @@ Plan:
 
 Values:
 
-| school | phq9_total |
-| ------ | ---------- |
-| Alpha  | 4.9        |
-| Beta   | 4.0        |
+| school | bw_wbeing_total |
+| ------ | --------------- |
+| Alpha  | 9.8             |
+| Beta   | 8.8             |
 
 Contributing distinct-student counts:
 
-| school | phq9_total |
-| ------ | ---------- |
-| Alpha  | 5.0        |
-| Beta   | 5.0        |
+| school | bw_wbeing_total |
+| ------ | --------------- |
+| Alpha  | 5.0             |
+| Beta   | 5.0             |
 
 Suppressions: `{}`
 
@@ -112,12 +112,12 @@ Suppression checkpoints:
 - Step 2 `aggregate`: computes the exact distinct-student `N` for every metric cell and blanks cells where `N < 5`.
 
 Execution provenance:
-- Derived phq9_total from available PHQ-9 item columns.
+- Derived bw_wbeing_total from available BeeWell wellbeing item columns.
 - Aggregated metrics with suppression based on contributing distinct-student N.
 
 ## Mean within-student change after a baseline threshold
 
-Question: Among students whose baseline `phq9_total` is at least 3, what is the mean change from wave 1 to wave 2 by school?
+Question: Among students whose baseline `bw_wbeing_total` is at least 3, what is the mean change from wave 1 to wave 2 by school?
 
 Plan:
 
@@ -126,19 +126,19 @@ Plan:
   "steps": [
     {
       "type": "derive_score",
-      "score": "phq9_total"
+      "score": "bw_wbeing_total"
     },
     {
       "type": "pair_waves",
       "from_wave": "1",
       "to_wave": "2",
       "measures": [
-        "phq9_total"
+        "bw_wbeing_total"
       ]
     },
     {
       "type": "filter",
-      "column": "baseline_phq9_total",
+      "column": "baseline_bw_wbeing_total",
       "op": "gte",
       "value": 3
     },
@@ -150,7 +150,7 @@ Plan:
       "metrics": [
         {
           "kind": "mean",
-          "column": "change_phq9_total",
+          "column": "change_bw_wbeing_total",
           "as_column": "avg_change"
         },
         {
@@ -166,7 +166,7 @@ Values:
 
 | school | avg_change | student_n |
 | ------ | ---------- | --------- |
-| Alpha  | -0.2       | 5.0       |
+| Alpha  | 0.8        | 5.0       |
 
 Contributing distinct-student counts:
 
@@ -180,18 +180,18 @@ Suppression checkpoints:
 - Before step execution, user scope filters are applied and `uid` is retained internally so distinct-student counts can be computed later without making identifiers public.
 - Step 1 `derive_score`: derives an approved measure on row-level data; suppression still waits for the terminal aggregate.
 - Step 2 `pair_waves`: uses hidden `uid` lineage to form matched student pairs and preserves that lineage so the final aggregate can count contributing students exactly.
-- Step 3 `filter`: validates that `baseline_phq9_total` is public at this stage; it narrows the cohort but does not publish a value or apply `min_n` yet.
+- Step 3 `filter`: validates that `baseline_bw_wbeing_total` is public at this stage; it narrows the cohort but does not publish a value or apply `min_n` yet.
 - Step 4 `aggregate`: computes the exact distinct-student `N` for every metric cell and blanks cells where `N < 5`.
 
 Execution provenance:
-- Derived phq9_total from available PHQ-9 item columns.
-- Paired waves 1 -> 2 for phq9_total.
-- Filtered baseline_phq9_total gte 3.
+- Derived bw_wbeing_total from available BeeWell wellbeing item columns.
+- Paired waves 1 -> 2 for bw_wbeing_total.
+- Filtered baseline_bw_wbeing_total gte 3.
 - Aggregated metrics with suppression based on contributing distinct-student N.
 
 ## Mean score after school-size bucketing
 
-Question: What is the mean `phq9_total` by year group after bucketing schools by distinct-student participation?
+Question: What is the mean `bw_wbeing_total` by year group after bucketing schools by distinct-student participation?
 
 Plan:
 
@@ -200,7 +200,7 @@ Plan:
   "steps": [
     {
       "type": "derive_score",
-      "score": "phq9_total"
+      "score": "bw_wbeing_total"
     },
     {
       "type": "bucket_school_size",
@@ -231,7 +231,7 @@ Plan:
       "metrics": [
         {
           "kind": "mean",
-          "column": "phq9_total"
+          "column": "bw_wbeing_total"
         }
       ]
     }
@@ -241,17 +241,17 @@ Plan:
 
 Values:
 
-| school_size_bucket | yearGroup | phq9_total |
-| ------------------ | --------- | ---------- |
-| medium             | 7         | 4.9        |
-| medium             | 8         | 4.0        |
+| school_size_bucket | yearGroup | bw_wbeing_total |
+| ------------------ | --------- | --------------- |
+| medium             | 7         | 9.8             |
+| medium             | 8         | 8.8             |
 
 Contributing distinct-student counts:
 
-| school_size_bucket | yearGroup | phq9_total |
-| ------------------ | --------- | ---------- |
-| medium             | 7         | 5.0        |
-| medium             | 8         | 5.0        |
+| school_size_bucket | yearGroup | bw_wbeing_total |
+| ------------------ | --------- | --------------- |
+| medium             | 7         | 5.0             |
+| medium             | 8         | 5.0             |
 
 Suppressions: `{}`
 
@@ -262,13 +262,13 @@ Suppression checkpoints:
 - Step 3 `aggregate`: computes the exact distinct-student `N` for every metric cell and blanks cells where `N < 5`.
 
 Execution provenance:
-- Derived phq9_total from available PHQ-9 item columns.
+- Derived bw_wbeing_total from available BeeWell wellbeing item columns.
 - Bucketed schools into school_size_bucket using distinct-student counts.
 - Aggregated metrics with suppression based on contributing distinct-student N.
 
 ## Suppressed small longitudinal cohort
 
-Question: How many students had a baseline `phq9_total` above 5 when matched from wave 1 to wave 2, by school?
+Question: How many students had a baseline `bw_wbeing_total` above 10 when matched from wave 1 to wave 2, by school?
 
 Plan:
 
@@ -277,21 +277,21 @@ Plan:
   "steps": [
     {
       "type": "derive_score",
-      "score": "phq9_total"
+      "score": "bw_wbeing_total"
     },
     {
       "type": "pair_waves",
       "from_wave": "1",
       "to_wave": "2",
       "measures": [
-        "phq9_total"
+        "bw_wbeing_total"
       ]
     },
     {
       "type": "filter",
-      "column": "baseline_phq9_total",
+      "column": "baseline_bw_wbeing_total",
       "op": "gt",
-      "value": 5
+      "value": 10
     },
     {
       "type": "aggregate",
@@ -326,11 +326,11 @@ Suppression checkpoints:
 - Before step execution, user scope filters are applied and `uid` is retained internally so distinct-student counts can be computed later without making identifiers public.
 - Step 1 `derive_score`: derives an approved measure on row-level data; suppression still waits for the terminal aggregate.
 - Step 2 `pair_waves`: uses hidden `uid` lineage to form matched student pairs and preserves that lineage so the final aggregate can count contributing students exactly.
-- Step 3 `filter`: validates that `baseline_phq9_total` is public at this stage; it narrows the cohort but does not publish a value or apply `min_n` yet.
+- Step 3 `filter`: validates that `baseline_bw_wbeing_total` is public at this stage; it narrows the cohort but does not publish a value or apply `min_n` yet.
 - Step 4 `aggregate`: computes the exact distinct-student `N` for every metric cell and blanks cells where `N < 5`.
 
 Execution provenance:
-- Derived phq9_total from available PHQ-9 item columns.
-- Paired waves 1 -> 2 for phq9_total.
-- Filtered baseline_phq9_total gt 5.
+- Derived bw_wbeing_total from available BeeWell wellbeing item columns.
+- Paired waves 1 -> 2 for bw_wbeing_total.
+- Filtered baseline_bw_wbeing_total gt 10.
 - Aggregated metrics with suppression based on contributing distinct-student N.

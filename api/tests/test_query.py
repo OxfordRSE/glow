@@ -16,8 +16,8 @@ def test_query_catalog_returns_scoped_dimensions_and_suggestions(client):
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert "school" in data["dimensions"]
-    assert "phq9_1" in data["measures"]
-    assert "phq9_total" in data["scores"]
+    assert "bw_wbeing_1" in data["measures"]
+    assert "bw_wbeing_total" in data["scores"]
     assert data["waves"] == ["1", "2"]
     assert "Alpha" in data["value_suggestions"]["school"]
 
@@ -44,12 +44,12 @@ def test_query_docs_are_generated_from_the_example_suite(sample_df):
 def test_query_rejects_unsafe_identifier_filters_even_when_buried(client):
     payload = {
         "steps": [
-            {"type": "derive_score", "score": "phq9_total"},
+            {"type": "derive_score", "score": "bw_wbeing_total"},
             {
                 "type": "pair_waves",
                 "from_wave": "1",
                 "to_wave": "2",
-                "measures": ["phq9_total"],
+                "measures": ["bw_wbeing_total"],
             },
             {"type": "filter", "column": "uid", "op": "eq", "value": "S001"},
             {
@@ -67,14 +67,19 @@ def test_query_rejects_unsafe_identifier_filters_even_when_buried(client):
 def test_query_rejects_unsafe_grouping_even_when_buried(client):
     payload = {
         "steps": [
-            {"type": "derive_score", "score": "phq9_total"},
+            {"type": "derive_score", "score": "bw_wbeing_total"},
             {
                 "type": "pair_waves",
                 "from_wave": "1",
                 "to_wave": "2",
-                "measures": ["phq9_total"],
+                "measures": ["bw_wbeing_total"],
             },
-            {"type": "filter", "column": "baseline_phq9_total", "op": "gte", "value": 3},
+            {
+                "type": "filter",
+                "column": "baseline_bw_wbeing_total",
+                "op": "gte",
+                "value": 3,
+            },
             {
                 "type": "aggregate",
                 "group_by": ["uid"],

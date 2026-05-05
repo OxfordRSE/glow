@@ -56,7 +56,7 @@
       }
     | {
         type: 'derive_score';
-        score: 'phq9_total';
+        score: 'bw_wbeing_total';
       }
     | {
         type: 'pair_waves';
@@ -132,14 +132,14 @@
       };
     }
     if (type === 'derive_score') {
-      return { type, score: 'phq9_total' };
+      return { type, score: 'bw_wbeing_total' };
     }
     if (type === 'pair_waves') {
       return {
         type,
         from_wave: catalog.waves[0] ?? '1',
         to_wave: catalog.waves[1] ?? catalog.waves[0] ?? '2',
-        measures_text: catalog.scores[0] ?? catalog.measures[0] ?? 'phq9_total'
+        measures_text: catalog.scores[0] ?? catalog.measures[0] ?? 'bw_wbeing_total'
       };
     }
     if (type === 'bucket_school_size') {
@@ -279,7 +279,7 @@
     if (source.type === 'derive_score') {
       return {
         type: 'derive_score',
-        score: source.score === 'phq9_total' ? 'phq9_total' : 'phq9_total'
+          score: source.score === 'bw_wbeing_total' ? 'bw_wbeing_total' : 'bw_wbeing_total'
       };
     }
     if (source.type === 'pair_waves') {
@@ -287,7 +287,7 @@
         type: 'pair_waves',
         from_wave: typeof source.from_wave === 'string' ? source.from_wave : catalog.waves[0] ?? '1',
         to_wave: typeof source.to_wave === 'string' ? source.to_wave : catalog.waves[1] ?? catalog.waves[0] ?? '2',
-        measures_text: typeof source.measures_text === 'string' ? source.measures_text : catalog.scores[0] ?? catalog.measures[0] ?? 'phq9_total'
+        measures_text: typeof source.measures_text === 'string' ? source.measures_text : catalog.scores[0] ?? catalog.measures[0] ?? 'bw_wbeing_total'
       };
     }
     if (source.type === 'bucket_school_size') {
@@ -536,16 +536,16 @@
 
     if (name === 'longitudinal') {
       steps = [
-        { type: 'derive_score', score: 'phq9_total' },
+        { type: 'derive_score', score: 'bw_wbeing_total' },
         {
           type: 'pair_waves',
           from_wave: catalog.waves[0] ?? '1',
           to_wave: catalog.waves[1] ?? '2',
-          measures_text: 'phq9_total'
+          measures_text: 'bw_wbeing_total'
         },
         {
           type: 'filter',
-          column: 'baseline_phq9_total',
+          column: 'baseline_bw_wbeing_total',
           op: 'gte',
           value: '3'
         },
@@ -553,7 +553,7 @@
           type: 'aggregate',
           group_by_text: 'school',
           metrics: [
-            { kind: 'mean', column: 'change_phq9_total', as_column: 'avg_change' },
+            { kind: 'mean', column: 'change_bw_wbeing_total', as_column: 'avg_change' },
             { kind: 'count_students', column: '', as_column: '' }
           ]
         }
@@ -562,7 +562,7 @@
     }
 
     steps = [
-      { type: 'derive_score', score: 'phq9_total' },
+      { type: 'derive_score', score: 'bw_wbeing_total' },
       {
         type: 'bucket_school_size',
         output_column: 'school_size_bucket',
@@ -574,7 +574,7 @@
       {
         type: 'aggregate',
         group_by_text: 'school_size_bucket, yearGroup',
-        metrics: [{ kind: 'mean', column: 'phq9_total', as_column: '' }]
+        metrics: [{ kind: 'mean', column: 'bw_wbeing_total', as_column: '' }]
       }
     ];
   }
@@ -669,7 +669,7 @@
       <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <h3 class="font-semibold text-slate-800">How to think in steps</h3>
         <p class="mt-2">1. Filter the scoped source data.</p>
-        <p>2. Derive approved scores such as `phq9_total`.</p>
+        <p>2. Derive approved scores such as `bw_wbeing_total`.</p>
         <p>3. Pair waves when you need within-student change columns.</p>
         <p>4. Add approved derived dimensions such as school size buckets.</p>
         <p>5. Aggregate to counts or means. This is the only step that exposes results.</p>

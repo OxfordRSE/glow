@@ -96,8 +96,8 @@ N is counted as **distinct students (uid)**, not rows. Any materialized result c
 Query columns are restricted to a whitelist to prevent data leakage:
 
 - **Dimensions**: `school`, `yearGroup`, `class`, `sex`, `ethnicity`, `wave`, `d_city`, `d_country`
-- **Measures**: `phq9_1`–`phq9_9`, `d_age`
-- **Derived scores**: currently `phq9_total`
+- **Measures**: `bw_wbeing_1`–`bw_wbeing_7`, `d_age`
+- **Derived scores**: currently `bw_wbeing_total`
 
 ### Query Builder
 

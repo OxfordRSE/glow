@@ -76,7 +76,7 @@ export interface QueryFilterStep {
 
 export interface QueryDeriveScoreStep {
   type: "derive_score";
-  score: "phq9_total";
+  score: "bw_wbeing_total";
 }
 
 export interface QueryPairWavesStep {

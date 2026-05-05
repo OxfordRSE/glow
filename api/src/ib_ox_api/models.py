@@ -174,7 +174,7 @@ class QueryFilterStep(BaseModel):
 
 class QueryDeriveScoreStep(BaseModel):
     type: Literal["derive_score"]
-    score: Literal["phq9_total"]
+    score: Literal["bw_wbeing_total"]
 
 
 class QueryPairWavesStep(BaseModel):

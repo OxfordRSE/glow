@@ -69,27 +69,27 @@ def query_examples() -> tuple[QueryExample, ...]:
         ),
         QueryExample(
             slug="mean-derived-score-by-school",
-            title="Mean derived PHQ score by school",
-            question="What is the mean derived `phq9_total` for each school?",
+            title="Mean derived BeeWell score by school",
+            question="What is the mean derived `bw_wbeing_total` for each school?",
             plan=QueryPlan.model_validate(
                 {
                     "steps": [
-                        {"type": "derive_score", "score": "phq9_total"},
+                        {"type": "derive_score", "score": "bw_wbeing_total"},
                         {
                             "type": "aggregate",
                             "group_by": ["school"],
-                            "metrics": [{"kind": "mean", "column": "phq9_total"}],
+                            "metrics": [{"kind": "mean", "column": "bw_wbeing_total"}],
                         },
                     ]
                 }
             ),
             expected_rows=[
-                {"school": "Alpha", "phq9_total": 4.9},
-                {"school": "Beta", "phq9_total": 4.0},
+                {"school": "Alpha", "bw_wbeing_total": 9.8},
+                {"school": "Beta", "bw_wbeing_total": 8.8},
             ],
             expected_count_rows=[
-                {"school": "Alpha", "phq9_total": 5.0},
-                {"school": "Beta", "phq9_total": 5.0},
+                {"school": "Alpha", "bw_wbeing_total": 5.0},
+                {"school": "Beta", "bw_wbeing_total": 5.0},
             ],
             expected_suppressions={},
             sort_by=("school",),
@@ -98,22 +98,22 @@ def query_examples() -> tuple[QueryExample, ...]:
             slug="longitudinal-change-by-school",
             title="Mean within-student change after a baseline threshold",
             question=(
-                "Among students whose baseline `phq9_total` is at least 3, what is the mean "
+                "Among students whose baseline `bw_wbeing_total` is at least 3, what is the mean "
                 "change from wave 1 to wave 2 by school?"
             ),
             plan=QueryPlan.model_validate(
                 {
                     "steps": [
-                        {"type": "derive_score", "score": "phq9_total"},
+                        {"type": "derive_score", "score": "bw_wbeing_total"},
                         {
                             "type": "pair_waves",
                             "from_wave": "1",
                             "to_wave": "2",
-                            "measures": ["phq9_total"],
+                            "measures": ["bw_wbeing_total"],
                         },
                         {
                             "type": "filter",
-                            "column": "baseline_phq9_total",
+                            "column": "baseline_bw_wbeing_total",
                             "op": "gte",
                             "value": 3,
                         },
@@ -123,7 +123,7 @@ def query_examples() -> tuple[QueryExample, ...]:
                             "metrics": [
                                 {
                                     "kind": "mean",
-                                    "column": "change_phq9_total",
+                                    "column": "change_bw_wbeing_total",
                                     "as_column": "avg_change",
                                 },
                                 {"kind": "count_students"},
@@ -132,7 +132,7 @@ def query_examples() -> tuple[QueryExample, ...]:
                     ]
                 }
             ),
-            expected_rows=[{"school": "Alpha", "avg_change": -0.2, "student_n": 5.0}],
+            expected_rows=[{"school": "Alpha", "avg_change": 0.8, "student_n": 5.0}],
             expected_count_rows=[{"school": "Alpha", "avg_change": 5.0, "student_n": 5.0}],
             expected_suppressions={},
             sort_by=("school",),
@@ -141,13 +141,13 @@ def query_examples() -> tuple[QueryExample, ...]:
             slug="bucketed-school-size-by-year-group",
             title="Mean score after school-size bucketing",
             question=(
-                "What is the mean `phq9_total` by year group after bucketing schools by "
+                "What is the mean `bw_wbeing_total` by year group after bucketing schools by "
                 "distinct-student participation?"
             ),
             plan=QueryPlan.model_validate(
                 {
                     "steps": [
-                        {"type": "derive_score", "score": "phq9_total"},
+                        {"type": "derive_score", "score": "bw_wbeing_total"},
                         {
                             "type": "bucket_school_size",
                             "output_column": "school_size_bucket",
@@ -160,18 +160,18 @@ def query_examples() -> tuple[QueryExample, ...]:
                         {
                             "type": "aggregate",
                             "group_by": ["school_size_bucket", "yearGroup"],
-                            "metrics": [{"kind": "mean", "column": "phq9_total"}],
+                            "metrics": [{"kind": "mean", "column": "bw_wbeing_total"}],
                         },
                     ]
                 }
             ),
             expected_rows=[
-                {"school_size_bucket": "medium", "yearGroup": 7, "phq9_total": 4.9},
-                {"school_size_bucket": "medium", "yearGroup": 8, "phq9_total": 4.0},
+                {"school_size_bucket": "medium", "yearGroup": 7, "bw_wbeing_total": 9.8},
+                {"school_size_bucket": "medium", "yearGroup": 8, "bw_wbeing_total": 8.8},
             ],
             expected_count_rows=[
-                {"school_size_bucket": "medium", "yearGroup": 7, "phq9_total": 5.0},
-                {"school_size_bucket": "medium", "yearGroup": 8, "phq9_total": 5.0},
+                {"school_size_bucket": "medium", "yearGroup": 7, "bw_wbeing_total": 5.0},
+                {"school_size_bucket": "medium", "yearGroup": 8, "bw_wbeing_total": 5.0},
             ],
             expected_suppressions={},
             sort_by=("school_size_bucket", "yearGroup"),
@@ -180,24 +180,24 @@ def query_examples() -> tuple[QueryExample, ...]:
             slug="suppressed-small-longitudinal-cohort",
             title="Suppressed small longitudinal cohort",
             question=(
-                "How many students had a baseline `phq9_total` above 5 when matched from wave 1 "
+                "How many students had a baseline `bw_wbeing_total` above 10 when matched from wave 1 "
                 "to wave 2, by school?"
             ),
             plan=QueryPlan.model_validate(
                 {
                     "steps": [
-                        {"type": "derive_score", "score": "phq9_total"},
+                        {"type": "derive_score", "score": "bw_wbeing_total"},
                         {
                             "type": "pair_waves",
                             "from_wave": "1",
                             "to_wave": "2",
-                            "measures": ["phq9_total"],
+                            "measures": ["bw_wbeing_total"],
                         },
                         {
                             "type": "filter",
-                            "column": "baseline_phq9_total",
+                            "column": "baseline_bw_wbeing_total",
                             "op": "gt",
-                            "value": 5,
+                            "value": 10,
                         },
                         {
                             "type": "aggregate",
