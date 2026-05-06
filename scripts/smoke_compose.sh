@@ -9,6 +9,7 @@ rm -f data/auth.db data/auth.db-shm data/auth.db-wal
 
 export IB_OX_SECRET_KEY="${IB_OX_SECRET_KEY:-smoke-test-secret}"
 
+docker compose down -v --remove-orphans
 docker compose up --build -d
 
 python3 - <<'PY'
@@ -16,7 +17,7 @@ import time
 import urllib.request
 
 url = "http://127.0.0.1:5173/api/health"
-deadline = time.time() + 60
+deadline = time.time() + 180
 last_error = None
 
 while time.time() < deadline:

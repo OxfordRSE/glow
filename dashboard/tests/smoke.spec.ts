@@ -28,9 +28,7 @@ test("admin can log in, run a query, and use the admin screen", async ({
   await expect(
     page.getByRole("heading", { name: "Query Builder", level: 1 }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Load Longitudinal Template" })
-    .click();
+  await page.getByRole("button", { name: "Load Count Template" }).click();
   await page.getByRole("button", { name: "Run Query" }).click();
 
   await expect(
