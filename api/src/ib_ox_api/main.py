@@ -94,14 +94,6 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-def root() -> dict:
-    return {
-        "title": app.title,
-        "description": app.description,
-        "version": app.version
-    }
-
 @app.get("/health", tags=["health"])
 def health() -> dict:
     return {"status": "ok", "version": __version__}
@@ -281,3 +273,12 @@ def admin_delete_user(
 def admin_me(current_user: UserRead = Depends(get_current_user)) -> UserRead:
     """Return the current user's details, including is_admin flag."""
     return current_user
+
+
+@app.get("/")
+def root() -> dict:
+    return {
+        "title": app.title,
+        "description": app.description,
+        "version": app.version
+    }

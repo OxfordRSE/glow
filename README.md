@@ -113,7 +113,9 @@ ib-ox-api users delete alice
 
 ### Suppression
 
-N is counted as **distinct students (uid)**, not rows. Any materialized result cell where the contributing student count is less than `IB_OX_MIN_N` is suppressed (set to empty in the CSV output) and recorded in the `suppressions` field of the response.
+N is counted as **distinct students (uid)**, not rows. 
+Any materialized result cell where the contributing student count is less than `IB_OX_MIN_N` is suppressed
+(set to empty in the CSV output) and recorded in the `suppressions` field of the response.
 
 ### Whitelisted columns
 

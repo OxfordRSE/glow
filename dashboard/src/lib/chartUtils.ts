@@ -34,6 +34,20 @@ export interface ChartOutput {
   options: Record<string, unknown>;
 }
 
+export interface ChartLabelOptions {
+  columnLabel?: (column: string) => string;
+  countLabel?: string;
+  meanLabel?: string;
+}
+
+function resolveChartLabels(options: ChartLabelOptions = {}) {
+  return {
+    columnLabel: options.columnLabel ?? ((column: string) => column),
+    countLabel: options.countLabel ?? "Count",
+    meanLabel: options.meanLabel ?? "Mean",
+  };
+}
+
 function baseOptions(yLabel = "Count"): Record<string, unknown> {
   return {
     responsive: true,
@@ -59,28 +73,35 @@ function baseOptions(yLabel = "Count"): Record<string, unknown> {
 export function frequencyToChartData(
   result: { csv: string },
   groupBy: string[],
+  labelOptions: ChartLabelOptions = {},
 ): ChartOutput {
+  const chartLabels = resolveChartLabels(labelOptions);
   const { headers, rows } = parseCSV(result.csv);
   if (headers.length === 0 || rows.length === 0) {
-    return { data: { labels: [], datasets: [] }, options: baseOptions() };
+    return {
+      data: { labels: [], datasets: [] },
+      options: baseOptions(chartLabels.countLabel),
+    };
   }
 
   // Single group-by: labels = first col values, dataset = "n" or last numeric col
   if (groupBy.length <= 1) {
     const labelCol = headers[0];
     const valueCol = headers[headers.length - 1];
-    const labels = rows.map((r) => String(r[0] ?? ""));
+    const xLabels = rows.map((r) => String(r[0] ?? ""));
     const data = rows.map((r) => {
       const v = r[headers.indexOf(valueCol)];
       return v === "" || v === undefined ? null : Number(v);
     });
     return {
       data: {
-        labels,
+        labels: xLabels,
         datasets: [
           {
             label:
-              valueCol === "n" || valueCol === "student_n" ? "Count" : valueCol,
+              valueCol === "n" || valueCol === "student_n"
+                ? chartLabels.countLabel
+                : chartLabels.columnLabel(valueCol),
             data,
             backgroundColor: PALETTE[0] + "CC",
             borderColor: PALETTE[0],
@@ -88,7 +109,11 @@ export function frequencyToChartData(
           },
         ],
       },
-      options: baseOptions(),
+      options: baseOptions(
+        valueCol === "n" || valueCol === "student_n"
+          ? chartLabels.countLabel
+          : chartLabels.columnLabel(valueCol),
+      ),
     };
   }
 
@@ -127,7 +152,7 @@ export function frequencyToChartData(
 
   return {
     data: { labels: xLabels, datasets },
-    options: baseOptions(),
+    options: baseOptions(chartLabels.countLabel),
   };
 }
 
@@ -139,8 +164,10 @@ export function frequencyToLineData(
   result: { csv: string },
   groupBy: string[],
   xCol: string,
+  labelOptions: ChartLabelOptions = {},
 ): ChartOutput {
-  const base = frequencyToChartData(result, groupBy);
+  const chartLabels = resolveChartLabels(labelOptions);
+  const base = frequencyToChartData(result, groupBy, labelOptions);
   // Convert datasets to line style
   const datasets = base.data.datasets.map((ds, i) => ({
     ...ds,
@@ -154,7 +181,7 @@ export function frequencyToLineData(
     ...base.options,
     scales: {
       ...(base.options.scales as Record<string, unknown>),
-      x: { title: { display: true, text: xCol } },
+      x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
     },
   };
   return { data: { ...base.data, datasets }, options };
@@ -166,16 +193,21 @@ export function frequencyToLineData(
 export function meansToChartData(
   result: { csv: string },
   groupBy: string[],
+  labelOptions: ChartLabelOptions = {},
 ): ChartOutput {
+  const chartLabels = resolveChartLabels(labelOptions);
   const { headers, rows } = parseCSV(result.csv);
   if (headers.length === 0 || rows.length === 0) {
-    return { data: { labels: [], datasets: [] }, options: baseOptions("Mean") };
+    return {
+      data: { labels: [], datasets: [] },
+      options: baseOptions(chartLabels.meanLabel),
+    };
   }
 
   // First column(s) are group-by, rest are value columns
   const groupCount = groupBy.length;
   const valueHeaders = headers.slice(groupCount);
-  const labels = rows.map((r) =>
+  const rowLabels = rows.map((r) =>
     groupBy.map((_, gi) => String(r[gi] ?? "")).join(" / "),
   );
 
@@ -185,7 +217,7 @@ export function meansToChartData(
       return v === "" || v === undefined ? null : Number(v);
     });
     return {
-      label: vh,
+      label: chartLabels.columnLabel(vh),
       data,
       backgroundColor: PALETTE[vi % PALETTE.length] + "CC",
       borderColor: PALETTE[vi % PALETTE.length],
@@ -194,14 +226,15 @@ export function meansToChartData(
   });
 
   return {
-    data: { labels, datasets },
-    options: baseOptions("Mean"),
+    data: { labels: rowLabels, datasets },
+    options: baseOptions(chartLabels.meanLabel),
   };
 }
 
 export function queryToChartData(
   result: QueryResult,
   groupBy: string[],
+  labelOptions: ChartLabelOptions = {},
 ): ChartOutput {
-  return meansToChartData(result, groupBy);
+  return meansToChartData(result, groupBy, labelOptions);
 }

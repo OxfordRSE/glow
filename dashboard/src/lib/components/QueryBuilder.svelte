@@ -12,12 +12,14 @@
   } from '$lib/api';
   import { queryToChartData } from '$lib/chartUtils';
   import ChartCard from './ChartCard.svelte';
+  import { createI18n, locale } from '$lib/i18n';
 
   interface Props {
     catalog: QueryCatalog;
   }
 
   let { catalog }: Props = $props();
+  const i18n = $derived(createI18n($locale));
 
   type StepType =
     | 'filter'
@@ -217,6 +219,14 @@
       .split(',')
       .map((item) => item.trim())
       .filter(Boolean);
+  }
+
+  function columnLabel(column: string): string {
+    return i18n.columnLabel(column);
+  }
+
+  function columnText(value: string): string {
+    return i18n.columnText(value);
   }
 
   function metricOutputName(metric: MetricEditor): string {
@@ -732,20 +742,20 @@
             </tr>
             <tr class="text-blue-800">
               {#each structureSnapshots[0].internalColumns as column}
-                <th class="px-3 py-2 text-left font-medium">{column}</th>
+                <th class="px-3 py-2 text-left font-medium" title={columnLabel(column)}>{column}</th>
               {/each}
               {#if structureSnapshots[0].dimensions.length === 0}
                 <th class="border-s border-blue-100 px-3 py-2 text-left font-medium text-blue-400">None</th>
               {:else}
                 {#each structureSnapshots[0].dimensions as column}
-                  <th class="border-s border-blue-100 px-3 py-2 text-left font-medium">{column}</th>
+                  <th class="border-s border-blue-100 px-3 py-2 text-left font-medium" title={columnLabel(column)}>{column}</th>
                 {/each}
               {/if}
               {#if structureSnapshots[0].measures.length === 0}
                 <th class="border-s border-blue-100 px-3 py-2 text-left font-medium text-blue-400">None</th>
               {:else}
                 {#each structureSnapshots[0].measures as column}
-                  <th class="border-s border-blue-100 px-3 py-2 text-left font-medium">{column}</th>
+                  <th class="border-s border-blue-100 px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
                 {/each}
               {/if}
             </tr>
@@ -756,17 +766,17 @@
 
     <datalist id="query-columns">
       {#each filterableColumns as column}
-        <option value={column}></option>
+        <option value={column} label={columnLabel(column)}></option>
       {/each}
     </datalist>
     <datalist id="query-group-columns">
       {#each groupableColumns as column}
-        <option value={column}></option>
+        <option value={column} label={columnLabel(column)}></option>
       {/each}
     </datalist>
     <datalist id="query-measures">
       {#each measurableColumns as column}
-        <option value={column}></option>
+        <option value={column} label={columnLabel(column)}></option>
       {/each}
     </datalist>
     <datalist id="query-waves">
@@ -804,6 +814,9 @@
             <label>
               <span class="label text-xs">Column</span>
               <input class="input" list="query-columns" bind:value={step.column} />
+              {#if step.column.trim()}
+                <p class="mt-1 text-xs text-gray-500" title={step.column}>{columnLabel(step.column)}</p>
+              {/if}
             </label>
             <label>
               <span class="label text-xs">Operator</span>
@@ -832,7 +845,7 @@
             <span class="label text-xs">Approved score</span>
             <select class="input max-w-sm" bind:value={step.score}>
               {#each catalog.scores as score}
-                <option value={score}>{score}</option>
+                <option value={score}>{columnLabel(score)}</option>
               {/each}
             </select>
           </label>
@@ -849,6 +862,9 @@
             <label>
               <span class="label text-xs">Measures (comma separated)</span>
               <input class="input" list="query-measures" bind:value={step.measures_text} />
+              {#if step.measures_text.trim()}
+                <p class="mt-1 text-xs text-gray-500">{columnText(step.measures_text)}</p>
+              {/if}
             </label>
           </div>
           <p class="text-xs text-gray-500">
@@ -859,6 +875,9 @@
             <label>
               <span class="label text-xs">Output column</span>
               <input class="input" bind:value={step.output_column} />
+              {#if step.output_column.trim()}
+                <p class="mt-1 text-xs text-gray-500" title={step.output_column}>{columnLabel(step.output_column)}</p>
+              {/if}
             </label>
             <label>
               <span class="label text-xs">Small max</span>
@@ -882,6 +901,9 @@
             <label class="block">
               <span class="label text-xs">Group by (comma separated)</span>
               <input class="input" list="query-group-columns" bind:value={step.group_by_text} />
+              {#if step.group_by_text.trim()}
+                <p class="mt-1 text-xs text-gray-500">{columnText(step.group_by_text)}</p>
+              {/if}
             </label>
 
             <div class="space-y-2">
@@ -907,6 +929,9 @@
                       bind:value={metric.column}
                       disabled={metric.kind === 'count_students'}
                     />
+                    {#if metric.kind === 'mean' && metric.column.trim()}
+                      <p class="mt-1 text-xs text-gray-500" title={metric.column}>{columnLabel(metric.column)}</p>
+                    {/if}
                   </label>
                   <label>
                     <span class="label text-xs">Output name (optional)</span>
@@ -969,20 +994,20 @@
                 </tr>
                 <tr class="text-slate-700">
                   {#each nextStructure.internalColumns as column}
-                    <th class="px-3 py-2 text-left font-medium">{column}</th>
+                    <th class="px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
                   {/each}
                   {#if nextStructure.dimensions.length === 0}
                     <th class="border-s border-slate-100 px-3 py-2 text-left font-medium text-slate-400">None</th>
                   {:else}
                     {#each nextStructure.dimensions as column}
-                      <th class="border-s border-slate-100 px-3 py-2 text-left font-medium">{column}</th>
+                      <th class="border-s border-slate-100 px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
                     {/each}
                   {/if}
                   {#if nextStructure.measures.length === 0}
                     <th class="border-s border-slate-100 px-3 py-2 text-left font-medium text-slate-400">None</th>
                   {:else}
                     {#each nextStructure.measures as column}
-                      <th class="border-s border-slate-100 px-3 py-2 text-left font-medium">{column}</th>
+                      <th class="border-s border-slate-100 px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
                     {/each}
                   {/if}
                 </tr>
@@ -1012,14 +1037,14 @@
                 <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium text-emerald-400">None</th>
               {:else}
                 {#each finalStructure.dimensions as column}
-                  <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium">{column}</th>
+                  <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
                 {/each}
               {/if}
               {#if finalStructure.measures.length === 0}
                 <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium text-emerald-400">None</th>
               {:else}
                 {#each finalStructure.measures as column}
-                  <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium">{column}</th>
+                  <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
                 {/each}
               {/if}
             </tr>
@@ -1054,19 +1079,20 @@
         Running query…
       </div>
     {:then result}
+      {@const chartResult = queryToChartData(result, resultGroupBy, i18n.chartFormatters)}
       <div class="space-y-4">
         <ChartCard
-          title="Query Result"
+          title={i18n.t('queryBuilder.resultTitle')}
           type="bar"
-          data={queryToChartData(result, resultGroupBy).data}
-          options={queryToChartData(result, resultGroupBy).options}
+          data={chartResult.data}
+          options={chartResult.options}
           csv={result.csv}
           suppressions={result.suppressions}
           filename="query-result"
         />
 
         <div class="card space-y-2">
-          <h3 class="font-semibold text-gray-800">Execution Provenance</h3>
+          <h3 class="font-semibold text-gray-800">{i18n.t('queryBuilder.executionProvenance')}</h3>
           {#if result.provenance.length === 0}
             <p class="text-sm text-gray-500">No provenance steps were returned.</p>
           {:else}

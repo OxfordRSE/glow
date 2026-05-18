@@ -1,0 +1,451 @@
+type QuestionGroup = {
+  label: string;
+  items: string[];
+};
+
+const beWellQuestionGroups: Record<string, QuestionGroup> = {
+  bw_migration: {
+    label: "Migration background",
+    items: [
+      "Birth parent or carer 1 was born outside the UK",
+      "Birth parent or carer 2 was born outside the UK",
+      "I was born outside the UK",
+    ],
+  },
+  bw_arrival: {
+    label: "Arrival in the UK",
+    items: ["How old were you when you first arrived in the UK?"],
+  },
+  bw_life_sat: {
+    label: "Life satisfaction",
+    items: ["Overall, how satisfied are you with your life nowadays?"],
+  },
+  bw_wbeing: {
+    label: "Psychological wellbeing",
+    items: [
+      "I've been feeling optimistic about the future",
+      "I've been feeling useful",
+      "I've been feeling relaxed",
+      "I've been dealing with problems well",
+      "I've been thinking clearly",
+      "I've been feeling close to other people",
+      "I've been able to make up my own mind about things",
+    ],
+  },
+  bw_selfest: {
+    label: "Self-esteem",
+    items: [
+      "On the whole, I am satisfied with myself",
+      "I feel that I have a number of good qualities",
+      "I am able to do things as well as most other people",
+      "I am a person of value",
+      "I feel good about myself",
+    ],
+  },
+  bw_emoreg: {
+    label: "Emotion regulation",
+    items: [
+      "When I am worried, I keep myself from losing control",
+      "When I am worried, I talk to someone until I feel better",
+      "When I am worried, I try to calmly settle the problem",
+    ],
+  },
+  bw_appear: {
+    label: "Appearance happiness",
+    items: ["How happy are you with your appearance?"],
+  },
+  bw_stress: {
+    label: "Stress",
+    items: [
+      "How often have you felt unable to control important things in your life?",
+      "How often have you felt difficulties piling up so high that you could not overcome them?",
+    ],
+  },
+  bw_coping: {
+    label: "Coping",
+    items: [
+      "How often have you felt confident about your ability to handle personal problems?",
+      "How often have you felt that things were going your way?",
+    ],
+  },
+  bw_emodies: {
+    label: "Emotional difficulties",
+    items: [
+      "I feel lonely",
+      "I am unhappy",
+      "Nobody likes me",
+      "I cry a lot",
+      "I worry when at school",
+      "I worry a lot",
+      "I have problems sleeping",
+      "I wake up in the night",
+      "I am shy",
+      "I feel scared",
+    ],
+  },
+  bw_behav: {
+    label: "Behavioural difficulties",
+    items: [
+      "I get very angry",
+      "I lose my temper",
+      "I hit out when I am angry",
+      "I am calm",
+      "I break things on purpose",
+      "I do things to hurt people",
+    ],
+  },
+  bw_physh: {
+    label: "Physical health",
+    items: ["In general would you say your physical health is:"],
+  },
+  bw_sleep: {
+    label: "Sleep adequacy",
+    items: [
+      "Is the amount of sleep you get enough to feel awake and concentrate?",
+    ],
+  },
+  bw_physact: {
+    label: "Physical activity days",
+    items: ["How many days in a usual week are you physically active?"],
+  },
+  bw_physdur: {
+    label: "Physical activity duration",
+    items: [
+      "On active days, how long on average do you spend being physically active?",
+    ],
+  },
+  bw_fruitveg: {
+    label: "Fruit and vegetables",
+    items: ["How many portions of fruit or veg do you eat in a typical day?"],
+  },
+  bw_unhealthy: {
+    label: "Unhealthy food and drink frequency",
+    items: [
+      "Sugary drinks",
+      "Diet or sugar-free drinks",
+      "Sweets, chocolate and snacks",
+      "Take-away and fast food",
+    ],
+  },
+  bw_freetime: {
+    label: "Free time",
+    items: ["How often can you do things that you like in your free time?"],
+  },
+  bw_socmedia: {
+    label: "Social media time",
+    items: ["On a normal weekday, how much time do you spend on social media?"],
+  },
+  bw_socmtype: {
+    label: "Social media use type",
+    items: [
+      "Active use such as chatting or posting",
+      "Passive use such as browsing or scrolling",
+    ],
+  },
+  bw_volunteer: {
+    label: "Volunteering",
+    items: ["How often do you do volunteer work?"],
+  },
+  bw_activ: {
+    label: "Activities when not at school",
+    items: [
+      "Listening to music",
+      "Going to the cinema or theatre",
+      "Watching TV shows or films",
+      "Watching live sport",
+      "Reading for enjoyment",
+      "Youth offer activities such as youth clubs or Scouts",
+      "Attending a religious service",
+      "Drawing, painting or making things",
+      "Computer or console gaming",
+      "Sport, exercise or physical activities not at school",
+      "Creative hobbies not mentioned above",
+    ],
+  },
+  bw_schoolconn: {
+    label: "School connection",
+    items: ["I feel that I belong at my school."],
+  },
+  bw_attain: {
+    label: "Attainment happiness",
+    items: ["How happy are you with the marks you get in school?"],
+  },
+  bw_staffrel: {
+    label: "Relationships with school staff",
+    items: [
+      "At school there is an adult who is interested in my schoolwork",
+      "At school there is an adult who believes that I will be a success",
+      "At school there is an adult who wants me to do my best",
+      "At school there is an adult who listens to me when I have something to say",
+    ],
+  },
+  bw_iso: {
+    label: "School isolation",
+    items: [
+      "Think about a typical school week. Are you ever placed in isolation?",
+    ],
+  },
+  bw_isodays: {
+    label: "School isolation days",
+    items: ["On how many days in a typical week are you placed in isolation?"],
+  },
+  bw_isodur: {
+    label: "School isolation duration",
+    items: ["How long does isolation typically last?"],
+  },
+  bw_schpress: {
+    label: "School pressure",
+    items: ["How pressured do you feel by the schoolwork you have to do?"],
+  },
+  bw_homeenv: {
+    label: "Home environment happiness",
+    items: ["How happy are you with the home that you live in?"],
+  },
+  bw_safety: {
+    label: "Safety in local area",
+    items: ["How safe do you feel when in your local area?"],
+  },
+  bw_localenv: {
+    label: "Local environment quality",
+    items: [
+      "People around here support each other with their wellbeing",
+      "You can trust people around here",
+      "I could ask for help or a favour from neighbours",
+      "There are good places to spend your free time",
+    ],
+  },
+  bw_beinheard: {
+    label: "Being heard outside school and home",
+    items: ["Away from school and home, there is an adult who listens to me."],
+  },
+  bw_foodsec: {
+    label: "Food security",
+    items: [
+      "The food that we bought just did not last. How often was this true?",
+    ],
+  },
+  bw_material: {
+    label: "Material wellbeing",
+    items: [
+      "How happy are you with the things that you have, like money and things you own?",
+    ],
+  },
+  bw_future: {
+    label: "Future readiness",
+    items: [
+      "I have hope and feel optimistic about my future",
+      "I feel that my generation will have a better life than my parents' generation",
+      "I am generally confident in my own skills and abilities",
+      "I usually cope well with most unexpected problems",
+      "When I finish education, I will have the skills I need to be prepared for life",
+      "If I do well with education, I will have the same chances as anyone else of getting a job",
+      "I feel in control about future education, training and job prospects",
+    ],
+  },
+  bw_careersed: {
+    label: "Careers education received",
+    items: ["How many types of careers education have you received at school?"],
+  },
+  bw_careershlp: {
+    label: "Careers education helpfulness",
+    items: [
+      "How helpful has the careers education you have received at school been?",
+    ],
+  },
+  bw_plans: {
+    label: "Post-Year-11 plans",
+    items: [
+      "Might do this after Year 11: school sixth form",
+      "Might do this after Year 11: further education or sixth-form college",
+      "Might do this after Year 11: UTC or Studio School",
+      "Might do this after Year 11: apprenticeship or traineeship",
+      "Might do this after Year 11: supported internship",
+      "Might do this after Year 11: T level",
+      "Might do this after Year 11: get a job",
+      "Might do this after Year 11: start a business",
+    ],
+  },
+  bw_gmacs: {
+    label: "GMACS",
+    items: [
+      "Do you know what GMACS is?",
+      "Have you used the GMACS website in the last 12 months?",
+    ],
+  },
+  bw_parentsrel: {
+    label: "Relationships with parents or carers",
+    items: [
+      "At home there is an adult who is interested in my schoolwork",
+      "At home there is an adult who believes that I will be a success",
+      "At home there is an adult who wants me to do my best",
+      "At home there is an adult who listens to me when I have something to say",
+    ],
+  },
+  bw_friends: {
+    label: "Friendships and social support",
+    items: [
+      "I get along with people around me",
+      "People like to spend time with me",
+      "I feel supported by my friends",
+      "My friends care about me when times are hard",
+    ],
+  },
+  bw_lonely: {
+    label: "Loneliness",
+    items: ["How often do you feel lonely?"],
+  },
+  bw_discrim: {
+    label: "Discrimination experiences",
+    items: [
+      "People make me feel bad because of my race or skin colour",
+      "People make me feel bad because of my gender",
+      "People make me feel bad because of my sexual orientation",
+      "People make me feel bad because of my disability",
+      "People make me feel bad because of my religion or faith",
+    ],
+  },
+  bw_discloc: {
+    label: "Where discrimination happened",
+    items: [
+      "At home",
+      "Walking to or from school",
+      "On public transport",
+      "At school",
+      "In my local area",
+      "Online",
+      "Somewhere else",
+    ],
+  },
+  bw_bullying: {
+    label: "Bullying",
+    items: ["Physical bullying", "Social bullying", "Cyber-bullying"],
+  },
+  bw_support: {
+    label: "Access to wellbeing support",
+    items: [
+      "I have a place to seek support for worries or mental health concerns.",
+    ],
+  },
+  bw_mhcontact: {
+    label: "Mental health contact",
+    items: [
+      "Someone in your family",
+      "A close friend",
+      "A trusted adult who is not at school and not in your family",
+      "A teacher",
+      "A school mental health worker",
+      "Online help such as websites, social media or self-help groups",
+    ],
+  },
+  bw_kooth: {
+    label: "Kooth",
+    items: ["Have you heard of or used Kooth, the online wellbeing service?"],
+  },
+};
+
+function buildBeeWellColumnLabels(
+  groups: Record<string, QuestionGroup>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(groups).flatMap(([prefix, group]) =>
+      group.items.map((item, index) => [
+        `${prefix}_${index + 1}`,
+        `${group.label}: ${item}`,
+      ]),
+    ),
+  );
+}
+
+export const en = {
+  text: {
+    nav: {
+      home: "Home",
+      query: "Query",
+      admin: "Admin",
+      dashboard: "Dashboard",
+      signOut: "Sign out",
+      adminBadge: "admin",
+      api: "API",
+      apiDown: "API down",
+      online: "Online",
+      offline: "Offline",
+      checking: "checking",
+      apiStatus: "API status: {status}",
+    },
+    chart: {
+      showTable: "Show Table",
+      hideTable: "Hide Table",
+      downloadCsv: "Download CSV",
+      noData: "No data to display",
+      suppressionNotice:
+        "Some values are suppressed to protect student privacy because the cell counts are small.",
+      count: "Count",
+      mean: "Mean",
+    },
+    table: {
+      noData: "No data available.",
+      sortBy: "Sort by {label}",
+    },
+    dashboard: {
+      title: "Dashboard",
+      subtitle: "Overview of IB-Oxford longitudinal questionnaire data.",
+      loadErrorHelp:
+        "If no data is loaded on the server, charts will be unavailable. Contact an administrator to ensure the dataset is configured correctly.",
+      participantCountBySchool: "Participant Count by School",
+      participantCountBySex: "Participant Count by Sex",
+      participantsPerWave: "Participants per Wave (Trend)",
+      noDataTitle: "No data available yet.",
+      noDataHint:
+        "The server may not have a dataset loaded. Check API configuration.",
+      gettingStarted: "Getting Started",
+      gettingStartedQuery:
+        "Use the Query Builder to create custom suppression-safe query plans.",
+      gettingStartedTable:
+        "Charts support Show Table for a tabular view and CSV download for raw results.",
+      gettingStartedSuppression:
+        "Suppressed cells show a hidden value placeholder to protect privacy.",
+      gettingStartedAdmin:
+        "As an admin, you can manage users and their pre-filters.",
+    },
+    queryPage: {
+      title: "Query Builder",
+      subtitle:
+        "Compose safe analytical plans that can filter, derive scores, pair waves, bucket cohorts, and aggregate with built-in suppression.",
+      loadingCatalog: "Loading query catalog...",
+    },
+    queryBuilder: {
+      resultTitle: "Query Result",
+      executionProvenance: "Execution Provenance",
+    },
+  },
+  phases: {
+    baseline: "Baseline",
+    comparison: "Comparison",
+    change: "Change",
+  },
+  columns: {
+    wave: "Wave",
+    uid: "Student ID",
+    name: "Name",
+    school: "School",
+    yearGroup: "Year group",
+    schoolYear: "School year",
+    class: "Class",
+    d_age: "Age",
+    d_city: "City",
+    d_country: "Country",
+    d_sex: "Sex",
+    sex: "Sex",
+    d_ethnicity: "Ethnicity",
+    ethnicity: "Ethnicity",
+    d_sexualOrientation: "Sexual orientation",
+    d_genderIdentity: "Gender identity",
+    school_size_bucket: "School size bucket",
+    student_n: "Student count",
+    n: "Count",
+    bw_wbeing_total: "Psychological wellbeing total (SWEMWBS)",
+    ...buildBeeWellColumnLabels(beWellQuestionGroups),
+  },
+} as const;
+
+export type Messages = typeof en;

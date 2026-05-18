@@ -4,10 +4,13 @@
   import { getQueryCatalog } from '$lib/api';
   import type { QueryCatalog } from '$lib/api';
   import QueryBuilder from '$lib/components/QueryBuilder.svelte';
+  import { createI18n, locale } from '$lib/i18n';
 
   let loading = $state(true);
   let error = $state<string | null>(null);
   let catalog = $state<QueryCatalog | null>(null);
+
+  const i18n = $derived(createI18n($locale));
 
   onMount(async () => {
     const token = $authStore.token;
@@ -28,10 +31,9 @@
 
 <div class="space-y-6">
   <div>
-    <h1>Query Builder</h1>
+    <h1>{i18n.t('queryPage.title')}</h1>
     <p class="text-gray-500 mt-1">
-      Compose safe analytical plans that can filter, derive scores, pair waves, bucket cohorts, and
-      aggregate with built-in suppression.
+      {i18n.t('queryPage.subtitle')}
     </p>
   </div>
 
@@ -41,7 +43,7 @@
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
       </svg>
-      Loading query catalog…
+      {i18n.t('queryPage.loadingCatalog')}
     </div>
   {:else if error}
     <div class="card bg-red-50 border-red-200 text-red-700">{error}</div>

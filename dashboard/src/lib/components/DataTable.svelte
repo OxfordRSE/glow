@@ -1,5 +1,6 @@
 <script lang="ts">
   import { parseCSV } from '$lib/csvUtils';
+  import { createI18n, locale } from '$lib/i18n';
 
   interface Props {
     csv: string;
@@ -8,6 +9,7 @@
 
   let { csv, suppressions = {} }: Props = $props();
 
+  const i18n = $derived(createI18n($locale));
   const parsed = $derived(parseCSV(csv));
 
   function isSuppressed(col: string, rowIdx: number): boolean {
@@ -53,7 +55,7 @@
 
 <div class="overflow-x-auto rounded-lg border border-gray-200">
   {#if parsed.headers.length === 0}
-    <p class="text-sm text-gray-500 p-4">No data available.</p>
+    <p class="text-sm text-gray-500 p-4">{i18n.t('table.noData')}</p>
   {:else}
     <table class="min-w-full text-sm divide-y divide-gray-200">
       <thead class="bg-gray-50">
@@ -62,9 +64,9 @@
             <th
               class="px-4 py-2 text-left font-medium text-gray-600 whitespace-nowrap cursor-pointer hover:bg-gray-100 select-none"
               onclick={() => toggleSort(ci)}
-              title="Sort by {header}"
+              title={i18n.t('table.sortBy', { label: i18n.columnLabel(header) })}
             >
-              {header}
+              <span title={header}>{i18n.columnLabel(header)}</span>
               {#if sortCol === ci}
                 <span class="ml-1 text-blue-500">{sortDir === 'asc' ? '↑' : '↓'}</span>
               {/if}

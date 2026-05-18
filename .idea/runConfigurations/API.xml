@@ -1,13 +1,14 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="API" type="Python.FastAPI">
     <option name="additionalOptions" value="--reload --host 0.0.0.0 --port 8000" />
+    <option name="debugJustMyCode" value="true" />
     <option name="file" value="$PROJECT_DIR$/api/src/ib_ox_api/main.py" />
     <module name="ib-ox-core" />
     <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
-    <option name="SDK_HOME" value="$PROJECT_DIR$/api/.venv/bin/python" />
-    <option name="SDK_NAME" value="uv (api)" />
+    <option name="SDK_HOME" value="docker-compose://[$PROJECT_DIR$/compose.yml]:api/python3" />
+    <option name="SDK_NAME" value="Docker Compose (api)" />
     <option name="WORKING_DIRECTORY" value="" />
     <option name="IS_MODULE_SDK" value="false" />
     <option name="ADD_CONTENT_ROOTS" value="true" />

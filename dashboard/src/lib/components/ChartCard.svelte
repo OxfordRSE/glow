@@ -14,6 +14,7 @@
   import DataTable from './DataTable.svelte';
   import { downloadCSV } from '$lib/csvUtils';
   import type { ChartJsData } from '$lib/chartUtils';
+  import { createI18n, locale } from '$lib/i18n';
 
   Chart.register(
     CategoryScale,
@@ -46,6 +47,7 @@
     filename = 'data'
   }: Props = $props();
 
+  const i18n = $derived(createI18n($locale));
   let showTable = $state(false);
 
   function handleDownload() {
@@ -69,10 +71,10 @@
         onclick={() => (showTable = !showTable)}
         aria-pressed={showTable}
       >
-        {showTable ? 'Hide Table' : 'Show Table'}
+        {showTable ? i18n.t('chart.hideTable') : i18n.t('chart.showTable')}
       </button>
       {#if csv}
-        <button class="btn-secondary btn-sm" onclick={handleDownload} title="Download CSV">
+        <button class="btn-secondary btn-sm" onclick={handleDownload} title={i18n.t('chart.downloadCsv')}>
           ↓ CSV
         </button>
       {/if}
@@ -90,14 +92,14 @@
     </div>
   {:else}
     <div class="flex items-center justify-center h-32 bg-gray-50 rounded-lg text-gray-400 text-sm">
-      No data to display
+      {i18n.t('chart.noData')}
     </div>
   {/if}
 
   <!-- Suppression notice -->
   {#if Object.keys(suppressions).length > 0}
     <p class="text-xs text-amber-600">
-      ⚠ Some values are suppressed (—) to protect student privacy (small cell counts).
+      {i18n.t('chart.suppressionNotice')}
     </p>
   {/if}
 
