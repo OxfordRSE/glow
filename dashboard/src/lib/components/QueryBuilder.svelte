@@ -755,7 +755,7 @@
                 <th class="border-s border-blue-100 px-3 py-2 text-left font-medium text-blue-400">None</th>
               {:else}
                 {#each structureSnapshots[0].measures as column}
-                  <th class="border-s border-blue-100 px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
+                  <th class="border-s border-blue-100 px-3 py-2 text-left font-medium" title={columnLabel(column)}>{column}</th>
                 {/each}
               {/if}
             </tr>
@@ -766,17 +766,17 @@
 
     <datalist id="query-columns">
       {#each filterableColumns as column}
-        <option value={column} label={columnLabel(column)}></option>
+        <option value={column} label={`${column} [${columnLabel(column)}]`}></option>
       {/each}
     </datalist>
     <datalist id="query-group-columns">
       {#each groupableColumns as column}
-        <option value={column} label={columnLabel(column)}></option>
+        <option value={column} label={`${column} [${columnLabel(column)}]`}></option>
       {/each}
     </datalist>
     <datalist id="query-measures">
       {#each measurableColumns as column}
-        <option value={column} label={columnLabel(column)}></option>
+        <option value={column} label={`${column} [${columnLabel(column)}]`}></option>
       {/each}
     </datalist>
     <datalist id="query-waves">
@@ -815,7 +815,7 @@
               <span class="label text-xs">Column</span>
               <input class="input" list="query-columns" bind:value={step.column} />
               {#if step.column.trim()}
-                <p class="mt-1 text-xs text-gray-500" title={step.column}>{columnLabel(step.column)}</p>
+                <p class="mt-1 text-xs text-gray-500" title={columnLabel(step.column)}>{step.column}</p>
               {/if}
             </label>
             <label>
@@ -845,7 +845,7 @@
             <span class="label text-xs">Approved score</span>
             <select class="input max-w-sm" bind:value={step.score}>
               {#each catalog.scores as score}
-                <option value={score}>{columnLabel(score)}</option>
+                <option value={score}>{`${score} (${columnLabel(score)})`}</option>
               {/each}
             </select>
           </label>
@@ -869,6 +869,9 @@
           </div>
           <p class="text-xs text-gray-500">
             This creates `baseline_*`, `comparison_*`, and `change_*` columns for each selected measure.
+            The baseline is the original value (from the 'From wave'),
+            the comparison is the later value (from the 'To wave'),
+            and the change is the difference (comparison - baseline).
           </p>
         {:else if step.type === 'bucket_school_size'}
           <div class="grid md:grid-cols-5 gap-3">
@@ -876,7 +879,7 @@
               <span class="label text-xs">Output column</span>
               <input class="input" bind:value={step.output_column} />
               {#if step.output_column.trim()}
-                <p class="mt-1 text-xs text-gray-500" title={step.output_column}>{columnLabel(step.output_column)}</p>
+                <p class="mt-1 text-xs text-gray-500" title={columnLabel(step.output_column)}>{step.output_column}</p>
               {/if}
             </label>
             <label>
@@ -930,7 +933,7 @@
                       disabled={metric.kind === 'count_students'}
                     />
                     {#if metric.kind === 'mean' && metric.column.trim()}
-                      <p class="mt-1 text-xs text-gray-500" title={metric.column}>{columnLabel(metric.column)}</p>
+                      <p class="mt-1 text-xs text-gray-500" title={columnLabel(metric.column)}>{metric.column}</p>
                     {/if}
                   </label>
                   <label>
@@ -994,20 +997,20 @@
                 </tr>
                 <tr class="text-slate-700">
                   {#each nextStructure.internalColumns as column}
-                    <th class="px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
+                    <th class="px-3 py-2 text-left font-medium" title={columnLabel(column)}>{column}</th>
                   {/each}
                   {#if nextStructure.dimensions.length === 0}
                     <th class="border-s border-slate-100 px-3 py-2 text-left font-medium text-slate-400">None</th>
                   {:else}
                     {#each nextStructure.dimensions as column}
-                      <th class="border-s border-slate-100 px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
+                      <th class="border-s border-slate-100 px-3 py-2 text-left font-medium" title={columnLabel(column)}>{column}</th>
                     {/each}
                   {/if}
                   {#if nextStructure.measures.length === 0}
                     <th class="border-s border-slate-100 px-3 py-2 text-left font-medium text-slate-400">None</th>
                   {:else}
                     {#each nextStructure.measures as column}
-                      <th class="border-s border-slate-100 px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
+                      <th class="border-s border-slate-100 px-3 py-2 text-left font-medium" title={columnLabel(column)}>{column}</th>
                     {/each}
                   {/if}
                 </tr>
@@ -1037,14 +1040,14 @@
                 <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium text-emerald-400">None</th>
               {:else}
                 {#each finalStructure.dimensions as column}
-                  <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
+                  <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium" title={columnLabel(column)}>{column}</th>
                 {/each}
               {/if}
               {#if finalStructure.measures.length === 0}
                 <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium text-emerald-400">None</th>
               {:else}
                 {#each finalStructure.measures as column}
-                  <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium" title={column}>{columnLabel(column)}</th>
+                  <th class="border-s border-emerald-100 px-3 py-2 text-left font-medium" title={columnLabel(column)}>{column}</th>
                 {/each}
               {/if}
             </tr>
