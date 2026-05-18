@@ -94,6 +94,14 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def root() -> dict:
+    return {
+        "title": app.title,
+        "description": app.description,
+        "version": app.version
+    }
+
 @app.get("/health", tags=["health"])
 def health() -> dict:
     return {"status": "ok", "version": __version__}

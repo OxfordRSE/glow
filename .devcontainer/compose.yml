@@ -1,0 +1,16 @@
+# Devcontainer-specific service definition
+# Provides a shell environment with Python + Node + tooling
+# App services are defined in ../compose.yml (shared with CI/local)
+
+services:
+  devcontainer:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspace:cached
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: sleep infinity
+    environment:
+      # Ensure host docker is accessible
+      DOCKER_HOST: unix:///var/run/docker.sock

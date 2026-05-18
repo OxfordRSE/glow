@@ -1,0 +1,23 @@
+# Test-specific overrides for compose.yml
+# Usage: docker compose -f compose.yml -f compose.test.yml up
+# Used by: CI smoke tests
+
+services:
+  api:
+    environment:
+      # Use deterministic secret for tests
+      IB_OX_SECRET_KEY: smoke-test-secret
+      # Stricter healthcheck for CI
+    healthcheck:
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    # Remove restart policy in test mode
+    restart: "no"
+
+  dashboard:
+    restart: "no"
+
+  proxy:
+    restart: "no"

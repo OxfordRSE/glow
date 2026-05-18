@@ -13,15 +13,39 @@ In development, both are served through an nginx proxy:
 - Dashboard → `http://localhost:5173`
 - API → `http://localhost:5173/api`
 
-## Quick Start (Docker Compose)
+## Quick Start
 
-`docker-compose.yml` is configured for local development: the API runs with reload enabled, the dashboard runs the Vite dev server, and both services bind-mount the local workspace so edits are reflected without rebuilding the images.
+### Option 1: Devcontainer (Recommended)
+
+For the most consistent development experience:
+
+1. Install [Docker](https://www.docker.com/products/docker-desktop) and [VS Code](https://code.visualstudio.com/) with the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+2. Open this repo in VS Code
+3. Click "Reopen in Container" when prompted (or use Command Palette → "Dev Containers: Reopen in Container")
+4. Wait for the devcontainer to build and app services to start
+5. Place your data file at `data/data.csv` (or copy from `testdata/demo_data.csv`)
+6. Create users:
+   ```bash
+   docker compose exec api ib-ox-api users create --admin admin
+   ```
+
+The dashboard will be available at <http://localhost:5173> and the API at <http://localhost:5173/api>.
+
+The devcontainer provides:
+- Python 3.12 + Node 22 pre-installed
+- `uv` for fast Python package management
+- Playwright with browser dependencies
+- All app services (API, dashboard, proxy) running via the canonical `compose.yml`
+
+### Option 2: Docker Compose (Host-Based)
+
+`compose.yml` is the canonical service specification used by local dev, CI, and devcontainer. The API runs with reload enabled, the dashboard runs the Vite dev server, and both bind-mount the local workspace.
 
 ```bash
 # Set a strong JWT secret
 export IB_OX_SECRET_KEY="your-strong-secret-here"
 
-# Place your data file (CSV or Parquet) in a Docker volume or bind-mount
+# Place your data file (CSV or Parquet) at data/data.csv
 # The API defaults to /data/data.csv inside the container
 
 # Start the local development stack
@@ -131,25 +155,65 @@ The SvelteKit dashboard provides:
 
 ## Development
 
-### API
+### Configuration Files
 
+This repo uses a centralized approach to minimize drift between dev/test/prod:
+
+- **`compose.yml`** — canonical service specification (API, dashboard, proxy)
+  - Used by: local dev, CI smoke tests, devcontainer
+  - Single source of truth for service topology
+- **`compose.test.yml`** — minimal test-specific overrides
+  - Stricter healthchecks, deterministic secrets, no restart policies
+  - Usage: `docker compose -f compose.yml -f compose.test.yml up`
+- **`.devcontainer/`** — VS Code devcontainer configuration
+  - Provides tooling shell (Python 3.12, Node 22, uv, Playwright)
+  - Delegates app services to `compose.yml` (no duplication)
+  - Mounts Docker socket for "Docker outside of Docker"
+- **`.env.example`** — documented environment variable defaults
+
+### Devcontainer (Recommended)
+
+The devcontainer provides a fully configured development environment. After opening in the devcontainer:
+
+**API development:**
 ```bash
 cd api
+uv pip install -e ".[test]"
+uv run pytest
+```
+
+**Dashboard development:**
+```bash
+cd dashboard
+npm install
+npm run check    # Type checking
+npm run lint     # Linting
+```
+
+**Running smoke tests:**
+```bash
+bash scripts/smoke_compose.sh
+```
+
+### Manual Setup (without devcontainer)
+
+**API:**
+```bash
+cd api
+python3.12 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[test]"
-# Initialise DB
 ib-ox-api db init
-# Start development server
 uvicorn ib_ox_api.main:app --reload
-# Run tests
 pytest
 ```
 
-### Dashboard
-
+**Dashboard:**
 ```bash
 cd dashboard
 npm install
 npm run dev
+npm run check
 ```
 
 ## Deployment (AWS)

@@ -9,32 +9,13 @@ rm -f data/auth.db data/auth.db-shm data/auth.db-wal
 
 export IB_OX_SECRET_KEY="${IB_OX_SECRET_KEY:-smoke-test-secret}"
 
-docker compose down -v --remove-orphans
-docker compose up --build -d
+# Use canonical compose.yml + test overrides
+docker compose -f compose.yml -f compose.test.yml down -v --remove-orphans
+docker compose -f compose.yml -f compose.test.yml up --build -d --wait
 
-python3 - <<'PY'
-import time
-import urllib.request
-
-url = "http://127.0.0.1:5173/api/health"
-deadline = time.time() + 180
-last_error = None
-
-while time.time() < deadline:
-    try:
-        with urllib.request.urlopen(url) as response:
-            if response.status == 200:
-                print(response.read().decode())
-                break
-    except Exception as exc:  # pragma: no cover - smoke script only
-        last_error = exc
-        time.sleep(1)
-else:  # pragma: no cover - smoke script only
-    raise SystemExit(f"Timed out waiting for {url}: {last_error}")
-PY
-
-docker compose exec -T api ib-ox-api users create --admin --password admin admin
-docker compose exec -T api ib-ox-api users create \
+# Healthcheck now guarantees API is ready, so seed users immediately
+docker compose -f compose.yml -f compose.test.yml exec -T api ib-ox-api users create --admin --password admin admin
+docker compose -f compose.yml -f compose.test.yml exec -T api ib-ox-api users create \
   --password alpha-user \
   --scope '{"filters":{"school":["Alpha"]}}' \
   alpha-user

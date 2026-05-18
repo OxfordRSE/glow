@@ -37,4 +37,4 @@ jobs:
         run: npm run test:e2e
       - name: Tear down compose stack
         if: always()
-        run: docker compose down -v --remove-orphans
+        run: docker compose -f compose.yml -f compose.test.yml down -v --remove-orphans
