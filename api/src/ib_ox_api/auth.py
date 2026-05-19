@@ -1,6 +1,6 @@
-import json
+"""Authentication and authorization logic."""
+
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -8,8 +8,9 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from ib_ox_api.database import UserModel, get_db, get_user_by_username, scope_json_to_dict
-from ib_ox_api.models import TokenData, UserRead, UserScope
+from ib_ox_api.database import get_db, get_user_by_username
+from ib_ox_api.metadata_models import User
+from ib_ox_api.models import TokenData, UserRead
 from ib_ox_api.settings import settings
 
 pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
@@ -24,7 +25,7 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -33,7 +34,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def authenticate_user(db: Session, username: str, password: str) -> Optional[UserModel]:
+def authenticate_user(db: Session, username: str, password: str) -> User | None:
     user = get_user_by_username(db, username)
     if user is None:
         return None
@@ -44,13 +45,12 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
     return user
 
 
-def _user_model_to_read(user: UserModel) -> UserRead:
-    scope_data = scope_json_to_dict(user.scope_json)
-    scope = UserScope(filters=scope_data.get("filters", {}))
+def _user_model_to_read(user: User) -> UserRead:
     return UserRead(
         id=user.id,
         username=user.username,
-        scope=scope,
+        school_ids=[s.id for s in user.schools],
+        school_names=[s.name for s in user.schools],
         is_active=user.is_active,
         is_admin=user.is_admin,
     )
@@ -67,7 +67,7 @@ async def get_current_user(
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        username: Optional[str] = payload.get("sub")
+        username: str | None = payload.get("sub")
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)

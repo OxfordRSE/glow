@@ -47,6 +47,7 @@ def query_examples() -> tuple[QueryExample, ...]:
             question="How many distinct students are in scope for each school?",
             plan=QueryPlan.model_validate(
                 {
+                    "waves": ["1", "2", "3"],
                     "steps": [
                         {
                             "type": "aggregate",
@@ -57,12 +58,12 @@ def query_examples() -> tuple[QueryExample, ...]:
                 }
             ),
             expected_rows=[
-                {"school": "Alpha", "student_n": 5.0},
-                {"school": "Beta", "student_n": 5.0},
+                {"school": "Focus School Academy", "student_n": 5.0},
+                {"school": "Neighbouring School", "student_n": 5.0},
             ],
             expected_count_rows=[
-                {"school": "Alpha", "student_n": 5.0},
-                {"school": "Beta", "student_n": 5.0},
+                {"school": "Focus School Academy", "student_n": 5.0},
+                {"school": "Neighbouring School", "student_n": 5.0},
             ],
             expected_suppressions={},
             sort_by=("school",),
@@ -73,6 +74,7 @@ def query_examples() -> tuple[QueryExample, ...]:
             question="What is the mean derived `bw_wbeing_total` for each school?",
             plan=QueryPlan.model_validate(
                 {
+                    "waves": ["1", "2", "3"],
                     "steps": [
                         {"type": "derive_score", "score": "bw_wbeing_total"},
                         {
@@ -84,12 +86,12 @@ def query_examples() -> tuple[QueryExample, ...]:
                 }
             ),
             expected_rows=[
-                {"school": "Alpha", "bw_wbeing_total": 9.8},
-                {"school": "Beta", "bw_wbeing_total": 8.8},
+                {"school": "Focus School Academy", "bw_wbeing_total": 9.8},
+                {"school": "Neighbouring School", "bw_wbeing_total": 8.8},
             ],
             expected_count_rows=[
-                {"school": "Alpha", "bw_wbeing_total": 5.0},
-                {"school": "Beta", "bw_wbeing_total": 5.0},
+                {"school": "Focus School Academy", "bw_wbeing_total": 5.0},
+                {"school": "Neighbouring School", "bw_wbeing_total": 5.0},
             ],
             expected_suppressions={},
             sort_by=("school",),
@@ -103,6 +105,7 @@ def query_examples() -> tuple[QueryExample, ...]:
             ),
             plan=QueryPlan.model_validate(
                 {
+                    "waves": ["1", "2", "3"],
                     "steps": [
                         {"type": "derive_score", "score": "bw_wbeing_total"},
                         {
@@ -132,8 +135,8 @@ def query_examples() -> tuple[QueryExample, ...]:
                     ]
                 }
             ),
-            expected_rows=[{"school": "Alpha", "avg_change": 0.8, "student_n": 5.0}],
-            expected_count_rows=[{"school": "Alpha", "avg_change": 5.0, "student_n": 5.0}],
+            expected_rows=[{"school": "Focus School Academy", "avg_change": 0.8, "student_n": 5.0}],
+            expected_count_rows=[{"school": "Focus School Academy", "avg_change": 5.0, "student_n": 5.0}],
             expected_suppressions={},
             sort_by=("school",),
         ),
@@ -146,6 +149,7 @@ def query_examples() -> tuple[QueryExample, ...]:
             ),
             plan=QueryPlan.model_validate(
                 {
+                    "waves": ["1", "2", "3"],
                     "steps": [
                         {"type": "derive_score", "score": "bw_wbeing_total"},
                         {
@@ -185,6 +189,7 @@ def query_examples() -> tuple[QueryExample, ...]:
             ),
             plan=QueryPlan.model_validate(
                 {
+                    "waves": ["1", "2", "3"],
                     "steps": [
                         {"type": "derive_score", "score": "bw_wbeing_total"},
                         {
@@ -207,8 +212,8 @@ def query_examples() -> tuple[QueryExample, ...]:
                     ]
                 }
             ),
-            expected_rows=[{"school": "Alpha", "student_n": float("nan")}],
-            expected_count_rows=[{"school": "Alpha", "student_n": float("nan")}],
+            expected_rows=[{"school": "Focus School Academy", "student_n": float("nan")}],
+            expected_count_rows=[{"school": "Focus School Academy", "student_n": float("nan")}],
             expected_suppressions={"student_n": {"0": "<5"}},
             sort_by=("school",),
         ),

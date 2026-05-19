@@ -6,7 +6,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 # Import the metadata from our models so Alembic can detect schema
-from ib_ox_api.database import Base
+from ib_ox_api.metadata_models import Base
 
 # this is the Alembic Config object
 config = context.config

@@ -26,6 +26,9 @@ test = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
 ]
+dev = [
+    "ruff>=0.1.0",
+]
 
 [project.scripts]
 ib-ox-api = "ib_ox_api.cli:cli"

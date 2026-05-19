@@ -1,7 +1,7 @@
-FROM node:22-alpine AS deps
+FROM node:22-bookworm-slim AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --include=optional
 
 FROM deps AS dev
 WORKDIR /app
@@ -14,7 +14,7 @@ WORKDIR /app
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine
+FROM node:22-bookworm-slim
 WORKDIR /app
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package*.json ./

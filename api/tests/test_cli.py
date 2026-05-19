@@ -6,7 +6,7 @@ from click.testing import CliRunner
 from sqlalchemy.orm import sessionmaker
 
 import ib_ox_api.cli as cli_module
-from ib_ox_api.database import UserModel
+from ib_ox_api.metadata_models import User
 
 
 def test_db_init_runs_migrations(monkeypatch):
@@ -25,7 +25,7 @@ def test_db_init_runs_migrations(monkeypatch):
     assert "Database initialised." in result.output
 
 
-def test_users_create_and_list(monkeypatch, db_engine):
+def test_users_create_and_list(monkeypatch, db_engine, sample_schools):
     Session = sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
     monkeypatch.setattr(cli_module, "SessionLocal", Session)
 
@@ -38,8 +38,8 @@ def test_users_create_and_list(monkeypatch, db_engine):
             "alice",
             "--password",
             "secret-pass",
-            "--scope",
-            json.dumps({"filters": {"school": ["Alpha"]}}),
+            "--schools",
+            "Focus School Academy",
             "--admin",
         ],
     )
@@ -48,16 +48,17 @@ def test_users_create_and_list(monkeypatch, db_engine):
     assert "User 'alice' created" in create_result.output
 
     with Session() as session:
-        user = session.query(UserModel).filter_by(username="alice").one()
+        user = session.query(User).filter_by(username="alice").one()
         assert user.is_admin is True
-        assert json.loads(user.scope_json) == {"filters": {"school": ["Alpha"]}}
+        assert len(user.schools) == 1
+        assert user.schools[0].name == "Focus School Academy"
 
     list_result = runner.invoke(cli_module.cli, ["users", "list"])
     assert list_result.exit_code == 0
     assert "alice" in list_result.output
 
 
-def test_users_delete(monkeypatch, db_engine):
+def test_users_delete(monkeypatch, db_engine, sample_schools):
     Session = sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
     monkeypatch.setattr(cli_module, "SessionLocal", Session)
 
@@ -77,4 +78,4 @@ def test_users_delete(monkeypatch, db_engine):
     assert "User 'alice' deleted." in delete_result.output
 
     with Session() as session:
-        assert session.query(UserModel).filter_by(username="alice").first() is None
+        assert session.query(User).filter_by(username="alice").first() is None

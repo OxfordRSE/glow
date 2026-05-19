@@ -12,7 +12,7 @@ COPY pyproject.toml .
 COPY src/ src/
 
 # Install the package and its dependencies
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e ".[test,dev]"
 
 COPY alembic.ini alembic.ini
 COPY alembic/ alembic/

@@ -1,0 +1,10 @@
+{
+  "id": "schools.empty",
+  "method": "GET",
+  "path": "/schools",
+  "status": 200,
+  "request_model": null,
+  "response_model": "SchoolListResponse",
+  "request": null,
+  "response": []
+}

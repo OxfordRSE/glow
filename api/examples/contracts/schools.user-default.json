@@ -1,0 +1,27 @@
+{
+  "id": "schools.user-default",
+  "method": "GET",
+  "path": "/schools",
+  "status": 200,
+  "request_model": null,
+  "response_model": "SchoolListResponse",
+  "request": null,
+  "response": [
+    {
+      "id": 1,
+      "name": "Focus School Academy",
+      "size": "medium",
+      "category": "comprehensive",
+      "geographical_neighbor_ids": [2],
+      "statistical_neighbor_ids": [2, 3]
+    },
+    {
+      "id": 2,
+      "name": "Neighbouring School",
+      "size": "large",
+      "category": "academy",
+      "geographical_neighbor_ids": [1],
+      "statistical_neighbor_ids": [1]
+    }
+  ]
+}

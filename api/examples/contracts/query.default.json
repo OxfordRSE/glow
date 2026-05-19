@@ -1,0 +1,76 @@
+{
+  "id": "query.default",
+  "method": "POST",
+  "path": "/api/query",
+  "status": 200,
+  "request_model": "SafeQueryRequest",
+  "response_model": "SafeQueryResponse",
+  "request": {
+    "school_id": 1,
+    "variable": "score",
+    "waves": ["1", "2"],
+    "aggregations": [],
+    "filters": {},
+    "include_neighbors": true
+  },
+  "response": {
+    "focus_school": {
+      "school_id": 1,
+      "school_name": "Focus School Academy",
+      "results": {
+        "1": {
+          "suppressed": false,
+          "suppression_message": null,
+          "results": [
+            {
+              "mean": 75.5,
+              "student_n": 120
+            }
+          ]
+        },
+        "2": {
+          "suppressed": false,
+          "suppression_message": null,
+          "results": [
+            {
+              "mean": 78.2,
+              "student_n": 125
+            }
+          ]
+        }
+      }
+    },
+    "neighbors": [
+      {
+        "school_id": 2,
+        "school_name": "Neighbouring School",
+        "results": {
+          "1": {
+            "suppressed": false,
+            "suppression_message": null,
+            "results": [
+              {
+                "mean": 72.1,
+                "student_n": 110
+              }
+            ]
+          },
+          "2": {
+            "suppressed": false,
+            "suppression_message": null,
+            "results": [
+              {
+                "mean": 74.8,
+                "student_n": 115
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "variable": "score",
+    "waves": ["1", "2"],
+    "aggregations": [],
+    "filters": {}
+  }
+}

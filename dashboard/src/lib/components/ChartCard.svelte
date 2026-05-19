@@ -29,12 +29,13 @@
 
   interface Props {
     title: string;
-    type: 'bar' | 'line';
+    type: 'bar' | 'line' | 'horizontalBar';
     data: ChartJsData;
     options?: Record<string, unknown>;
     csv: string;
     suppressions?: Record<string, Record<number, string>>;
     filename?: string;
+    noNeighborData?: boolean;
   }
 
   let {
@@ -44,7 +45,8 @@
     options = {},
     csv,
     suppressions = {},
-    filename = 'data'
+    filename = 'data',
+    noNeighborData = false
   }: Props = $props();
 
   const i18n = $derived(createI18n($locale));
@@ -57,6 +59,7 @@
   const chartOptions = $derived({
     responsive: true,
     maintainAspectRatio: false,
+    indexAxis: type === 'horizontalBar' ? 'y' : 'x',
     ...options
   });
 </script>
@@ -66,13 +69,15 @@
   <div class="flex items-start justify-between gap-4">
     <h3 class="font-semibold text-gray-800">{title}</h3>
     <div class="flex items-center gap-2 shrink-0">
-      <button
-        class="btn-secondary btn-sm"
-        onclick={() => (showTable = !showTable)}
-        aria-pressed={showTable}
-      >
-        {showTable ? i18n.t('chart.hideTable') : i18n.t('chart.showTable')}
-      </button>
+      {#if data.datasets.length > 0}
+        <button
+          class="btn-secondary btn-sm"
+          onclick={() => (showTable = !showTable)}
+          aria-pressed={showTable}
+        >
+          {showTable ? i18n.t('chart.hideTable') : i18n.t('chart.showTable')}
+        </button>
+      {/if}
       {#if csv}
         <button class="btn-secondary btn-sm" onclick={handleDownload} title={i18n.t('chart.downloadCsv')}>
           ↓ CSV
@@ -90,14 +95,24 @@
         <Bar {data} options={chartOptions} />
       {/if}
     </div>
+    {#if noNeighborData}
+      <p class="text-xs text-gray-500 mt-2">
+        Note: No neighbour data is available for this query.
+      </p>
+    {/if}
   {:else}
-    <div class="flex items-center justify-center h-32 bg-gray-50 rounded-lg text-gray-400 text-sm">
-      {i18n.t('chart.noData')}
+    <div class="flex items-center justify-center h-32 bg-gray-50 rounded-lg text-gray-400 text-sm flex-col gap-2">
+      <p>{i18n.t('chart.noData')}</p>
+      {#if Object.keys(suppressions).length > 0}
+        <p class="text-xs text-amber-600 max-w-md text-center">
+          {i18n.t('chart.suppressionNotice')}
+        </p>
+      {/if}
     </div>
   {/if}
 
-  <!-- Suppression notice -->
-  {#if Object.keys(suppressions).length > 0}
+  <!-- Suppression notice (only shown when data is available) -->
+  {#if Object.keys(suppressions).length > 0 && data.datasets.length > 0}
     <p class="text-xs text-amber-600">
       {i18n.t('chart.suppressionNotice')}
     </p>

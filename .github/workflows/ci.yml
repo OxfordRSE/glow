@@ -33,7 +33,7 @@ jobs:
           PLAYWRIGHT_ADMIN_PASSWORD: admin
           PLAYWRIGHT_SCOPED_USER: alpha-user
           PLAYWRIGHT_SCOPED_PASSWORD: alpha-user
-          PLAYWRIGHT_SCOPED_SCHOOL: Alpha
+          PLAYWRIGHT_SCOPED_SCHOOL: Focus School Academy
         run: npm run test:e2e
       - name: Tear down compose stack
         if: always()

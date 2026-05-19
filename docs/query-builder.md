@@ -42,15 +42,15 @@ Values:
 
 | school | student_n |
 | ------ | --------- |
-| Alpha  | 5.0       |
-| Beta   | 5.0       |
+| Focus School Academy  | 5.0       |
+| Neighbouring School   | 5.0       |
 
 Contributing distinct-student counts:
 
 | school | student_n |
 | ------ | --------- |
-| Alpha  | 5.0       |
-| Beta   | 5.0       |
+| Focus School Academy  | 5.0       |
+| Neighbouring School   | 5.0       |
 
 Suppressions: `{}`
 
@@ -94,15 +94,15 @@ Values:
 
 | school | bw_wbeing_total |
 | ------ | --------------- |
-| Alpha  | 9.8             |
-| Beta   | 8.8             |
+| Focus School Academy  | 9.8             |
+| Neighbouring School   | 8.8             |
 
 Contributing distinct-student counts:
 
 | school | bw_wbeing_total |
 | ------ | --------------- |
-| Alpha  | 5.0             |
-| Beta   | 5.0             |
+| Focus School Academy  | 5.0             |
+| Neighbouring School   | 5.0             |
 
 Suppressions: `{}`
 
@@ -166,13 +166,13 @@ Values:
 
 | school | avg_change | student_n |
 | ------ | ---------- | --------- |
-| Alpha  | 0.8        | 5.0       |
+| Focus School Academy  | 0.8        | 5.0       |
 
 Contributing distinct-student counts:
 
 | school | avg_change | student_n |
 | ------ | ---------- | --------- |
-| Alpha  | 5.0        | 5.0       |
+| Focus School Academy  | 5.0        | 5.0       |
 
 Suppressions: `{}`
 
@@ -312,13 +312,13 @@ Values:
 
 | school | student_n |
 | ------ | --------- |
-| Alpha  |           |
+| Focus School Academy  |           |
 
 Contributing distinct-student counts:
 
 | school | student_n |
 | ------ | --------- |
-| Alpha  |           |
+| Focus School Academy  |           |
 
 Suppressions: `{"student_n": {"0": "<5"}}`
 

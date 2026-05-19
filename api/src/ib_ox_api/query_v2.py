@@ -17,6 +17,7 @@ from ib_ox_api.models import (
     QueryPairWavesStep,
     QueryPlan,
     QueryResult,
+    QueryResultForWave,
     SuppressionCode,
     UserScope,
 )
@@ -31,7 +32,32 @@ from ib_ox_api.query import (
 )
 
 SAFE_OUTPUT_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
-DERIVED_SCORE_NAMES = {"bw_wbeing_total"}
+
+# All subscale and scale total scores computed during data ingestion
+DERIVED_SCORE_NAMES = {
+    "bw_migration_total",
+    "bw_wbeing_total",
+    "bw_selfest_total",
+    "bw_emoreg_total",
+    "bw_stress_total",
+    "bw_coping_total",
+    "bw_emodies_total",
+    "bw_behav_total",
+    "bw_unhealthy_total",
+    "bw_socmtype_total",
+    "bw_activ_total",
+    "bw_staffrel_total",
+    "bw_localenv_total",
+    "bw_future_total",
+    "bw_plans_total",
+    "bw_gmacs_total",
+    "bw_parentsrel_total",
+    "bw_friends_total",
+    "bw_discrim_total",
+    "bw_discloc_total",
+    "bw_bullying_total",
+    "bw_mhcontact_total",
+}
 
 
 def build_query_catalog(df: pd.DataFrame) -> QueryCatalog:
@@ -395,7 +421,7 @@ def _apply_aggregate_step(
     provenance.append(
         "Aggregated metrics with suppression based on contributing distinct-student N."
     )
-    return QueryResult(
+    return QueryResultForWave(
         csv=_df_to_csv(result_df),
         count_csv=_df_to_csv(counts_df),
         suppressions=suppressions,  # type: ignore[arg-type]
@@ -409,23 +435,47 @@ def execute_query(
     scope: UserScope,
     min_n: int,
 ) -> QueryResult:
-    frame = _initial_frame(df, scope)
-
-    for step in plan.steps:
-        if step.type == "filter":
-            frame = _apply_filter_step(frame, step)
-        elif step.type == "derive_score":
-            frame = _apply_derive_score_step(frame, step)
-        elif step.type == "pair_waves":
-            frame = _apply_pair_waves_step(frame, step)
-        elif step.type == "bucket_school_size":
-            frame = _apply_bucket_school_size_step(frame, step)
-        elif step.type == "aggregate":
-            return _apply_aggregate_step(frame, step, min_n)
-        else:
-            raise ValueError(f"Unsupported step type '{step.type}'.")
-
-    raise ValueError("Query plans must end with an aggregate step.")
+    """Execute a query plan for each specified wave.
+    
+    Returns a wave-indexed dictionary of results.
+    """
+    from ib_ox_api.models import Filter
+    
+    results = {}
+    
+    for wave in plan.waves:
+        # Start with initial frame for this wave
+        frame = _initial_frame(df, scope)
+        
+        # Apply wave filter first
+        wave_filter = QueryFilterStep(
+            type="filter",
+            column="wave",
+            op=FilterOp.EQ,
+            value=wave
+        )
+        frame = _apply_filter_step(frame, wave_filter)
+        
+        # Execute the rest of the plan
+        for step in plan.steps:
+            if step.type == "filter":
+                frame = _apply_filter_step(frame, step)
+            elif step.type == "derive_score":
+                frame = _apply_derive_score_step(frame, step)
+            elif step.type == "pair_waves":
+                frame = _apply_pair_waves_step(frame, step)
+            elif step.type == "bucket_school_size":
+                frame = _apply_bucket_school_size_step(frame, step)
+            elif step.type == "aggregate":
+                results[wave] = _apply_aggregate_step(frame, step, min_n)
+                break  # Aggregate is always the last step
+            else:
+                raise ValueError(f"Unsupported step type '{step.type}'.")
+        
+        if wave not in results:
+            raise ValueError("Query plans must end with an aggregate step.")
+    
+    return QueryResult(results=results)
 
 
 build_query_v2_catalog = build_query_catalog

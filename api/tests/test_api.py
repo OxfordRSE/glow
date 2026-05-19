@@ -98,7 +98,7 @@ def test_suppression_frequency_below_min_n(tiny_df):
 def test_suppression_frequency_above_min_n(sample_df):
     from ib_ox_api.suppression import suppress_frequency_table
 
-    alpha_df = sample_df[sample_df["school"] == "Alpha"]
+    alpha_df = sample_df[sample_df["school"] == "Focus School Academy"]
     result_df, suppressions = suppress_frequency_table(
         alpha_df, group_cols=["wave"], value_col=None, min_n=3
     )
@@ -130,9 +130,9 @@ def test_user_scope_applied(sample_df):
     from ib_ox_api.models import UserScope
     from ib_ox_api.query import apply_user_scope
 
-    scope = UserScope(filters={"school": ["Alpha"]})
+    scope = UserScope(filters={"school": ["Focus School Academy"]})
     filtered = apply_user_scope(sample_df, scope)
-    assert set(filtered["school"].unique()) == {"Alpha"}
+    assert set(filtered["school"].unique()) == {"Focus School Academy"}
 
 
 def test_admin_list_users(admin_client):
@@ -144,27 +144,35 @@ def test_admin_list_users(admin_client):
     assert users[0]["is_admin"] is True
 
 
-def test_admin_create_user(admin_client):
+def test_admin_create_user(admin_client, sample_schools):
+    # Get school ID for Focus School Academy
+    alpha_id = sample_schools["Focus School Academy"].id
+    
     payload = {
         "username": "analyst",
         "password": "analyst-pass",
-        "scope": {"filters": {"school": ["Alpha"]}},
+        "school_ids": [alpha_id],
         "is_admin": False,
     }
     response = admin_client.post("/admin/users", json=payload)
     assert response.status_code == status.HTTP_201_CREATED
     user = response.json()
     assert user["username"] == "analyst"
-    assert user["scope"]["filters"] == {"school": ["Alpha"]}
+    assert alpha_id in user["school_ids"]
+    assert "Focus School Academy" in user["school_names"]
 
 
-def test_admin_update_user(admin_client):
+def test_admin_update_user(admin_client, sample_schools):
+    # Get school IDs
+    alpha_id = sample_schools["Focus School Academy"].id
+    beta_id = sample_schools["Neighbouring School"].id
+    
     create_response = admin_client.post(
         "/admin/users",
         json={
             "username": "analyst",
             "password": "analyst-pass",
-            "scope": {"filters": {"school": ["Alpha"]}},
+            "school_ids": [alpha_id],
             "is_admin": False,
         },
     )
@@ -173,25 +181,28 @@ def test_admin_update_user(admin_client):
     response = admin_client.put(
         f"/admin/users/{user_id}",
         json={
-            "scope": {"filters": {"school": ["Beta"]}},
+            "school_ids": [beta_id],
             "is_active": False,
             "is_admin": True,
         },
     )
     assert response.status_code == status.HTTP_200_OK
     updated = response.json()
-    assert updated["scope"]["filters"] == {"school": ["Beta"]}
+    assert beta_id in updated["school_ids"]
+    assert "Neighbouring School" in updated["school_names"]
     assert updated["is_active"] is False
     assert updated["is_admin"] is True
 
 
-def test_admin_delete_user(admin_client):
+def test_admin_delete_user(admin_client, sample_schools):
+    alpha_id = sample_schools["Focus School Academy"].id
+    
     create_response = admin_client.post(
         "/admin/users",
         json={
             "username": "analyst",
             "password": "analyst-pass",
-            "scope": {"filters": {"school": ["Alpha"]}},
+            "school_ids": [alpha_id],
             "is_admin": False,
         },
     )

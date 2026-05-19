@@ -14,6 +14,8 @@ const PALETTE = [
   "#6366F1",
 ];
 
+const GREY = "#9CA3AF";
+
 export interface ChartDataset {
   label: string;
   data: (number | null)[];
@@ -32,12 +34,21 @@ export interface ChartJsData {
 export interface ChartOutput {
   data: ChartJsData;
   options: Record<string, unknown>;
+  type?: 'bar' | 'line' | 'horizontalBar';
 }
 
 export interface ChartLabelOptions {
   columnLabel?: (column: string) => string;
   countLabel?: string;
   meanLabel?: string;
+}
+
+/**
+ * Determine if data represents single-wave data (should use horizontal bar)
+ * vs multi-wave data (should use line chart).
+ */
+function isSingleWave(groupBy: string[]): boolean {
+  return !groupBy.includes('wave');
 }
 
 function resolveChartLabels(options: ChartLabelOptions = {}) {
@@ -48,15 +59,21 @@ function resolveChartLabels(options: ChartLabelOptions = {}) {
   };
 }
 
-function baseOptions(yLabel = "Count"): Record<string, unknown> {
+function baseOptions(yLabel = "Count", horizontal = false): Record<string, unknown> {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    indexAxis: horizontal ? 'y' : 'x',
     plugins: {
       legend: { position: "top" as const },
       tooltip: { mode: "index" as const, intersect: false },
     },
-    scales: {
+    scales: horizontal ? {
+      x: {
+        beginAtZero: true,
+        title: { display: true, text: yLabel },
+      },
+    } : {
       y: {
         beginAtZero: true,
         title: { display: true, text: yLabel },
@@ -69,6 +86,7 @@ function baseOptions(yLabel = "Count"): Record<string, unknown> {
  * Convert a FrequencyResult to a bar-chart dataset.
  * If groupBy has one column: simple bar chart with that column as labels.
  * If groupBy has two columns: grouped bar chart (first col = x-axis, second = series).
+ * Single-wave data uses horizontal bars for compactness.
  */
 export function frequencyToChartData(
   result: { csv: string },
@@ -77,10 +95,13 @@ export function frequencyToChartData(
 ): ChartOutput {
   const chartLabels = resolveChartLabels(labelOptions);
   const { headers, rows } = parseCSV(result.csv);
+  const horizontal = isSingleWave(groupBy);
+  
   if (headers.length === 0 || rows.length === 0) {
     return {
       data: { labels: [], datasets: [] },
-      options: baseOptions(chartLabels.countLabel),
+      options: baseOptions(chartLabels.countLabel, horizontal),
+      type: horizontal ? 'horizontalBar' : 'bar',
     };
   }
 
@@ -113,7 +134,9 @@ export function frequencyToChartData(
         valueCol === "n" || valueCol === "student_n"
           ? chartLabels.countLabel
           : chartLabels.columnLabel(valueCol),
+        horizontal,
       ),
+      type: horizontal ? 'horizontalBar' : 'bar',
     };
   }
 
@@ -152,43 +175,192 @@ export function frequencyToChartData(
 
   return {
     data: { labels: xLabels, datasets },
-    options: baseOptions(chartLabels.countLabel),
+    options: baseOptions(chartLabels.countLabel, horizontal),
+    type: horizontal ? 'horizontalBar' : 'bar',
   };
 }
 
 /**
- * Convert a FrequencyResult to a line-chart dataset (for trend data).
+ * Convert a FrequencyResult to a line-chart dataset (for trend/wave data).
  * xCol = the column to use as the x-axis (e.g. "wave").
+ * 
+ * Multi-wave line chart styling:
+ * - Wave on horizontal axis
+ * - Non-focus school data in grey with alpha
+ * - Focus school data in color with full opacity
+ * - Focus school data split into different colored lines if required by aggregator
+ * 
+ * Options:
+ * - focusSchoolName: If provided, this school's data will be rendered in color with full opacity
+ * - All other schools will be rendered in grey with alpha
  */
 export function frequencyToLineData(
   result: { csv: string },
   groupBy: string[],
   xCol: string,
   labelOptions: ChartLabelOptions = {},
+  focusSchoolName?: string,
 ): ChartOutput {
   const chartLabels = resolveChartLabels(labelOptions);
-  const base = frequencyToChartData(result, groupBy, labelOptions);
-  // Convert datasets to line style
-  const datasets = base.data.datasets.map((ds, i) => ({
-    ...ds,
-    tension: 0.3,
-    fill: false,
-    backgroundColor: PALETTE[i % PALETTE.length],
-    borderColor: PALETTE[i % PALETTE.length],
-    borderWidth: 2,
-  }));
-  const options = {
-    ...base.options,
-    scales: {
-      ...(base.options.scales as Record<string, unknown>),
-      x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
-    },
-  };
-  return { data: { ...base.data, datasets }, options };
+  const { headers, rows } = parseCSV(result.csv);
+  
+  if (headers.length === 0 || rows.length === 0) {
+    return {
+      data: { labels: [], datasets: [] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "top" as const },
+        },
+        scales: {
+          x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
+          y: { beginAtZero: true },
+        },
+      },
+      type: 'line',
+    };
+  }
+
+  // If we have 'school' in groupBy, we need to separate focus school from neighbors
+  const hasSchool = headers.includes('school');
+  const schoolIdx = hasSchool ? headers.indexOf('school') : -1;
+  
+  // Get all unique x-axis values (e.g., waves)
+  const xIdx = headers.indexOf(xCol);
+  const xLabels = [...new Set(rows.map((r) => String(r[xIdx] ?? "")))].sort();
+  
+  // Determine other grouping columns (exclude xCol and school)
+  const otherGroupCols = groupBy.filter(col => col !== xCol && col !== 'school');
+  
+  if (hasSchool && focusSchoolName) {
+    // Multi-school line chart with focus school styling
+    const schools = [...new Set(rows.map((r) => String(r[schoolIdx] ?? "")))];
+    
+    // If there are other aggregations, split focus school data by them
+    if (otherGroupCols.length > 0) {
+      const datasets: ChartDataset[] = [];
+      
+      for (const school of schools) {
+        const isFocus = school === focusSchoolName;
+        const schoolRows = rows.filter(r => String(r[schoolIdx]) === school);
+        
+        // Get unique values for other group columns
+        const otherGroups = [...new Set(schoolRows.map(r => 
+          otherGroupCols.map(col => String(r[headers.indexOf(col)] ?? "")).join(" / ")
+        ))];
+        
+        otherGroups.forEach((groupLabel, groupIdx) => {
+          const data = xLabels.map((xLabel) => {
+            const row = schoolRows.find((r) => {
+              const xMatch = String(r[xIdx]) === xLabel;
+              const groupMatch = otherGroupCols.map(col => 
+                String(r[headers.indexOf(col)] ?? "")
+              ).join(" / ") === groupLabel;
+              return xMatch && groupMatch;
+            });
+            if (!row) return null;
+            const v = row[headers.length - 1]; // Last column is the value
+            return v === "" || v === undefined ? null : Number(v);
+          });
+          
+          const label = isFocus 
+            ? (otherGroupCols.length > 0 ? groupLabel : school)
+            : school;
+          
+          datasets.push({
+            label,
+            data,
+            tension: 0.3,
+            fill: false,
+            backgroundColor: isFocus ? PALETTE[groupIdx % PALETTE.length] : GREY,
+            borderColor: isFocus ? PALETTE[groupIdx % PALETTE.length] : GREY + "80",
+            borderWidth: 2,
+          });
+        });
+      }
+      
+      return {
+        data: { labels: xLabels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "top" as const },
+          },
+          scales: {
+            x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
+            y: { beginAtZero: true, title: { display: true, text: chartLabels.meanLabel } },
+          },
+        },
+        type: 'line',
+      };
+    } else {
+      // Just school + wave, no other aggregations
+      const datasets: ChartDataset[] = schools.map((school) => {
+        const isFocus = school === focusSchoolName;
+        const data = xLabels.map((xLabel) => {
+          const row = rows.find(
+            (r) => String(r[schoolIdx]) === school && String(r[xIdx]) === xLabel,
+          );
+          if (!row) return null;
+          const v = row[headers.length - 1];
+          return v === "" || v === undefined ? null : Number(v);
+        });
+        
+        return {
+          label: school,
+          data,
+          tension: 0.3,
+          fill: false,
+          backgroundColor: isFocus ? PALETTE[0] : GREY,
+          borderColor: isFocus ? PALETTE[0] : GREY + "80",
+          borderWidth: 2,
+        };
+      });
+      
+      return {
+        data: { labels: xLabels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "top" as const },
+          },
+          scales: {
+            x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
+            y: { beginAtZero: true, title: { display: true, text: chartLabels.meanLabel } },
+          },
+        },
+        type: 'line',
+      };
+    }
+  } else {
+    // Single school or no focus school specified - use base implementation
+    const base = frequencyToChartData(result, groupBy, labelOptions);
+    // Convert datasets to line style
+    const datasets = base.data.datasets.map((ds, i) => ({
+      ...ds,
+      tension: 0.3,
+      fill: false,
+      backgroundColor: PALETTE[i % PALETTE.length],
+      borderColor: PALETTE[i % PALETTE.length],
+      borderWidth: 2,
+    }));
+    const options = {
+      ...base.options,
+      scales: {
+        ...(base.options.scales as Record<string, unknown>),
+        x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
+      },
+    };
+    return { data: { ...base.data, datasets }, options, type: 'line' };
+  }
 }
 
 /**
  * Convert a means-like result to a bar-chart dataset.
+ * Single-wave data uses horizontal bars for compactness.
  */
 export function meansToChartData(
   result: { csv: string },
@@ -197,10 +369,13 @@ export function meansToChartData(
 ): ChartOutput {
   const chartLabels = resolveChartLabels(labelOptions);
   const { headers, rows } = parseCSV(result.csv);
+  const horizontal = isSingleWave(groupBy);
+  
   if (headers.length === 0 || rows.length === 0) {
     return {
       data: { labels: [], datasets: [] },
-      options: baseOptions(chartLabels.meanLabel),
+      options: baseOptions(chartLabels.meanLabel, horizontal),
+      type: horizontal ? 'horizontalBar' : 'bar',
     };
   }
 
@@ -227,7 +402,8 @@ export function meansToChartData(
 
   return {
     data: { labels: rowLabels, datasets },
-    options: baseOptions(chartLabels.meanLabel),
+    options: baseOptions(chartLabels.meanLabel, horizontal),
+    type: horizontal ? 'horizontalBar' : 'bar',
   };
 }
 
@@ -237,4 +413,63 @@ export function queryToChartData(
   labelOptions: ChartLabelOptions = {},
 ): ChartOutput {
   return meansToChartData(result, groupBy, labelOptions);
+}
+
+/**
+ * Convert SafeQueryResponse to chart data for wave analysis
+ * Handles focus school vs neighbor styling:
+ * - Non-focus school data in grey with alpha
+ * - Focus school data in colour with full opacity
+ * - Focus school data split into different colored lines if required by aggregator
+ */
+export function safeQueryToWaveChart(
+  focusSchool: { school_name: string; results: Record<string, unknown>[] | null },
+  neighbors: { school_name: string; results: Record<string, unknown>[] | null }[],
+  aggregations: string[],
+  labelOptions: ChartLabelOptions = {},
+): ChartOutput {
+  const chartLabels = resolveChartLabels(labelOptions);
+  
+  // Combine all data into CSV format for processing
+  if (!focusSchool.results || focusSchool.results.length === 0) {
+    return {
+      data: { labels: [], datasets: [] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "top" as const } },
+        scales: {
+          x: { title: { display: true, text: chartLabels.columnLabel('wave') } },
+          y: { beginAtZero: true, title: { display: true, text: chartLabels.meanLabel } },
+        },
+      },
+      type: 'line',
+    };
+  }
+  
+  const allResults = [
+    ...focusSchool.results.map(r => ({ ...r, school: focusSchool.school_name, _isFocus: true })),
+    ...neighbors.flatMap(n => 
+      (n.results || []).map(r => ({ ...r, school: n.school_name, _isFocus: false }))
+    ),
+  ];
+  
+  // Convert to CSV
+  const headers = ['school', ...aggregations, 'mean', 'student_n'];
+  const csvRows = allResults.map(r => {
+    return headers.map(h => {
+      if (h === 'school') return String(r.school);
+      return String(r[h] ?? '');
+    }).join(',');
+  });
+  const csv = headers.join(',') + '\n' + csvRows.join('\n');
+  
+  // Use frequencyToLineData with focus school name
+  return frequencyToLineData(
+    { csv },
+    ['school', ...aggregations],
+    'wave',
+    labelOptions,
+    focusSchool.school_name,
+  );
 }

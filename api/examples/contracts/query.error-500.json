@@ -1,0 +1,19 @@
+{
+  "id": "query.error-500",
+  "method": "POST",
+  "path": "/api/query",
+  "status": 500,
+  "request_model": "SafeQueryRequest",
+  "response_model": "ErrorDetailResponse",
+  "request": {
+    "school_id": 1,
+    "variable": "score",
+    "waves": ["1", "2"],
+    "aggregations": [],
+    "filters": {},
+    "include_neighbors": true
+  },
+  "response": {
+    "detail": "Internal server error"
+  }
+}

@@ -8,7 +8,7 @@ const adminUser = process.env.PLAYWRIGHT_ADMIN_USER ?? "admin";
 const adminPassword = process.env.PLAYWRIGHT_ADMIN_PASSWORD ?? "admin";
 const scopedUser = process.env.PLAYWRIGHT_SCOPED_USER ?? "alpha-user";
 const scopedPassword = process.env.PLAYWRIGHT_SCOPED_PASSWORD ?? "alpha-user";
-const scopedSchool = process.env.PLAYWRIGHT_SCOPED_SCHOOL ?? "Alpha";
+const scopedSchool = process.env.PLAYWRIGHT_SCOPED_SCHOOL ?? "Focus School Academy";
 
 async function login(page: Page, username: string, password: string) {
   await page.goto("/login");

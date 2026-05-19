@@ -3,14 +3,86 @@ import { env } from "$env/dynamic/public";
 // Can be overridden by setting PUBLIC_API_BASE env var (e.g. http://localhost:8000)
 const API_BASE = env.PUBLIC_API_BASE ?? "/api";
 
+// Target backend version - update this when making breaking changes to API surface
+export const TARGET_BACKEND_VERSION = "0.1.0";
+
+export type VersionCompatibility = "compatible" | "minor-mismatch" | "major-mismatch" | "unknown";
+
+/**
+ * Compare semantic versions and determine compatibility status.
+ * - compatible: versions match exactly or differ only in patch
+ * - minor-mismatch: minor versions differ (warning)
+ * - major-mismatch: major versions differ (error)
+ * - unknown: cannot parse version
+ */
+export function checkVersionCompatibility(
+  backendVersion: string,
+  targetVersion: string = TARGET_BACKEND_VERSION,
+): VersionCompatibility {
+  const parseVersion = (v: string): [number, number, number] | null => {
+    const match = v.match(/^(\d+)\.(\d+)\.(\d+)/);
+    if (!match) return null;
+    return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+  };
+
+  const backend = parseVersion(backendVersion);
+  const target = parseVersion(targetVersion);
+
+  if (!backend || !target) return "unknown";
+
+  const [bMajor, bMinor] = backend;
+  const [tMajor, tMinor] = target;
+
+  if (bMajor !== tMajor) return "major-mismatch";
+  if (bMinor !== tMinor) return "minor-mismatch";
+  return "compatible";
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public detail?: string,
   ) {
     super(message);
     this.name = "ApiError";
   }
+}
+
+/**
+ * Get a user-friendly error message based on the HTTP status code.
+ */
+function getFriendlyErrorMessage(status: number, detail?: string): string {
+  if (status >= 500) {
+    return "The server encountered an error. Please try again later or contact support if the problem persists.";
+  }
+  
+  if (status === 400) {
+    return detail 
+      ? `Your request could not be processed: ${detail}`
+      : "Your request could not be processed. Please check your input and try again.";
+  }
+  
+  if (status === 401) {
+    return "You are not authenticated. Please log in and try again.";
+  }
+  
+  if (status === 403) {
+    return detail 
+      ? `Access denied: ${detail}`
+      : "You do not have permission to access this resource.";
+  }
+  
+  if (status === 404) {
+    return "The requested resource was not found.";
+  }
+  
+  // For other client errors (4xx)
+  if (status >= 400 && status < 500) {
+    return detail || "There was a problem with your request. Please try again.";
+  }
+  
+  return detail || "An unexpected error occurred. Please try again.";
 }
 
 async function apiFetch<T>(
@@ -18,12 +90,61 @@ async function apiFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, options);
+  
   if (!res.ok) {
-    // The API always returns JSON error details; let any parse error propagate naturally
-    const body = (await res.json()) as { detail?: string };
-    throw new ApiError(res.status, body.detail ?? res.statusText);
+    // Try to parse JSON error details
+    let errorDetail: string | undefined;
+    let rawBody: string | undefined;
+    
+    try {
+      const contentType = res.headers.get("content-type");
+      if (contentType?.includes("application/json")) {
+        rawBody = await res.text();
+        const body = JSON.parse(rawBody) as { detail?: string };
+        errorDetail = body.detail;
+      } else {
+        // Non-JSON response
+        rawBody = await res.text();
+        errorDetail = rawBody;
+      }
+    } catch (parseError) {
+      // JSON parsing failed
+      console.error(`Failed to parse error response from ${path}:`, {
+        status: res.status,
+        statusText: res.statusText,
+        rawBody,
+        parseError: parseError instanceof Error ? parseError.message : String(parseError),
+      });
+      
+      errorDetail = "The server returned an invalid response.";
+    }
+    
+    const friendlyMessage = getFriendlyErrorMessage(res.status, errorDetail);
+    
+    // Log detailed error information for debugging
+    console.error(`API Error [${res.status}] ${path}:`, {
+      status: res.status,
+      statusText: res.statusText,
+      detail: errorDetail,
+      friendlyMessage,
+    });
+    
+    throw new ApiError(res.status, friendlyMessage, errorDetail);
   }
-  return res.json() as Promise<T>;
+  
+  // Parse successful response
+  try {
+    const data = await res.json();
+    return data as T;
+  } catch (parseError) {
+    console.error(`Failed to parse successful response from ${path}:`, {
+      status: res.status,
+      parseError: parseError instanceof Error ? parseError.message : String(parseError),
+    });
+    
+    // Throw a user-friendly error that matches the server error pattern
+    throw new Error("The server encountered an error processing your request. The response format was invalid.");
+  }
 }
 
 function authHeaders(token: string): HeadersInit {
@@ -43,11 +164,15 @@ export interface QueryFilter {
   value: string | number | (string | number)[];
 }
 
-export interface QueryResult {
+export interface QueryResultForWave {
   csv: string;
   count_csv: string;
   suppressions: Record<string, Record<number, string>>;
   provenance: string[];
+}
+
+export interface QueryResult {
+  results: Record<string, QueryResultForWave>;
 }
 
 export interface QueryCatalog {
@@ -112,32 +237,29 @@ export type QueryStep =
   | QueryAggregateStep;
 
 export interface QueryPlan {
+  waves: string[];
   steps: QueryStep[];
-}
-
-export interface UserScope {
-  filters: Record<string, string[]>;
 }
 
 export interface User {
   id: number;
   username: string;
-  scope: UserScope;
+  school_ids: number[];
+  school_names: string[];
   is_active: boolean;
   is_admin: boolean;
-  student_count: number | null;
 }
 
 export interface UserCreate {
   username: string;
   password: string;
-  scope?: UserScope;
+  school_ids: number[];
   is_admin?: boolean;
 }
 
 export interface UserUpdate {
   password?: string;
-  scope?: UserScope;
+  school_ids?: number[];
   is_active?: boolean;
   is_admin?: boolean;
 }
@@ -171,36 +293,59 @@ export async function getColumns(token: string): Promise<string[]> {
   return apiFetch<string[]>("/data/columns", { headers: authHeaders(token) });
 }
 
-// ─── Queries ─────────────────────────────────────────────────────────────────
+export interface VariableOption {
+  value: string;
+  label_key: string;
+}
 
-export async function getQueryCatalog(token: string): Promise<QueryCatalog> {
-  return apiFetch<QueryCatalog>("/query/catalog", {
+export interface AggregationOption {
+  value: string;
+  label_key: string;
+}
+
+export interface FilterOption {
+  value: string;
+  label_key: string;
+  values: string[];
+}
+
+export interface DescribeDataResponse {
+  variables: VariableOption[];
+  aggregation_options: AggregationOption[];
+  filter_options: FilterOption[];
+}
+
+export async function describeData(token: string): Promise<DescribeDataResponse> {
+  return apiFetch<DescribeDataResponse>("/data/describe", {
     headers: authHeaders(token),
   });
 }
 
-export async function query(
-  token: string,
-  plan: QueryPlan,
-): Promise<QueryResult> {
-  return apiFetch<QueryResult>("/query", {
-    method: "POST",
-    headers: { ...authHeaders(token), "Content-Type": "application/json" },
-    body: JSON.stringify(plan),
+// ─── Queries ─────────────────────────────────────────────────────────────────
+
+export async function getQueryCatalog(token: string): Promise<QueryCatalog> {
+  return apiFetch<QueryCatalog>("/catalog", {
+    headers: authHeaders(token),
   });
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────
 
-/** Returns true if the API is reachable and healthy. */
-export async function checkHealth(): Promise<boolean> {
+export interface HealthResponse {
+  status: string;
+  version: string;
+}
+
+/** Returns the API health status including version info. */
+export async function checkHealth(): Promise<HealthResponse | null> {
   try {
     const res = await fetch(`${API_BASE}/health`, {
       signal: AbortSignal.timeout(5000),
     });
-    return res.ok;
+    if (!res.ok) return null;
+    return res.json() as Promise<HealthResponse>;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -242,4 +387,101 @@ export async function deleteUser(token: string, id: number): Promise<void> {
     const j = (await res.json()) as { detail?: string };
     throw new ApiError(res.status, j.detail ?? res.statusText);
   }
+}
+
+// ─── Safe Query (with blanket suppression) ──────────────────────────────────
+
+export interface School {
+  id: number;
+  name: string;
+  size: string | null;
+  category: string | null;
+  geographical_neighbor_ids: number[];
+  statistical_neighbor_ids: number[];
+}
+
+export interface SafeQueryRequest {
+  school_id: number;
+  variable: string;
+  waves: string[];
+  aggregations: string[];
+  filters: Record<string, (string | number)[]>;
+  include_neighbors?: boolean;
+  neighbor_type?: "geographical" | "statistical";
+}
+
+export interface SafeQueryResultForWave {
+  suppressed: boolean;
+  suppression_message: string | null;
+  results: Record<string, unknown>[] | null;
+}
+
+export interface SafeQueryResult {
+  school_id: number;
+  school_name: string;
+  results: Record<string, SafeQueryResultForWave>;
+}
+
+export interface SafeQueryResponse {
+  focus_school: SafeQueryResult;
+  neighbors: SafeQueryResult[];
+  variable: string;
+  waves: string[];
+  aggregations: string[];
+  filters: Record<string, (string | number)[]>;
+}
+
+export async function listSchools(token: string): Promise<School[]> {
+  return apiFetch<School[]>("/schools", { headers: authHeaders(token) });
+}
+
+export async function createSchool(
+  token: string,
+  data: { name: string; size?: string | null; category?: string | null },
+): Promise<School> {
+  return apiFetch<School>("//schools", {
+    method: "POST",
+    headers: { ...authHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateSchool(
+  token: string,
+  id: number,
+  data: {
+    name?: string;
+    size?: string | null;
+    category?: string | null;
+    geographical_neighbor_ids?: number[];
+    statistical_neighbor_ids?: number[];
+  },
+): Promise<School> {
+  return apiFetch<School>(`//schools/${id}`, {
+    method: "PUT",
+    headers: { ...authHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteSchool(token: string, id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}//schools/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  if (!res.ok && res.status !== 204) {
+    const j = (await res.json()) as { detail?: string };
+    throw new ApiError(res.status, j.detail ?? res.statusText);
+  }
+}
+
+export async function safeQuery(
+  token: string,
+  request: SafeQueryRequest,
+): Promise<SafeQueryResponse> {
+  return apiFetch<SafeQueryResponse>("/query", {
+    method: "POST",
+    headers: { ...authHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
 }

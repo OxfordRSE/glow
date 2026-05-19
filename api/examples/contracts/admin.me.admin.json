@@ -1,0 +1,17 @@
+{
+  "id": "admin.me.admin",
+  "method": "GET",
+  "path": "/admin/me",
+  "status": 200,
+  "request_model": null,
+  "response_model": "UserRead",
+  "request": null,
+  "response": {
+    "id": 2,
+    "username": "admin@example.com",
+    "school_ids": [],
+    "school_names": [],
+    "is_active": true,
+    "is_admin": true
+  }
+}

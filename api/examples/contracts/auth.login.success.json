@@ -1,0 +1,16 @@
+{
+  "id": "auth.login.success",
+  "method": "POST",
+  "path": "/auth/login",
+  "status": 200,
+  "request_model": null,
+  "response_model": "TokenResponse",
+  "request": {
+    "username": "user@example.com",
+    "password": "password123"
+  },
+  "response": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIiwiZXhwIjoxNzE2MjQwMDAwfQ.fake_signature",
+    "token_type": "bearer"
+  }
+}

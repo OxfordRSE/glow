@@ -1,0 +1,15 @@
+{
+  "id": "data.columns.default",
+  "method": "GET",
+  "path": "/data/columns",
+  "status": 200,
+  "request_model": null,
+  "response_model": "ColumnsResponse",
+  "request": null,
+  "response": [
+    "d_sex",
+    "d_ethnicity",
+    "yearGroup",
+    "class_"
+  ]
+}

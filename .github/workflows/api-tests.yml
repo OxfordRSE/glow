@@ -24,7 +24,10 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install -e ".[test]"
+        run: pip install -e ".[test,dev]"
+
+      - name: Check formatting with ruff
+        run: ruff format --check .
 
       - name: Run tests
         run: pytest

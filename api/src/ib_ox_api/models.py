@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, RootModel, model_validator
 
 
 class SuppressionCode(str, Enum):
@@ -9,11 +9,27 @@ class SuppressionCode(str, Enum):
 
 
 class FrequencyResult(BaseModel):
+    """Wave-indexed results for frequency queries.
+    
+    Each wave produces its own result, keyed by wave value.
+    """
+    results: dict[str, "FrequencyResultForWave"]
+
+
+class FrequencyResultForWave(BaseModel):
     csv: str
     suppressions: dict[str, dict[int, SuppressionCode]]
 
 
 class MeansResult(BaseModel):
+    """Wave-indexed results for means queries.
+    
+    Each wave produces its own result, keyed by wave value.
+    """
+    results: dict[str, "MeansResultForWave"]
+
+
+class MeansResultForWave(BaseModel):
     csv: str
     count_csv: str
     suppressions: dict[str, dict[int, SuppressionCode]]
@@ -33,8 +49,16 @@ class WaveChangeResult(BaseModel):
 
 
 class QueryResult(BaseModel):
-    """Result of a query plan execution."""
+    """Wave-indexed result of a query plan execution.
+    
+    Each wave produces its own result, keyed by wave value.
+    """
+    results: dict[str, "QueryResultForWave"]
 
+
+class QueryResultForWave(BaseModel):
+    """Result of a query plan execution for a single wave."""
+    
     csv: str
     count_csv: str
     suppressions: dict[str, dict[int, SuppressionCode]]
@@ -59,25 +83,54 @@ class UserScope(BaseModel):
 class UserCreate(BaseModel):
     username: str
     password: str
-    scope: UserScope = Field(default_factory=UserScope)
+    school_ids: list[int] = Field(default_factory=list)
     is_admin: bool = False
 
 
 class UserRead(BaseModel):
     id: int
     username: str
-    scope: UserScope
+    school_ids: list[int] = Field(default_factory=list)
+    school_names: list[str] = Field(default_factory=list)
     is_active: bool
     is_admin: bool = False
-    student_count: Optional[int] = None
     model_config = {"from_attributes": True}
 
 
 class UserUpdate(BaseModel):
     password: Optional[str] = None
-    scope: Optional[UserScope] = None
+    school_ids: Optional[list[int]] = None
     is_active: Optional[bool] = None
     is_admin: Optional[bool] = None
+
+
+class SchoolCreate(BaseModel):
+    name: str
+    size: Optional[str] = None
+    category: Optional[str] = None
+
+
+class SchoolRead(BaseModel):
+    id: int
+    name: str
+    size: Optional[str] = None
+    category: Optional[str] = None
+    geographical_neighbor_ids: list[int] = Field(default_factory=list)
+    statistical_neighbor_ids: list[int] = Field(default_factory=list)
+    model_config = {"from_attributes": True}
+
+
+class SchoolListResponse(RootModel[list[SchoolRead]]):
+    """List of schools response wrapper for OpenAPI examples."""
+    pass
+
+
+class SchoolUpdate(BaseModel):
+    name: Optional[str] = None
+    size: Optional[str] = None
+    category: Optional[str] = None
+    geographical_neighbor_ids: Optional[list[int]] = None
+    statistical_neighbor_ids: Optional[list[int]] = None
 
 
 class FilterOp(str, Enum):
@@ -99,28 +152,44 @@ class Filter(BaseModel):
 class FrequencyQuery(BaseModel):
     """Query for a frequency table.
 
+    waves: one or more waves to query (required, query is run separately for each wave)
     group_by: columns to group by (must be whitelisted categorical columns).
               May be empty to return a single total count.
-    filters: additional filters to apply
+    filters: additional filters to apply (wave filter is automatically applied)
     value_column: the column to count (optional; if omitted, count rows with distinct uid)
     """
 
+    waves: list[str]
     group_by: list[str] = Field(default_factory=list)
     filters: list[Filter] = Field(default_factory=list)
     value_column: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_waves(self) -> "FrequencyQuery":
+        if not self.waves:
+            raise ValueError("At least one wave must be specified.")
+        return self
 
 
 class MeansQuery(BaseModel):
     """Query for a means table.
 
+    waves: one or more waves to query (required, query is run separately for each wave)
     group_by: columns to group by
     value_columns: columns to average
-    filters: additional filters
+    filters: additional filters (wave filter is automatically applied)
     """
 
+    waves: list[str]
     group_by: list[str]
     value_columns: list[str]
     filters: list[Filter] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_waves(self) -> "MeansQuery":
+        if not self.waves:
+            raise ValueError("At least one wave must be specified.")
+        return self
 
 
 class WaveChangeQuery(BaseModel):
@@ -219,10 +288,18 @@ QueryStep = Annotated[
 
 
 class QueryPlan(BaseModel):
+    """A query plan with one or more waves.
+    
+    All queries must specify at least one wave. The plan is executed separately
+    for each wave, and results are returned as a wave-indexed dictionary.
+    """
+    waves: list[str]
     steps: list[QueryStep]
 
     @model_validator(mode="after")
     def validate_plan(self) -> "QueryPlan":
+        if not self.waves:
+            raise ValueError("At least one wave must be specified.")
         if not self.steps:
             raise ValueError("Query plans must contain at least one step.")
         if self.steps[-1].type != "aggregate":
@@ -237,3 +314,128 @@ class QueryCatalog(BaseModel):
     waves: list[str]
     value_suggestions: dict[str, list[str]]
     step_types: list[str]
+
+
+# ---------------------------------------------------------------------------
+# Describe Data Models
+# ---------------------------------------------------------------------------
+
+
+class VariableOption(BaseModel):
+    """A variable option with its i18n key."""
+    
+    value: str  # The column name (e.g., "bw_wbeing_1", "bw_wbeing_total")
+    label_key: str  # i18n key with api. prefix (e.g., "api.bw_wbeing_1")
+
+
+class AggregationOption(BaseModel):
+    """An aggregation/grouping option with its i18n key."""
+    
+    value: str  # The dimension name (e.g., "yearGroup", "d_sex")
+    label_key: str  # i18n key with api. prefix (e.g., "api.yearGroup")
+
+
+class FilterOption(BaseModel):
+    """A filter option with its i18n key and possible values."""
+    
+    value: str  # The dimension name (e.g., "yearGroup", "wave")
+    label_key: str  # i18n key with api. prefix (e.g., "api.yearGroup")
+    values: list[str]  # Possible values for this filter
+
+
+class DescribeDataResponse(BaseModel):
+    """Response containing all variables, aggregation options, and filter options."""
+    
+    variables: list[VariableOption]  # All data variables including totals
+    aggregation_options: list[AggregationOption]  # Grouping variables (wave excluded)
+    filter_options: list[FilterOption]  # Filter variables (wave included with all waves as default)
+
+
+class ColumnsResponse(RootModel[list[str]]):
+    """List of column names response wrapper for OpenAPI examples."""
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Safe Query Models (with blanket suppression)
+# ---------------------------------------------------------------------------
+
+
+class SafeQueryRequest(BaseModel):
+    """Request for a safe query with blanket suppression.
+    
+    All queries must specify at least one wave. Results are returned
+    separately for each wave.
+    """
+    
+    school_id: int
+    variable: str  # Question column or derived score
+    waves: list[str]  # Required: one or more waves to query
+    aggregations: list[str] = Field(default_factory=list)  # e.g., ["yearGroup", "d_sex"]
+    filters: dict[str, list] = Field(default_factory=dict)  # e.g., {"d_ethnicity": ["White"]} (wave is handled separately)
+    include_neighbors: bool = False
+    neighbor_type: Literal["geographical", "statistical"] = "geographical"
+
+    @model_validator(mode="after")
+    def validate_waves(self) -> "SafeQueryRequest":
+        if not self.waves:
+            raise ValueError("At least one wave must be specified.")
+        return self
+
+
+class SafeQueryResult(BaseModel):
+    """Wave-indexed results for a single school with optional suppression.
+    
+    Each wave produces its own result, keyed by wave value.
+    """
+    
+    school_id: int
+    school_name: str
+    results: dict[str, "SafeQueryResultForWave"]
+
+
+class SafeQueryRow(BaseModel):
+    """A single row in a safe query result.
+    
+    Contains mean and student count, plus any grouping columns.
+    Additional fields are allowed to support dynamic group_by columns.
+    """
+    
+    mean: Optional[float] = None
+    student_n: int
+    # Dynamic fields for group_by columns (d_sex, yearGroup, d_ethnicity, class_)
+    # These are validated at runtime based on the aggregations parameter
+    model_config = {"extra": "allow"}
+
+
+class SafeQueryResultForWave(BaseModel):
+    """Single school result for a specific wave."""
+    
+    suppressed: bool
+    suppression_message: Optional[str] = None
+    results: Optional[list[SafeQueryRow]] = None  # List of result rows (group_by cols + mean + student_n)
+
+
+class SafeQueryResponse(BaseModel):
+    """Response for a safe query including focus school and neighbors.
+    
+    Results are wave-indexed - each school has separate results for each wave.
+    """
+    
+    focus_school: SafeQueryResult
+    neighbors: list[SafeQueryResult] = Field(default_factory=list)
+    variable: str
+    waves: list[str]
+    aggregations: list[str]
+    filters: dict[str, list]
+
+
+# ---------------------------------------------------------------------------
+# Error Response Models
+# ---------------------------------------------------------------------------
+
+
+class ErrorDetailResponse(BaseModel):
+    """Standard error response format for API errors."""
+    
+    detail: str

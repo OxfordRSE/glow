@@ -2,6 +2,16 @@
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores';
   import { login, getMe, ApiError } from '$lib/api';
+  import { createI18n, locale, type Locale } from '$lib/i18n';
+
+  interface Props {
+    data: { locale: Locale };
+  }
+
+  let { data }: Props = $props();
+
+  const i18n = $derived(createI18n($locale));
+  const currentLocale = $derived(data.locale || 'en');
 
   let username = $state('');
   let password = $state('');
@@ -16,12 +26,12 @@
       const token = await login(username, password);
       const user = await getMe(token.access_token);
       authStore.login(token.access_token, user);
-      goto('/');
+      goto(`/${currentLocale}`);
     } catch (e: unknown) {
       if (e instanceof ApiError && e.status === 401) {
-        error = 'Invalid username or password.';
+        error = i18n.t('login.invalidCredentials');
       } else {
-        error = e instanceof Error ? e.message : 'Login failed. Please try again.';
+        error = e instanceof Error ? e.message : i18n.t('login.loginFailed');
       }
     } finally {
       loading = false;
@@ -30,22 +40,22 @@
 </script>
 
 <svelte:head>
-  <title>Sign In — IB-Oxford Dashboard</title>
+  <title>{i18n.t('login.signIn')} — {i18n.t('login.title')} {i18n.t('nav.dashboard')}</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center px-4">
+<div class="min-h-screen bg-blue-900 flex items-center justify-center px-4">
   <div class="w-full max-w-md">
     <div class="text-center mb-8">
-      <h1 class="text-3xl font-bold text-white">IB-Oxford</h1>
-      <p class="text-blue-200 mt-1">Longitudinal Data Dashboard</p>
+      <h1 class="text-3xl font-bold text-white">{i18n.t('login.title')}</h1>
+      <p class="text-blue-200 mt-1">{i18n.t('login.subtitle')}</p>
     </div>
 
     <div class="bg-white rounded-2xl shadow-xl p-8">
-      <h2 class="text-xl font-semibold text-gray-800 mb-6">Sign In</h2>
+      <h2 class="text-xl font-semibold text-gray-800 mb-6">{i18n.t('login.signIn')}</h2>
 
       <form onsubmit={handleSubmit} class="space-y-5">
         <div>
-          <label class="label" for="username">Username</label>
+          <label class="label" for="username">{i18n.t('login.username')}</label>
           <input
             id="username"
             type="text"
@@ -54,12 +64,12 @@
             autocomplete="username"
             required
             disabled={loading}
-            placeholder="your.username"
+            placeholder={i18n.t('login.usernamePlaceholder')}
           />
         </div>
 
         <div>
-          <label class="label" for="password">Password</label>
+          <label class="label" for="password">{i18n.t('login.password')}</label>
           <input
             id="password"
             type="password"
@@ -68,7 +78,7 @@
             autocomplete="current-password"
             required
             disabled={loading}
-            placeholder="••••••••"
+            placeholder={i18n.t('login.passwordPlaceholder')}
           />
         </div>
 
@@ -84,20 +94,20 @@
           disabled={loading}
         >
           {#if loading}
-            <svg class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <svg class="motion-safe:animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" aria-hidden="true">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
             </svg>
-            Signing in…
+            {i18n.t('login.signingIn')}
           {:else}
-            Sign In
+            {i18n.t('login.signIn')}
           {/if}
         </button>
       </form>
     </div>
 
     <p class="text-center text-blue-200 text-xs mt-6">
-      IB-Oxford Wellbeing Research · Read-only access
+      {i18n.t('login.footer')}
     </p>
   </div>
 </div>

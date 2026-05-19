@@ -17,7 +17,7 @@ docker compose -f compose.yml -f compose.test.yml up --build -d --wait
 docker compose -f compose.yml -f compose.test.yml exec -T api ib-ox-api users create --admin --password admin admin
 docker compose -f compose.yml -f compose.test.yml exec -T api ib-ox-api users create \
   --password alpha-user \
-  --scope '{"filters":{"school":["Alpha"]}}' \
+  --scope '{"filters":{"school":["Focus School Academy"]}}' \
   alpha-user
 
 python3 - <<'PY'

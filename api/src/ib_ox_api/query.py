@@ -8,8 +8,10 @@ from ib_ox_api.models import (
     FilterOp,
     FrequencyQuery,
     FrequencyResult,
+    FrequencyResultForWave,
     MeansQuery,
     MeansResult,
+    MeansResultForWave,
     UserScope,
     WaveChangeQuery,
     WaveChangeResult,
@@ -84,11 +86,40 @@ _BW_QUESTIONNAIRES: list[tuple[str, int]] = [
 ]
 
 # Columns allowed in value_columns for means (numeric)
+# All individual questionnaire items
 NUMERIC_WHITELIST: set[str] = {
     f"{prefix}_{i}"
     for prefix, n_items in _BW_QUESTIONNAIRES
     for i in range(1, n_items + 1)
 } | {"d_age"}
+
+# Add derived subscale and scale totals
+_DERIVED_TOTALS = {
+    "bw_migration_total",
+    "bw_wbeing_total",
+    "bw_selfest_total",
+    "bw_emoreg_total",
+    "bw_stress_total",
+    "bw_coping_total",
+    "bw_emodies_total",
+    "bw_behav_total",
+    "bw_unhealthy_total",
+    "bw_socmtype_total",
+    "bw_activ_total",
+    "bw_staffrel_total",
+    "bw_localenv_total",
+    "bw_future_total",
+    "bw_plans_total",
+    "bw_gmacs_total",
+    "bw_parentsrel_total",
+    "bw_friends_total",
+    "bw_discrim_total",
+    "bw_discloc_total",
+    "bw_bullying_total",
+    "bw_mhcontact_total",
+}
+
+NUMERIC_WHITELIST = NUMERIC_WHITELIST | _DERIVED_TOTALS
 
 
 def _df_to_csv(df: pd.DataFrame) -> str:
@@ -234,26 +265,42 @@ def execute_frequency_query(
     scope: UserScope,
     min_n: int,
 ) -> FrequencyResult:
-    df = apply_user_scope(df, scope)
-    df = apply_filters(df, query.filters)
+    """Execute a frequency query for each specified wave.
+    
+    Returns a wave-indexed dictionary of results.
+    """
+    results = {}
+    
+    for wave in query.waves:
+        # Apply user scope
+        wave_df = apply_user_scope(df, scope)
+        
+        # Apply wave filter
+        wave_filter = Filter(column="wave", op=FilterOp.EQ, value=wave)
+        wave_df = _apply_single_filter(wave_df, wave_filter)
+        
+        # Apply other filters
+        wave_df = apply_filters(wave_df, query.filters)
 
-    result_df, suppressions = suppress_frequency_table(
-        df=df,
-        group_cols=query.group_by,
-        value_col=query.value_column,
-        min_n=min_n,
-    )
+        result_df, suppressions = suppress_frequency_table(
+            df=wave_df,
+            group_cols=query.group_by,
+            value_col=query.value_column,
+            min_n=min_n,
+        )
 
-    # Convert SuppressionCode values to serialisable form
-    serialisable: dict[str, dict[int, str]] = {
-        col: {idx: code.value for idx, code in codes.items()}
-        for col, codes in suppressions.items()
-    }
+        # Convert SuppressionCode values to serialisable form
+        serialisable: dict[str, dict[int, str]] = {
+            col: {idx: code.value for idx, code in codes.items()}
+            for col, codes in suppressions.items()
+        }
 
-    return FrequencyResult(
-        csv=_df_to_csv(result_df),
-        suppressions=serialisable,  # type: ignore[arg-type]
-    )
+        results[wave] = FrequencyResultForWave(
+            csv=_df_to_csv(result_df),
+            suppressions=serialisable,  # type: ignore[arg-type]
+        )
+
+    return FrequencyResult(results=results)
 
 
 def execute_means_query(
@@ -262,26 +309,42 @@ def execute_means_query(
     scope: UserScope,
     min_n: int,
 ) -> MeansResult:
-    df = apply_user_scope(df, scope)
-    df = apply_filters(df, query.filters)
+    """Execute a means query for each specified wave.
+    
+    Returns a wave-indexed dictionary of results.
+    """
+    results = {}
+    
+    for wave in query.waves:
+        # Apply user scope
+        wave_df = apply_user_scope(df, scope)
+        
+        # Apply wave filter
+        wave_filter = Filter(column="wave", op=FilterOp.EQ, value=wave)
+        wave_df = _apply_single_filter(wave_df, wave_filter)
+        
+        # Apply other filters
+        wave_df = apply_filters(wave_df, query.filters)
 
-    means_df, counts_df, suppressions = suppress_means_table(
-        df=df,
-        group_cols=query.group_by,
-        value_cols=query.value_columns,
-        min_n=min_n,
-    )
+        means_df, counts_df, suppressions = suppress_means_table(
+            df=wave_df,
+            group_cols=query.group_by,
+            value_cols=query.value_columns,
+            min_n=min_n,
+        )
 
-    serialisable: dict[str, dict[int, str]] = {
-        col: {idx: code.value for idx, code in codes.items()}
-        for col, codes in suppressions.items()
-    }
+        serialisable: dict[str, dict[int, str]] = {
+            col: {idx: code.value for idx, code in codes.items()}
+            for col, codes in suppressions.items()
+        }
 
-    return MeansResult(
-        csv=_df_to_csv(means_df),
-        count_csv=_df_to_csv(counts_df),
-        suppressions=serialisable,  # type: ignore[arg-type]
-    )
+        results[wave] = MeansResultForWave(
+            csv=_df_to_csv(means_df),
+            count_csv=_df_to_csv(counts_df),
+            suppressions=serialisable,  # type: ignore[arg-type]
+        )
+
+    return MeansResult(results=results)
 
 
 def validate_wave_change_query(query: WaveChangeQuery, df_columns: set[str]) -> None:

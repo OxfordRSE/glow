@@ -1,0 +1,19 @@
+{
+  "id": "query.error-400",
+  "method": "POST",
+  "path": "/api/query",
+  "status": 400,
+  "request_model": "SafeQueryRequest",
+  "response_model": "ErrorDetailResponse",
+  "request": {
+    "school_id": 1,
+    "variable": "invalid_variable",
+    "waves": ["1", "2"],
+    "aggregations": [],
+    "filters": {},
+    "include_neighbors": true
+  },
+  "response": {
+    "detail": "Variable 'invalid_variable' not found in dataset"
+  }
+}
