@@ -118,7 +118,7 @@ def sample_df():
     # Compute derived scores like the real DataStore does
     from glow_api.data import DataStore
     ds = DataStore.__new__(DataStore)
-    df = ds._compute_derived_scores(df)
+    df = ds._process_loaded_data(df)
     return df
 
 
@@ -145,7 +145,7 @@ def client(db_session, sample_user, sample_schools, sample_df):
     import threading
 
     fake_store = DataStore.__new__(DataStore)
-    fake_store._df = sample_df
+    fake_store._df = fake_store._process_loaded_data(sample_df)
     fake_store._lock = threading.Lock()
     fake_store.startup = lambda: None
     fake_store.shutdown = lambda: None
@@ -184,7 +184,7 @@ def auth_client(db_session, sample_user, sample_schools, sample_df):
     from glow_api.data import get_datastore
 
     fake_store = DataStore.__new__(DataStore)
-    fake_store._df = sample_df
+    fake_store._df = fake_store._process_loaded_data(sample_df)
     fake_store._lock = threading.Lock()
     fake_store.startup = lambda: None
     fake_store.shutdown = lambda: None
@@ -215,7 +215,7 @@ def admin_client(db_session, admin_user, sample_schools, sample_df):
     import threading
 
     fake_store = DataStore.__new__(DataStore)
-    fake_store._df = sample_df
+    fake_store._df = fake_store._process_loaded_data(sample_df)
     fake_store._lock = threading.Lock()
     fake_store.startup = lambda: None
     fake_store.shutdown = lambda: None

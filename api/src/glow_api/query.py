@@ -1,478 +1,452 @@
 import io
-from decimal import Decimal, InvalidOperation
+import re
+from dataclasses import dataclass, field
 
 import pandas as pd
+from glow_api.data import DataFrameWithWhitelists
 
 from glow_api.models import (
-    Filter,
     FilterOp,
-    FrequencyQuery,
-    FrequencyResult,
-    FrequencyResultForWave,
-    MeansQuery,
-    MeansResult,
-    MeansResultForWave,
+    QueryAggregateStep,
+    QueryBucketBand,
+    QueryBucketSchoolSizeStep,
+    QueryCatalog,
+    QueryDeriveScoreStep,
+    QueryFilterStep,
+    QueryMetric,
+    QueryMetricKind,
+    QueryPairWavesStep,
+    QueryPlan,
+    QueryPlanResult,
+    QueryPlanResultForWave,
+    SuppressionCode,
     UserScope,
-    WaveChangeQuery,
-    WaveChangeResult,
 )
-from glow_api.suppression import suppress_frequency_table, suppress_means_table
+from glow_api.query_utils import _df_to_csv, _normalize_comparable_value, _series_as_strings, apply_user_scope, \
+    _apply_single_filter
 
-# Columns allowed in group_by (categorical)
-CATEGORICAL_WHITELIST: set[str] = {
-    "school",
-    "yearGroup",
-    "class",
-    "sex",
-    "ethnicity",
-    "wave",
-    "d_city",
-    "d_country",
-}
-
-# Questionnaire item columns from the #BeeWell GM Survey model
-# (glow-dummies examples/beewell_model.toml).
-# Each tuple is (column_prefix, number_of_items).
-_BW_QUESTIONNAIRES: list[tuple[str, int]] = [
-    ("bw_migration", 3),
-    ("bw_arrival", 1),
-    ("bw_life_sat", 1),
-    ("bw_wbeing", 7),
-    ("bw_selfest", 5),
-    ("bw_emoreg", 3),
-    ("bw_appear", 1),
-    ("bw_stress", 2),
-    ("bw_coping", 2),
-    ("bw_emodies", 10),
-    ("bw_behav", 6),
-    ("bw_physh", 1),
-    ("bw_sleep", 1),
-    ("bw_physact", 1),
-    ("bw_physdur", 1),
-    ("bw_fruitveg", 1),
-    ("bw_unhealthy", 4),
-    ("bw_freetime", 1),
-    ("bw_socmedia", 1),
-    ("bw_socmtype", 2),
-    ("bw_volunteer", 1),
-    ("bw_activ", 11),
-    ("bw_schoolconn", 1),
-    ("bw_attain", 1),
-    ("bw_staffrel", 4),
-    ("bw_iso", 1),
-    ("bw_isodays", 1),
-    ("bw_isodur", 1),
-    ("bw_schpress", 1),
-    ("bw_homeenv", 1),
-    ("bw_safety", 1),
-    ("bw_localenv", 4),
-    ("bw_beinheard", 1),
-    ("bw_foodsec", 1),
-    ("bw_material", 1),
-    ("bw_future", 7),
-    ("bw_careersed", 1),
-    ("bw_careershlp", 1),
-    ("bw_plans", 8),
-    ("bw_gmacs", 2),
-    ("bw_parentsrel", 4),
-    ("bw_friends", 4),
-    ("bw_lonely", 1),
-    ("bw_discrim", 5),
-    ("bw_discloc", 7),
-    ("bw_bullying", 3),
-    ("bw_support", 1),
-    ("bw_mhcontact", 6),
-    ("bw_kooth", 1),
-]
-
-# Columns allowed in value_columns for means (numeric)
-# All individual questionnaire items
-NUMERIC_WHITELIST: set[str] = {
-    f"{prefix}_{i}"
-    for prefix, n_items in _BW_QUESTIONNAIRES
-    for i in range(1, n_items + 1)
-} | {"d_age"}
-
-# Add derived subscale and scale totals
-_DERIVED_TOTALS = {
-    "bw_migration_total",
-    "bw_wbeing_total",
-    "bw_selfest_total",
-    "bw_emoreg_total",
-    "bw_stress_total",
-    "bw_coping_total",
-    "bw_emodies_total",
-    "bw_behav_total",
-    "bw_unhealthy_total",
-    "bw_socmtype_total",
-    "bw_activ_total",
-    "bw_staffrel_total",
-    "bw_localenv_total",
-    "bw_future_total",
-    "bw_plans_total",
-    "bw_gmacs_total",
-    "bw_parentsrel_total",
-    "bw_friends_total",
-    "bw_discrim_total",
-    "bw_discloc_total",
-    "bw_bullying_total",
-    "bw_mhcontact_total",
-}
-
-NUMERIC_WHITELIST = NUMERIC_WHITELIST | _DERIVED_TOTALS
+SAFE_OUTPUT_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
-def _df_to_csv(df: pd.DataFrame) -> str:
-    buf = io.StringIO()
-    df.to_csv(buf, index=False)
-    return buf.getvalue()
-
-
-def _normalize_comparable_value(value: object) -> str:
-    """Normalize numeric-like values so "1" and "1.0" compare identically."""
-    if pd.isna(value):
-        return ""
-
-    if isinstance(value, str):
-        stripped = value.strip()
-        try:
-            decimal_value = Decimal(stripped)
-        except InvalidOperation:
-            return stripped
-    elif isinstance(value, (int, float)):
-        try:
-            decimal_value = Decimal(str(value))
-        except InvalidOperation:
-            return str(value)
-    else:
-        return str(value)
-
-    normalized = decimal_value.normalize()
-    if normalized == normalized.to_integral():
-        return str(normalized.quantize(Decimal("1")))
-
-    as_text = format(normalized, "f")
-    return as_text.rstrip("0").rstrip(".")
-
-
-def _series_as_strings(df: pd.DataFrame, column: str) -> pd.Series:
-    if column == "wave":
-        return df[column].map(_normalize_comparable_value)
-    return df[column].astype(str)
-
-
-def _filter_values_as_strings(column: str, values: list[object]) -> list[str]:
-    if column == "wave":
-        return [_normalize_comparable_value(v) for v in values]
-    return [str(v) for v in values]
-
-
-def validate_frequency_query(query: FrequencyQuery, df_columns: set[str]) -> None:
-    """Raise ValueError if the query references disallowed or missing columns."""
-    for col in query.group_by:
-        if col not in CATEGORICAL_WHITELIST:
-            raise ValueError(
-                f"Column '{col}' is not allowed in group_by. "
-                f"Allowed: {sorted(CATEGORICAL_WHITELIST)}"
-            )
-        if col not in df_columns:
-            raise ValueError(f"Column '{col}' does not exist in the dataset.")
-
-    if query.value_column is not None:
-        if query.value_column not in CATEGORICAL_WHITELIST:
-            raise ValueError(
-                f"value_column '{query.value_column}' is not in the allowed categorical columns. "
-                f"Allowed: {sorted(CATEGORICAL_WHITELIST)}"
-            )
-        if query.value_column not in df_columns:
-            raise ValueError(
-                f"value_column '{query.value_column}' does not exist in the dataset."
-            )
-
-    for f in query.filters:
-        if f.column not in df_columns:
-            raise ValueError(f"Filter column '{f.column}' does not exist in the dataset.")
-
-
-def validate_means_query(query: MeansQuery, df_columns: set[str]) -> None:
-    """Raise ValueError if the query references disallowed or missing columns."""
-    for col in query.group_by:
-        if col not in CATEGORICAL_WHITELIST:
-            raise ValueError(
-                f"Column '{col}' is not allowed in group_by. "
-                f"Allowed: {sorted(CATEGORICAL_WHITELIST)}"
-            )
-        if col not in df_columns:
-            raise ValueError(f"Column '{col}' does not exist in the dataset.")
-
-    for col in query.value_columns:
-        if col not in NUMERIC_WHITELIST:
-            raise ValueError(
-                f"Column '{col}' is not allowed in value_columns. "
-                f"Allowed: {sorted(NUMERIC_WHITELIST)}"
-            )
-        if col not in df_columns:
-            raise ValueError(f"Column '{col}' does not exist in the dataset.")
-
-    for f in query.filters:
-        if f.column not in df_columns:
-            raise ValueError(f"Filter column '{f.column}' does not exist in the dataset.")
-
-
-def apply_user_scope(df: pd.DataFrame, scope: UserScope) -> pd.DataFrame:
-    """Apply the user's pre-filters to the DataFrame."""
-    for col, allowed_values in scope.filters.items():
-        if col not in df.columns:
+def build_query_catalog(dfwl: DataFrameWithWhitelists) -> QueryCatalog:
+    df = dfwl.df
+    value_suggestions: dict[str, list[str]] = {}
+    for column in sorted(dfwl.categorical_whitelist):
+        if column not in df.columns:
             continue
-        series = _series_as_strings(df, col)
-        df = df[series.isin(_filter_values_as_strings(col, list(allowed_values)))]
-    return df
+        series = _series_as_strings(df.dropna(subset=[column]), column)
+        value_suggestions[column] = sorted(series.dropna().astype(str).unique().tolist())[:50]
+
+    waves = value_suggestions.get("wave", [])
+
+    return QueryCatalog(
+        dimensions=sorted(col for col in dfwl.categorical_whitelist if col in df.columns),
+        measures=sorted(col for col in dfwl.numerical_whitelist if col in df.columns and not col.endswith("_total")),
+        scores=sorted(col for col in dfwl.numerical_whitelist if col in df.columns and col.endswith("_total")),
+        waves=waves,
+        value_suggestions=value_suggestions,
+        step_types=[
+            "filter",
+            "derive_score",
+            "pair_waves",
+            "bucket_school_size",
+            "aggregate",
+        ],
+    )
 
 
-def _apply_single_filter(df: pd.DataFrame, f: Filter) -> pd.DataFrame:
-    col = f.column
-    val = f.value
-    op = f.op
-    str_series = _series_as_strings(df, col)
+@dataclass
+class SuppressionAwareFrame:
+    df: pd.DataFrame
+    row_grain: str
+    public_dimensions: set[str]
+    public_measures: set[str]
+    provenance: list[str] = field(default_factory=list)
 
-    if op == FilterOp.EQ:
-        return df[str_series == _filter_values_as_strings(col, [val])[0]]
-    if op == FilterOp.NE:
-        return df[str_series != _filter_values_as_strings(col, [val])[0]]
-    if op == FilterOp.IN:
-        values = val if isinstance(val, list) else [val]
-        return df[str_series.isin(_filter_values_as_strings(col, list(values)))]
-    if op == FilterOp.GT:
-        return df[pd.to_numeric(df[col], errors="coerce") > float(val)]  # type: ignore[arg-type]
-    if op == FilterOp.LT:
-        return df[pd.to_numeric(df[col], errors="coerce") < float(val)]  # type: ignore[arg-type]
-    if op == FilterOp.GTE:
-        return df[pd.to_numeric(df[col], errors="coerce") >= float(val)]  # type: ignore[arg-type]
-    if op == FilterOp.LTE:
-        return df[pd.to_numeric(df[col], errors="coerce") <= float(val)]  # type: ignore[arg-type]
-    return df
+    @property
+    def public_columns(self) -> set[str]:
+        return self.public_dimensions | self.public_measures
 
-
-def apply_filters(df: pd.DataFrame, filters: list[Filter]) -> pd.DataFrame:
-    for f in filters:
-        df = _apply_single_filter(df, f)
-    return df
-
-
-def execute_frequency_query(
-    df: pd.DataFrame,
-    query: FrequencyQuery,
-    scope: UserScope,
-    min_n: int,
-) -> FrequencyResult:
-    """Execute a frequency query for each specified wave.
-    
-    Returns a wave-indexed dictionary of results.
-    """
-    results = {}
-    
-    for wave in query.waves:
-        # Apply user scope
-        wave_df = apply_user_scope(df, scope)
-        
-        # Apply wave filter
-        wave_filter = Filter(column="wave", op=FilterOp.EQ, value=wave)
-        wave_df = _apply_single_filter(wave_df, wave_filter)
-        
-        # Apply other filters
-        wave_df = apply_filters(wave_df, query.filters)
-
-        result_df, suppressions = suppress_frequency_table(
-            df=wave_df,
-            group_cols=query.group_by,
-            value_col=query.value_column,
-            min_n=min_n,
-        )
-
-        # Convert SuppressionCode values to serialisable form
-        serialisable: dict[str, dict[int, str]] = {
-            col: {idx: code.value for idx, code in codes.items()}
-            for col, codes in suppressions.items()
-        }
-
-        results[wave] = FrequencyResultForWave(
-            csv=_df_to_csv(result_df),
-            suppressions=serialisable,  # type: ignore[arg-type]
-        )
-
-    return FrequencyResult(results=results)
-
-
-def execute_means_query(
-    df: pd.DataFrame,
-    query: MeansQuery,
-    scope: UserScope,
-    min_n: int,
-) -> MeansResult:
-    """Execute a means query for each specified wave.
-    
-    Returns a wave-indexed dictionary of results.
-    """
-    results = {}
-    
-    for wave in query.waves:
-        # Apply user scope
-        wave_df = apply_user_scope(df, scope)
-        
-        # Apply wave filter
-        wave_filter = Filter(column="wave", op=FilterOp.EQ, value=wave)
-        wave_df = _apply_single_filter(wave_df, wave_filter)
-        
-        # Apply other filters
-        wave_df = apply_filters(wave_df, query.filters)
-
-        means_df, counts_df, suppressions = suppress_means_table(
-            df=wave_df,
-            group_cols=query.group_by,
-            value_cols=query.value_columns,
-            min_n=min_n,
-        )
-
-        serialisable: dict[str, dict[int, str]] = {
-            col: {idx: code.value for idx, code in codes.items()}
-            for col, codes in suppressions.items()
-        }
-
-        results[wave] = MeansResultForWave(
-            csv=_df_to_csv(means_df),
-            count_csv=_df_to_csv(counts_df),
-            suppressions=serialisable,  # type: ignore[arg-type]
-        )
-
-    return MeansResult(results=results)
-
-
-def validate_wave_change_query(query: WaveChangeQuery, df_columns: set[str]) -> None:
-    """Raise ValueError if the wave-change query references disallowed or missing columns."""
-    if "wave" not in df_columns:
-        raise ValueError("Dataset does not contain a 'wave' column required for wave-change queries.")
-
-    for col in query.group_by:
-        if col not in CATEGORICAL_WHITELIST:
+    def ensure_public_column(self, column: str) -> None:
+        if column not in self.public_columns:
             raise ValueError(
-                f"Column '{col}' is not allowed in group_by. "
-                f"Allowed: {sorted(CATEGORICAL_WHITELIST)}"
+                f"Column '{column}' is not available at this stage. "
+                f"Available columns: {sorted(self.public_columns)}"
             )
-        if col not in df_columns:
-            raise ValueError(f"Column '{col}' does not exist in the dataset.")
 
-    if not query.value_columns:
-        raise ValueError("value_columns must not be empty.")
-
-    for col in query.value_columns:
-        if col not in NUMERIC_WHITELIST:
+    def ensure_dimension(self, column: str) -> None:
+        if column not in self.public_dimensions:
             raise ValueError(
-                f"Column '{col}' is not allowed in value_columns. "
-                f"Allowed: {sorted(NUMERIC_WHITELIST)}"
+                f"Column '{column}' is not an allowed grouping dimension at this stage. "
+                f"Allowed dimensions: {sorted(self.public_dimensions)}"
             )
-        if col not in df_columns:
-            raise ValueError(f"Column '{col}' does not exist in the dataset.")
 
-    for f in query.filters:
-        if f.column not in df_columns:
-            raise ValueError(f"Filter column '{f.column}' does not exist in the dataset.")
+    def ensure_measure(self, column: str) -> None:
+        if column not in self.public_measures:
+            raise ValueError(
+                f"Column '{column}' is not an allowed measure at this stage. "
+                f"Allowed measures: {sorted(self.public_measures)}"
+            )
 
 
-def execute_wave_change_query(
-    df: pd.DataFrame,
-    query: WaveChangeQuery,
-    scope: UserScope,
-    min_n: int,
-) -> WaveChangeResult:
-    """Compute per-student within-person change between two waves.
+def _initial_frame(dfwl: DataFrameWithWhitelists, scope: UserScope) -> SuppressionAwareFrame:
+    df = dfwl.df
+    scoped = apply_user_scope(df, scope)
+    dimensions = {col for col in dfwl.categorical_whitelist if col in scoped.columns}
+    measures = {col for col in dfwl.numerical_whitelist if col in scoped.columns}
+    return SuppressionAwareFrame(
+        df=scoped.copy(),
+        row_grain="student_wave",
+        public_dimensions=dimensions,
+        public_measures=measures,
+    )
 
-    For each student (uid) that has observations in both from_wave and to_wave,
-    the change in each value_column is computed as:
-        change = value_at_to_wave - value_at_from_wave
 
-    Those per-student differences are then optionally grouped by group_by columns
-    (taken from the from_wave observation) and averaged. Suppression is applied
-    based on the count of matched students per group.
-    """
-    df = apply_user_scope(df, scope)
-    df = apply_filters(df, query.filters)
+def _append_provenance(frame: SuppressionAwareFrame, message: str) -> None:
+    frame.provenance.append(message)
 
-    wave_col = "wave"
-    uid_col = "uid"
 
-    # Split into baseline and comparison waves
-    wave_series = _series_as_strings(df, wave_col)
-    baseline = df[wave_series == _normalize_comparable_value(query.from_wave)].copy()
-    comparison = df[wave_series == _normalize_comparable_value(query.to_wave)].copy()
-
-    if baseline.empty or comparison.empty:
-        # No matched data → return empty result
-        empty_cols = (query.group_by + query.value_columns) if query.group_by else query.value_columns
-        empty_df = pd.DataFrame(columns=empty_cols)
-        return WaveChangeResult(
-            csv=_df_to_csv(empty_df),
-            count_csv=_df_to_csv(empty_df),
-            suppressions={},
+def _validate_output_name(name: str) -> None:
+    if not SAFE_OUTPUT_NAME_RE.match(name):
+        raise ValueError(
+            f"Output column '{name}' must match {SAFE_OUTPUT_NAME_RE.pattern!r}."
         )
 
-    # Merge on uid to find students present in both waves
-    merge_cols = [uid_col] + query.value_columns
-    # Only keep columns we need from each wave to avoid name collisions
-    baseline_cols = [uid_col] + query.value_columns + query.group_by
-    comparison_cols = [uid_col] + query.value_columns
 
-    # Keep only available columns
-    baseline_cols = [c for c in baseline_cols if c in baseline.columns]
-    comparison_cols = [c for c in comparison_cols if c in comparison.columns]
+def _ensure_no_duplicate_output_names(group_by: list[str], metrics: list[QueryMetric]) -> None:
+    seen = set(group_by)
+    duplicates = [name for name in group_by if group_by.count(name) > 1]
+    if duplicates:
+        raise ValueError(f"Duplicate group_by columns are not allowed: {sorted(set(duplicates))}")
+
+    for metric in metrics:
+        output_name = _metric_output_name(metric)
+        if output_name in seen:
+            raise ValueError(f"Output column '{output_name}' conflicts with another output column.")
+        seen.add(output_name)
+
+
+def _metric_output_name(metric: QueryMetric) -> str:
+    if metric.as_column:
+        _validate_output_name(metric.as_column)
+        return metric.as_column
+    if metric.kind == QueryMetricKind.COUNT_STUDENTS:
+        return "student_n"
+    assert metric.column is not None
+    return metric.column
+
+
+def _ensure_student_level(frame: SuppressionAwareFrame, step_name: str) -> None:
+    if frame.row_grain == "aggregate":
+        raise ValueError(f"'{step_name}' cannot run after aggregation.")
+
+
+def _apply_filter_step(frame: SuppressionAwareFrame, step: QueryFilterStep) -> SuppressionAwareFrame:
+    _ensure_student_level(frame, "filter")
+    frame.ensure_public_column(step.column)
+    filtered = _apply_single_filter(
+        frame.df,
+        QueryFilterStep.model_construct(
+            type="filter",
+            column=step.column,
+            op=step.op,
+            value=step.value,
+        ),
+    )
+    next_frame = SuppressionAwareFrame(
+        df=filtered.copy(),
+        row_grain=frame.row_grain,
+        public_dimensions=set(frame.public_dimensions),
+        public_measures=set(frame.public_measures),
+        provenance=list(frame.provenance),
+    )
+    _append_provenance(next_frame, f"Filtered {step.column} {step.op.value} {step.value!r}.")
+    return next_frame
+
+
+def _derive_bw_wbeing_total(frame: SuppressionAwareFrame) -> SuppressionAwareFrame:
+    _ensure_student_level(frame, "derive_score")
+    if frame.row_grain != "student_wave":
+        raise ValueError(
+            "bw_wbeing_total can only be derived on student-wave data before pair_waves."
+        )
+
+    bw_wbeing_columns = [
+        col for col in sorted(frame.df.columns) if re.fullmatch(r"bw_wbeing_[1-9]", col)
+    ]
+    if not bw_wbeing_columns:
+        raise ValueError(
+            "Cannot derive bw_wbeing_total because no BeeWell wellbeing item columns are present."
+        )
+
+    derived = frame.df.copy()
+    derived["bw_wbeing_total"] = (
+        derived[bw_wbeing_columns].apply(pd.to_numeric, errors="coerce").sum(axis=1)
+    )
+    next_frame = SuppressionAwareFrame(
+        df=derived,
+        row_grain=frame.row_grain,
+        public_dimensions=set(frame.public_dimensions),
+        public_measures=set(frame.public_measures) | {"bw_wbeing_total"},
+        provenance=list(frame.provenance),
+    )
+    _append_provenance(
+        next_frame,
+        "Derived bw_wbeing_total from available BeeWell wellbeing item columns.",
+    )
+    return next_frame
+
+
+def _apply_derive_score_step(
+    frame: SuppressionAwareFrame, step: QueryDeriveScoreStep
+) -> SuppressionAwareFrame:
+    if step.score == "bw_wbeing_total":
+        return _derive_bw_wbeing_total(frame)
+    raise ValueError(f"Unsupported score '{step.score}'.")
+
+
+def _apply_pair_waves_step(
+    frame: SuppressionAwareFrame, step: QueryPairWavesStep
+) -> SuppressionAwareFrame:
+    _ensure_student_level(frame, "pair_waves")
+    if frame.row_grain != "student_wave":
+        raise ValueError("pair_waves can only be applied once and only to student-wave data.")
+    if "wave" not in frame.df.columns:
+        raise ValueError("pair_waves requires a 'wave' column.")
+
+    for measure in step.measures:
+        frame.ensure_measure(measure)
+
+    wave_series = _series_as_strings(frame.df, "wave")
+    baseline = frame.df[wave_series == _normalize_comparable_value(step.from_wave)].copy()
+    comparison = frame.df[wave_series == _normalize_comparable_value(step.to_wave)].copy()
+
+    baseline_dims = [col for col in sorted(frame.public_dimensions - {"wave"}) if col in baseline.columns]
+    baseline_cols = ["uid"] + baseline_dims + step.measures
+    comparison_cols = ["uid"] + step.measures
 
     merged = baseline[baseline_cols].merge(
         comparison[comparison_cols],
-        on=uid_col,
-        suffixes=("_from", "_to"),
+        on="uid",
+        suffixes=("_baseline", "_comparison"),
     )
 
-    if merged.empty:
-        empty_cols = (query.group_by + query.value_columns) if query.group_by else query.value_columns
-        empty_df = pd.DataFrame(columns=empty_cols)
-        return WaveChangeResult(
-            csv=_df_to_csv(empty_df),
-            count_csv=_df_to_csv(empty_df),
-            suppressions={},
+    for measure in step.measures:
+        merged[f"baseline_{measure}"] = pd.to_numeric(
+            merged[f"{measure}_baseline"], errors="coerce"
+        )
+        merged[f"comparison_{measure}"] = pd.to_numeric(
+            merged[f"{measure}_comparison"], errors="coerce"
+        )
+        merged[f"change_{measure}"] = (
+            merged[f"comparison_{measure}"] - merged[f"baseline_{measure}"]
         )
 
-    # Compute per-student changes
-    for col in query.value_columns:
-        from_col = f"{col}_from" if f"{col}_from" in merged.columns else col
-        to_col = f"{col}_to" if f"{col}_to" in merged.columns else col
-        if from_col in merged.columns and to_col in merged.columns:
-            merged[col] = pd.to_numeric(merged[to_col], errors="coerce") - pd.to_numeric(
-                merged[from_col], errors="coerce"
-            )
-        else:
-            merged[col] = float("nan")
-
-    # Build working dataframe with uid, group_by cols, and change cols
-    keep_cols = [uid_col] + query.group_by + query.value_columns
-    keep_cols = [c for c in keep_cols if c in merged.columns]
-    changes_df = merged[keep_cols].copy()
-
-    # Apply suppression via suppress_means_table (reuses the same logic)
-    from glow_api.suppression import suppress_means_table
-
-    means_df, counts_df, suppressions = suppress_means_table(
-        df=changes_df,
-        group_cols=query.group_by,
-        value_cols=query.value_columns,
-        min_n=min_n,
-    )
-
-    serialisable: dict[str, dict[int, str]] = {
-        col: {idx: code.value for idx, code in codes.items()}
-        for col, codes in suppressions.items()
+    pair_measure_cols = {
+        f"baseline_{measure}" for measure in step.measures
+    } | {
+        f"comparison_{measure}" for measure in step.measures
+    } | {
+        f"change_{measure}" for measure in step.measures
     }
 
-    return WaveChangeResult(
-        csv=_df_to_csv(means_df),
-        count_csv=_df_to_csv(counts_df),
-        suppressions=serialisable,  # type: ignore[arg-type]
+    keep_cols = ["uid"] + baseline_dims + sorted(pair_measure_cols)
+    next_frame = SuppressionAwareFrame(
+        df=merged[keep_cols].copy(),
+        row_grain="student_pair",
+        public_dimensions=set(baseline_dims),
+        public_measures=pair_measure_cols,
+        provenance=list(frame.provenance),
     )
+    _append_provenance(
+        next_frame,
+        f"Paired waves {step.from_wave} -> {step.to_wave} for {', '.join(step.measures)}.",
+    )
+    return next_frame
+
+
+def _bucket_label_for_count(count: int, bands: list[QueryBucketBand]) -> str | None:
+    for band in bands:
+        if count < band.min_students:
+            continue
+        if band.max_students is not None and count > band.max_students:
+            continue
+        return band.label
+    return None
+
+
+def _apply_bucket_school_size_step(
+    frame: SuppressionAwareFrame, step: QueryBucketSchoolSizeStep
+) -> SuppressionAwareFrame:
+    _ensure_student_level(frame, "bucket_school_size")
+    frame.ensure_dimension("school")
+    _validate_output_name(step.output_column)
+
+    school_counts = frame.df.groupby("school")["uid"].nunique()
+    bucket_map: dict[str, str] = {}
+    for school, student_count in school_counts.items():
+        label = _bucket_label_for_count(int(student_count), step.bands)
+        if label is None:
+            raise ValueError(
+                f"No bucket matched school '{school}' with {student_count} students."
+            )
+        bucket_map[str(school)] = label
+
+    derived = frame.df.copy()
+    derived[step.output_column] = derived["school"].astype(str).map(bucket_map)
+    next_frame = SuppressionAwareFrame(
+        df=derived,
+        row_grain=frame.row_grain,
+        public_dimensions=set(frame.public_dimensions) | {step.output_column},
+        public_measures=set(frame.public_measures),
+        provenance=list(frame.provenance),
+    )
+    _append_provenance(
+        next_frame,
+        f"Bucketed schools into {step.output_column} using distinct-student counts.",
+    )
+    return next_frame
+
+
+def _series_from_grouped(
+    df: pd.DataFrame,
+    group_by: list[str],
+    column: str,
+    kind: QueryMetricKind,
+) -> tuple[pd.Series, pd.Series]:
+    if kind == QueryMetricKind.COUNT_STUDENTS:
+        if group_by:
+            counts = df.groupby(group_by)["uid"].nunique()
+            return counts.astype(float), counts.astype(float)
+        count = float(df["uid"].nunique())
+        series = pd.Series([count], name=column)
+        return series, series.copy()
+
+    sub = df.dropna(subset=[column])
+    if group_by:
+        grouped = sub.groupby(group_by)
+        values = grouped[column].mean()
+        counts = grouped["uid"].nunique().astype(float)
+        return values, counts
+
+    values = pd.Series([sub[column].mean()], name=column)
+    counts = pd.Series([float(sub["uid"].nunique())], name=column)
+    return values, counts
+
+
+def _reset_result_index(df: pd.DataFrame, group_by: list[str]) -> pd.DataFrame:
+    if group_by:
+        return df.reset_index()
+    return df.reset_index(drop=True)
+
+
+def _apply_aggregate_step(
+    frame: SuppressionAwareFrame,
+    step: QueryAggregateStep,
+    min_n: int,
+) -> QueryPlanResultForWave:
+    _ensure_student_level(frame, "aggregate")
+    for column in step.group_by:
+        frame.ensure_dimension(column)
+    if not step.metrics:
+        raise ValueError("aggregate steps must contain at least one metric.")
+
+    _ensure_no_duplicate_output_names(step.group_by, step.metrics)
+
+    values_parts: dict[str, pd.Series] = {}
+    counts_parts: dict[str, pd.Series] = {}
+
+    for metric in step.metrics:
+        output_name = _metric_output_name(metric)
+        if metric.kind == QueryMetricKind.MEAN:
+            assert metric.column is not None
+            frame.ensure_measure(metric.column)
+            values, counts = _series_from_grouped(
+                frame.df, step.group_by, metric.column, QueryMetricKind.MEAN
+            )
+        else:
+            values, counts = _series_from_grouped(
+                frame.df, step.group_by, output_name, QueryMetricKind.COUNT_STUDENTS
+            )
+        values_parts[output_name] = values
+        counts_parts[output_name] = counts
+
+    result_df = _reset_result_index(pd.DataFrame(values_parts), step.group_by)
+    counts_df = _reset_result_index(pd.DataFrame(counts_parts), step.group_by)
+
+    suppressions: dict[str, dict[int, SuppressionCode]] = {}
+    metric_columns = [_metric_output_name(metric) for metric in step.metrics]
+    for column in metric_columns:
+        col_suppressions: dict[int, SuppressionCode] = {}
+        for idx in counts_df.index:
+            n = counts_df.at[idx, column]
+            if pd.isna(n) or float(n) < min_n:
+                result_df.at[idx, column] = float("nan")
+                counts_df.at[idx, column] = float("nan")
+                col_suppressions[int(idx)] = SuppressionCode.SMALL_N
+        if col_suppressions:
+            suppressions[column] = col_suppressions
+
+    provenance = list(frame.provenance)
+    provenance.append(
+        "Aggregated metrics with suppression based on contributing distinct-student N."
+    )
+    return QueryPlanResultForWave(
+        csv=_df_to_csv(result_df),
+        count_csv=_df_to_csv(counts_df),
+        suppressions=suppressions,  # type: ignore[arg-type]
+        provenance=provenance,
+    )
+
+
+def execute_query(
+    df: pd.DataFrame,
+    plan: QueryPlan,
+    scope: UserScope,
+    min_n: int,
+) -> QueryPlanResult:
+    """Execute a query plan for each specified wave.
+    
+    Returns a wave-indexed dictionary of results.
+    """
+    from glow_api.models import Filter
+    
+    results = {}
+    
+    for wave in plan.waves:
+        # Start with initial frame for this wave
+        frame = _initial_frame(df, scope)
+        
+        # Apply wave filter first
+        wave_filter = QueryFilterStep(
+            type="filter",
+            column="wave",
+            op=FilterOp.EQ,
+            value=wave
+        )
+        frame = _apply_filter_step(frame, wave_filter)
+        
+        # Execute the rest of the plan
+        for step in plan.steps:
+            if step.type == "filter":
+                frame = _apply_filter_step(frame, step)
+            elif step.type == "derive_score":
+                frame = _apply_derive_score_step(frame, step)
+            elif step.type == "pair_waves":
+                frame = _apply_pair_waves_step(frame, step)
+            elif step.type == "bucket_school_size":
+                frame = _apply_bucket_school_size_step(frame, step)
+            elif step.type == "aggregate":
+                results[wave] = _apply_aggregate_step(frame, step, min_n)
+                break  # Aggregate is always the last step
+            else:
+                raise ValueError(f"Unsupported step type '{step.type}'.")
+        
+        if wave not in results:
+            raise ValueError("Query plans must end with an aggregate step.")
+    
+    return QueryPlanResult(results=results)
+
+
+build_query_v2_catalog = build_query_catalog
+execute_query_v2 = execute_query

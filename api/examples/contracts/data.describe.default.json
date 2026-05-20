@@ -8,24 +8,12 @@
   "request": null,
   "response": {
     "variables": [
-      {
-        "value": "bw_wbeing_1",
-        "label_key": "api.bw_wbeing_1"
-      },
-      {
-        "value": "bw_wbeing_total",
-        "label_key": "api.bw_wbeing_total"
-      }
+      "bw_wbeing_1",
+      "bw_wbeing_total"
     ],
     "aggregation_options": [
-      {
-        "value": "d_sex",
-        "label_key": "api.d_sex"
-      },
-      {
-        "value": "yearGroup",
-        "label_key": "api.yearGroup"
-      }
+      "d_sex",
+      "yearGroup"
     ],
     "filter_options": [
       {

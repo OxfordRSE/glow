@@ -319,35 +319,18 @@ class QueryCatalog(BaseModel):
 # ---------------------------------------------------------------------------
 # Describe Data Models
 # ---------------------------------------------------------------------------
-
-
-class VariableOption(BaseModel):
-    """A variable option with its i18n key."""
-    
-    value: str  # The column name (e.g., "bw_wbeing_1", "bw_wbeing_total")
-    label_key: str  # i18n key with api. prefix (e.g., "api.bw_wbeing_1")
-
-
-class AggregationOption(BaseModel):
-    """An aggregation/grouping option with its i18n key."""
-    
-    value: str  # The dimension name (e.g., "yearGroup", "d_sex")
-    label_key: str  # i18n key with api. prefix (e.g., "api.yearGroup")
-
-
 class FilterOption(BaseModel):
     """A filter option with its i18n key and possible values."""
     
     value: str  # The dimension name (e.g., "yearGroup", "wave")
-    label_key: str  # i18n key with api. prefix (e.g., "api.yearGroup")
     values: list[str]  # Possible values for this filter
 
 
 class DescribeDataResponse(BaseModel):
     """Response containing all variables, aggregation options, and filter options."""
     
-    variables: list[VariableOption]  # All data variables including totals
-    aggregation_options: list[AggregationOption]  # Grouping variables (wave excluded)
+    variables: list[str]  # All data variables including totals
+    aggregation_options: list[str]  # Grouping variables (wave excluded)
     filter_options: list[FilterOption]  # Filter variables (wave included with all waves as default)
 
 

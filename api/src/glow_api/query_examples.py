@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 
 from glow_api.models import QueryPlan, QueryPlanResult, UserScope
-from glow_api.query_v2 import execute_query
+from glow_api.query import execute_query
 
 MIN_N_FOR_DOCS = 5
 MAX_DOC_ROWS = 8

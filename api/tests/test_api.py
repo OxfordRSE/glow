@@ -45,9 +45,27 @@ def test_get_columns(client):
     response = client.get("/data/columns")
     assert response.status_code == status.HTTP_200_OK
     cols = response.json()
-    assert "uid" in cols
+    assert "uid" not in cols
     assert "school" in cols
     assert "bw_wbeing_1" in cols
+
+
+def test_get_columns(client):
+    response = client.get("/data/describe")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert "variables" in data
+    assert len(data["variables"]) == 5
+    assert "bw_wbeing_1" in data["variables"]
+    assert "bw_wbeing_total" in data["variables"]
+    assert "aggregation_options" in data
+    assert len(data["aggregation_options"]) == 4
+    assert "class" in data["aggregation_options"]
+    assert "school" not in data["aggregation_options"]
+    assert "filter_options" in data
+    assert len(data["filter_options"]) == 4
+    assert "value" in data["filter_options"][0]
+    assert "values" in data["filter_options"][0]
 
 
 def test_suppression_count_students(sample_df):
@@ -128,7 +146,7 @@ def test_suppression_means_above_min_n(sample_df):
 
 def test_user_scope_applied(sample_df):
     from glow_api.models import UserScope
-    from glow_api.query import apply_user_scope
+    from glow_api.query_utils import apply_user_scope
 
     scope = UserScope(filters={"school": ["Focus School Academy"]})
     filtered = apply_user_scope(sample_df, scope)

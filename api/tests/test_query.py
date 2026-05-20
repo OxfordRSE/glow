@@ -136,28 +136,6 @@ class TestQueryEndpoint:
                     assert "mean" in result
                     assert "student_n" in result
 
-    def test_query_with_wave_filter(self, auth_client, alpha_user, login_as_user):
-        """Query with wave filter."""
-        token = login_as_user(alpha_user["username"])
-        
-        response = auth_client.post(
-            "/query",
-            json={
-                "school_id": alpha_user["school_id"],
-                "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
-                "aggregations": [],
-                "filters": {"wave": [1]},
-            },
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        
-        assert response.status_code == 200
-        data = response.json()
-        
-        # Should return valid response (suppressed or not)
-        assert "focus_school" in data
-
     def test_query_with_class_aggregation(self, auth_client, alpha_user, login_as_user):
         """Query with class aggregation (focus school only)."""
         token = login_as_user(alpha_user["username"])

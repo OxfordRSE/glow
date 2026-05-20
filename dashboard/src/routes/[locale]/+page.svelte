@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { authStore } from '$lib/stores';
-  import { listSchools, query, describeData, type School, type QueryResponse, type DescribeDataResponse, type VariableOption, type AggregationOption, type FilterOption } from '$lib/api';
+  import { listSchools, query, describeData, type School, type QueryResponse, type DescribeDataResponse, type FilterOption } from '$lib/api';
   import ChartCard from '$lib/components/ChartCard.svelte';
   import type { ChartJsData } from '$lib/chartUtils';
   import { createI18n, locale } from '$lib/i18n';
@@ -20,15 +20,15 @@
   // Query parameters - now loaded from API
   const variables = $derived(
     dataDescription?.variables.map(v => ({
-      value: v.value,
-      label: i18n.t(v.label_key)
+      value: v,
+      label: i18n.t(`api.${v}`)
     })) ?? []
   );
   
   const aggregationOptions = $derived(
     dataDescription?.aggregation_options.map(a => ({
-      value: a.value,
-      label: i18n.t(a.label_key)
+      value: a,
+      label: i18n.t(`api.${a}`)
     })) ?? []
   );
   
@@ -37,7 +37,7 @@
       .filter(f => f.value !== 'wave')  // Wave is now first-class, not a filter
       .map(f => ({
         value: f.value,
-        label: i18n.t(f.label_key),
+        label: i18n.t(`api.${f.value}`),
         values: f.values
       })) ?? []
   );

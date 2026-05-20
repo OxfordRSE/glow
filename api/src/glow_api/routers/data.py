@@ -3,14 +3,12 @@ from fastapi import APIRouter, Depends
 from glow_api.auth import get_current_user
 from glow_api.data import DataStore, get_datastore
 from glow_api.models import (
-    AggregationOption,
     ColumnsResponse,
     DescribeDataResponse,
     FilterOption,
     UserRead,
-    VariableOption,
 )
-from glow_api.query_v2 import build_query_catalog
+from glow_api.query import build_query_catalog
 
 router = APIRouter(prefix="/data", tags=["data"])
 
@@ -20,8 +18,8 @@ def get_columns(
     current_user: UserRead = Depends(get_current_user),
     datastore: DataStore = Depends(get_datastore),
 ) -> list[str]:
-    df = datastore.get_dataframe()
-    return list(df.columns)
+    dfwl = datastore.to_frozen()
+    return list(set([*dfwl.categorical_whitelist, *dfwl.numerical_whitelist]))
 
 
 @router.get("/describe", response_model=DescribeDataResponse)
@@ -35,31 +33,22 @@ def describe_data(
     School is always used for grouping (focus school + neighbors) so it's excluded from both aggregations and filters.
     Wave is included in filters (with all values selected by default) but excluded from aggregations.
     """
-    df = datastore.get_dataframe()
-    catalog = build_query_catalog(df)
+    dfwl = datastore.to_frozen()
+    catalog = build_query_catalog(dfwl)
 
     # Build variables list (all numeric measures including derived totals)
-    variables = [
-        VariableOption(value=measure, label_key=f"api.{measure}")
-        for measure in catalog.measures + catalog.scores
-    ]
+    variables = [measure for measure in catalog.measures + catalog.scores]
 
     # Build aggregation options (exclude wave and school)
-    aggregation_options = [
-        AggregationOption(value=dim, label_key=f"api.{dim}")
-        for dim in catalog.dimensions
-        if dim not in ("wave", "school")
-    ]
+    aggregation_options = catalog.dimensions
 
     # Build filter options (exclude school, include wave)
     filter_options = [
         FilterOption(
             value=dim,
-            label_key=f"api.{dim}",
             values=catalog.value_suggestions.get(dim, [])
         )
         for dim in catalog.dimensions
-        if dim != "school"
     ]
 
     return DescribeDataResponse(

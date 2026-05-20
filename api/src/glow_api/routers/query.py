@@ -8,7 +8,7 @@ from glow_api.blanket_suppression import execute_query_with_neighbors
 from glow_api.data import DataStore, get_datastore
 from glow_api.database import get_db, get_school_by_id
 from glow_api.models import QueryRequest, QueryResponse, QueryResult, QueryResultForWave, UserRead
-from glow_api.query_v2 import build_query_catalog
+from glow_api.query import build_query_catalog
 from glow_api.settings import settings
 
 router = APIRouter(prefix="/query", tags=["query"])
@@ -25,196 +25,9 @@ def sort_key(value: str) -> str:
         value,
     )
 
-
-ALLOWED_VARIABLES = sorted([
-    # Questionnaire prefixes (individual items)
-    "bw_migration",
-    "bw_wbeing",
-    "bw_selfest",
-    "bw_emoreg",
-    "bw_stress",
-    "bw_coping",
-    "bw_emodies",
-    "bw_behav",
-    "bw_unhealthy",
-    "bw_socmtype",
-    "bw_activ",
-    "bw_staffrel",
-    "bw_localenv",
-    "bw_future",
-    "bw_plans",
-    "bw_gmacs",
-    "bw_parentsrel",
-    "bw_friends",
-    "bw_discrim",
-    "bw_discloc",
-    "bw_bullying",
-    "bw_mhcontact",
-    # Derived total scores
-    "bw_migration_total",
-    "bw_wbeing_total",
-    "bw_selfest_total",
-    "bw_emoreg_total",
-    "bw_stress_total",
-    "bw_coping_total",
-    "bw_emodies_total",
-    "bw_behav_total",
-    "bw_unhealthy_total",
-    "bw_socmtype_total",
-    "bw_activ_total",
-    "bw_staffrel_total",
-    "bw_localenv_total",
-    "bw_future_total",
-    "bw_plans_total",
-    "bw_gmacs_total",
-    "bw_parentsrel_total",
-    "bw_friends_total",
-    "bw_discrim_total",
-    "bw_discloc_total",
-    "bw_bullying_total",
-    "bw_mhcontact_total",
-    # Individual questionnaire items
-    "bw_activ_1",
-    "bw_activ_10",
-    "bw_activ_11",
-    "bw_activ_2",
-    "bw_activ_3",
-    "bw_activ_4",
-    "bw_activ_5",
-    "bw_activ_6",
-    "bw_activ_7",
-    "bw_activ_8",
-    "bw_activ_9",
-    "bw_appear_1",
-    "bw_arrival_1",
-    "bw_attain_1",
-    "bw_behav_1",
-    "bw_behav_2",
-    "bw_behav_3",
-    "bw_behav_4",
-    "bw_behav_5",
-    "bw_behav_6",
-    "bw_beinheard_1",
-    "bw_bullying_1",
-    "bw_bullying_2",
-    "bw_bullying_3",
-    "bw_careershlp_1",
-    "bw_careersed_1",
-    "bw_coping_1",
-    "bw_coping_2",
-    "bw_discloc_1",
-    "bw_discloc_2",
-    "bw_discloc_3",
-    "bw_discloc_4",
-    "bw_discloc_5",
-    "bw_discloc_6",
-    "bw_discloc_7",
-    "bw_discrim_1",
-    "bw_discrim_2",
-    "bw_discrim_3",
-    "bw_discrim_4",
-    "bw_discrim_5",
-    "bw_emodies_1",
-    "bw_emodies_10",
-    "bw_emodies_2",
-    "bw_emodies_3",
-    "bw_emodies_4",
-    "bw_emodies_5",
-    "bw_emodies_6",
-    "bw_emodies_7",
-    "bw_emodies_8",
-    "bw_emodies_9",
-    "bw_emoreg_1",
-    "bw_emoreg_2",
-    "bw_emoreg_3",
-    "bw_foodsec_1",
-    "bw_freetime_1",
-    "bw_friends_1",
-    "bw_friends_2",
-    "bw_friends_3",
-    "bw_friends_4",
-    "bw_fruitveg_1",
-    "bw_future_1",
-    "bw_future_2",
-    "bw_future_3",
-    "bw_future_4",
-    "bw_future_5",
-    "bw_future_6",
-    "bw_future_7",
-    "bw_gmacs_1",
-    "bw_gmacs_2",
-    "bw_homeenv_1",
-    "bw_iso_1",
-    "bw_isodays_1",
-    "bw_isodur_1",
-    "bw_kooth_1",
-    "bw_life_sat_1",
-    "bw_localenv_1",
-    "bw_localenv_2",
-    "bw_localenv_3",
-    "bw_localenv_4",
-    "bw_lonely_1",
-    "bw_material_1",
-    "bw_mhcontact_1",
-    "bw_mhcontact_2",
-    "bw_mhcontact_3",
-    "bw_mhcontact_4",
-    "bw_mhcontact_5",
-    "bw_mhcontact_6",
-    "bw_migration_1",
-    "bw_migration_2",
-    "bw_migration_3",
-    "bw_parentsrel_1",
-    "bw_parentsrel_2",
-    "bw_parentsrel_3",
-    "bw_parentsrel_4",
-    "bw_physact_1",
-    "bw_physdur_1",
-    "bw_physh_1",
-    "bw_plans_1",
-    "bw_plans_2",
-    "bw_plans_3",
-    "bw_plans_4",
-    "bw_plans_5",
-    "bw_plans_6",
-    "bw_plans_7",
-    "bw_plans_8",
-    "bw_safety_1",
-    "bw_schoolconn_1",
-    "bw_schpress_1",
-    "bw_selfest_1",
-    "bw_selfest_2",
-    "bw_selfest_3",
-    "bw_selfest_4",
-    "bw_selfest_5",
-    "bw_sleep_1",
-    "bw_socmedia_1",
-    "bw_socmtype_1",
-    "bw_socmtype_2",
-    "bw_staffrel_1",
-    "bw_staffrel_2",
-    "bw_staffrel_3",
-    "bw_staffrel_4",
-    "bw_stress_1",
-    "bw_stress_2",
-    "bw_support_1",
-    "bw_unhealthy_1",
-    "bw_unhealthy_2",
-    "bw_unhealthy_3",
-    "bw_unhealthy_4",
-    "bw_volunteer_1",
-    "bw_wbeing_1",
-    "bw_wbeing_2",
-    "bw_wbeing_3",
-    "bw_wbeing_4",
-    "bw_wbeing_5",
-    "bw_wbeing_6",
-    "bw_wbeing_7"
-], key=sort_key)
-
 ALLOWED_AGGREGATIONS = ["yearGroup", "d_ethnicity", "d_sex", "class"]
 
-ALLOWED_FILTERS = ["yearGroup", "d_ethnicity", "d_sex", "wave", "class"]
+ALLOWED_FILTERS = ["yearGroup", "d_ethnicity", "d_sex", "class"]
 
 
 @router.post("", response_model=QueryResponse, include_in_schema=False)
@@ -240,11 +53,13 @@ def query(
             detail=f"You do not have access to school {request.school_id}",
         )
 
+    dfwl = datastore.to_frozen()
+    allowed_variables = [*dfwl.categorical_whitelist, *dfwl.numerical_whitelist]
     # Validate variable
-    if request.variable not in ALLOWED_VARIABLES:
+    if request.variable not in allowed_variables:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Variable '{request.variable}' is not allowed. Allowed variables: {ALLOWED_VARIABLES}",
+            detail=f"Variable '{request.variable}' is not allowed. Allowed variables: {allowed_variables}",
         )
 
     # Validate aggregations
@@ -286,7 +101,7 @@ def query(
             neighbor_schools = focus_school.statistical_neighbors
 
     # Get data
-    df = datastore.get_dataframe()
+    df = dfwl.df
 
     # Check if variable exists in dataframe
     if request.variable not in df.columns:
@@ -364,7 +179,7 @@ def query_catalog(
     datastore: DataStore = Depends(get_datastore),
 ):
     """Get query catalog for building queries."""
-    df = datastore.get_dataframe()
+    dfwl = datastore.to_frozen()
     if not current_user.is_admin:
-        df = df[df["school"].isin(current_user.school_names)]
-    return build_query_catalog(df)
+        dfwl.df = dfwl.df[dfwl.df["school"].isin(current_user.school_names)]
+    return build_query_catalog(dfwl)

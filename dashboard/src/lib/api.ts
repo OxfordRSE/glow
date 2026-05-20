@@ -293,25 +293,14 @@ export async function getColumns(token: string): Promise<string[]> {
   return apiFetch<string[]>("/data/columns", { headers: authHeaders(token) });
 }
 
-export interface VariableOption {
-  value: string;
-  label_key: string;
-}
-
-export interface AggregationOption {
-  value: string;
-  label_key: string;
-}
-
 export interface FilterOption {
   value: string;
-  label_key: string;
   values: string[];
 }
 
 export interface DescribeDataResponse {
-  variables: VariableOption[];
-  aggregation_options: AggregationOption[];
+  variables: string[];
+  aggregation_options: string[];
   filter_options: FilterOption[];
 }
 
