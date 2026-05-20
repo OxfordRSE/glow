@@ -416,13 +416,13 @@ export function queryToChartData(
 }
 
 /**
- * Convert SafeQueryResponse to chart data for wave analysis
+ * Convert QueryResponse to chart data for wave analysis
  * Handles focus school vs neighbor styling:
  * - Non-focus school data in grey with alpha
  * - Focus school data in colour with full opacity
  * - Focus school data split into different colored lines if required by aggregator
  */
-export function safeQueryToWaveChart(
+export function queryToWaveChart(
   focusSchool: { school_name: string; results: Record<string, unknown>[] | null },
   neighbors: { school_name: string; results: Record<string, unknown>[] | null }[],
   aggregations: string[],

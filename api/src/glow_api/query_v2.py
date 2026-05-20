@@ -16,8 +16,8 @@ from glow_api.models import (
     QueryMetricKind,
     QueryPairWavesStep,
     QueryPlan,
-    QueryResult,
-    QueryResultForWave,
+    QueryPlanResult,
+    QueryPlanResultForWave,
     SuppressionCode,
     UserScope,
 )
@@ -374,7 +374,7 @@ def _apply_aggregate_step(
     frame: SuppressionAwareFrame,
     step: QueryAggregateStep,
     min_n: int,
-) -> QueryResult:
+) -> QueryPlanResultForWave:
     _ensure_student_level(frame, "aggregate")
     for column in step.group_by:
         frame.ensure_dimension(column)
@@ -421,7 +421,7 @@ def _apply_aggregate_step(
     provenance.append(
         "Aggregated metrics with suppression based on contributing distinct-student N."
     )
-    return QueryResultForWave(
+    return QueryPlanResultForWave(
         csv=_df_to_csv(result_df),
         count_csv=_df_to_csv(counts_df),
         suppressions=suppressions,  # type: ignore[arg-type]
@@ -434,7 +434,7 @@ def execute_query(
     plan: QueryPlan,
     scope: UserScope,
     min_n: int,
-) -> QueryResult:
+) -> QueryPlanResult:
     """Execute a query plan for each specified wave.
     
     Returns a wave-indexed dictionary of results.
@@ -475,7 +475,7 @@ def execute_query(
         if wave not in results:
             raise ValueError("Query plans must end with an aggregate step.")
     
-    return QueryResult(results=results)
+    return QueryPlanResult(results=results)
 
 
 build_query_v2_catalog = build_query_catalog

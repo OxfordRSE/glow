@@ -160,8 +160,8 @@ export const contractExamplesData = [
     "method": "POST",
     "path": "/api/query",
     "status": 200,
-    "request_model": "SafeQueryRequest",
-    "response_model": "SafeQueryResponse",
+    "request_model": "QueryRequest",
+    "response_model": "QueryResponse",
     "request": {
       "school_id": 1,
       "variable": "score",
@@ -242,7 +242,7 @@ export const contractExamplesData = [
     "method": "POST",
     "path": "/api/query",
     "status": 400,
-    "request_model": "SafeQueryRequest",
+    "request_model": "QueryRequest",
     "response_model": "ErrorDetailResponse",
     "request": {
       "school_id": 1,
@@ -264,7 +264,7 @@ export const contractExamplesData = [
     "method": "POST",
     "path": "/api/query",
     "status": 403,
-    "request_model": "SafeQueryRequest",
+    "request_model": "QueryRequest",
     "response_model": "ErrorDetailResponse",
     "request": {
       "school_id": 999,
@@ -286,7 +286,7 @@ export const contractExamplesData = [
     "method": "POST",
     "path": "/api/query",
     "status": 500,
-    "request_model": "SafeQueryRequest",
+    "request_model": "QueryRequest",
     "response_model": "ErrorDetailResponse",
     "request": {
       "school_id": 1,
@@ -308,8 +308,8 @@ export const contractExamplesData = [
     "method": "POST",
     "path": "/api/query",
     "status": 200,
-    "request_model": "SafeQueryRequest",
-    "response_model": "SafeQueryResponse",
+    "request_model": "QueryRequest",
+    "response_model": "QueryResponse",
     "request": {
       "school_id": 1,
       "variable": "score",
@@ -398,8 +398,8 @@ export const contractExamplesData = [
     "method": "POST",
     "path": "/api/query",
     "status": 200,
-    "request_model": "SafeQueryRequest",
-    "response_model": "SafeQueryResponse",
+    "request_model": "QueryRequest",
+    "response_model": "QueryResponse",
     "request": {
       "school_id": 1,
       "variable": "score",
@@ -508,8 +508,8 @@ export const contractExamplesData = [
     "method": "POST",
     "path": "/api/query",
     "status": 200,
-    "request_model": "SafeQueryRequest",
-    "response_model": "SafeQueryResponse",
+    "request_model": "QueryRequest",
+    "response_model": "QueryResponse",
     "request": {
       "school_id": 2,
       "variable": "score",
@@ -590,8 +590,8 @@ export const contractExamplesData = [
     "method": "POST",
     "path": "/api/query",
     "status": 200,
-    "request_model": "SafeQueryRequest",
-    "response_model": "SafeQueryResponse",
+    "request_model": "QueryRequest",
+    "response_model": "QueryResponse",
     "request": {
       "school_id": 1,
       "variable": "score",

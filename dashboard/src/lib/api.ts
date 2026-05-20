@@ -400,7 +400,7 @@ export interface School {
   statistical_neighbor_ids: number[];
 }
 
-export interface SafeQueryRequest {
+export interface QueryRequest {
   school_id: number;
   variable: string;
   waves: string[];
@@ -410,21 +410,21 @@ export interface SafeQueryRequest {
   neighbor_type?: "geographical" | "statistical";
 }
 
-export interface SafeQueryResultForWave {
+export interface QueryResultForWave {
   suppressed: boolean;
   suppression_message: string | null;
   results: Record<string, unknown>[] | null;
 }
 
-export interface SafeQueryResult {
+export interface QueryResult {
   school_id: number;
   school_name: string;
-  results: Record<string, SafeQueryResultForWave>;
+  results: Record<string, QueryResultForWave>;
 }
 
-export interface SafeQueryResponse {
-  focus_school: SafeQueryResult;
-  neighbors: SafeQueryResult[];
+export interface QueryResponse {
+  focus_school: QueryResult;
+  neighbors: QueryResult[];
   variable: string;
   waves: string[];
   aggregations: string[];
@@ -475,11 +475,11 @@ export async function deleteSchool(token: string, id: number): Promise<void> {
   }
 }
 
-export async function safeQuery(
+export async function query(
   token: string,
-  request: SafeQueryRequest,
-): Promise<SafeQueryResponse> {
-  return apiFetch<SafeQueryResponse>("/query", {
+  request: QueryRequest,
+): Promise<QueryResponse> {
+  return apiFetch<QueryResponse>("/query", {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(request),

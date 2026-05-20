@@ -31,7 +31,7 @@ def examples_for_model(model_name: str) -> list[dict[str, Any]]:
     """Get all response examples for a given Pydantic model.
     
     Args:
-        model_name: The name of the Pydantic model (e.g., "SafeQueryResponse")
+        model_name: The name of the Pydantic model (e.g., "QueryResponse")
         
     Returns:
         List of example response bodies that match the given model.

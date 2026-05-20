@@ -143,13 +143,13 @@ def check_blanket_suppression(
     return False
 
 
-def execute_safe_query(
+def execute_query(
     df: pd.DataFrame,
     query_params: dict[str, Any],
     min_n: int,
 ) -> dict[str, dict[str, Any]]:
     """
-    Execute a safe query with blanket suppression for each wave.
+    Execute a query with blanket suppression for each wave.
 
     Args:
         df: Full DataFrame
@@ -250,13 +250,13 @@ def execute_safe_query(
     return results
 
 
-def execute_safe_query_with_neighbors(
+def execute_query_with_neighbors(
     df: pd.DataFrame,
     query_params: dict[str, Any],
     min_n: int,
 ) -> dict[str, Any]:
     """
-    Execute a safe query for focus school and neighbor schools.
+    Execute a query for focus school and neighbor schools.
 
     Args:
         df: Full DataFrame
@@ -278,14 +278,14 @@ def execute_safe_query_with_neighbors(
 
     # Execute query for focus school
     focus_params = query_params.copy()
-    focus_result = execute_safe_query(df, focus_params, min_n)
+    focus_result = execute_query(df, focus_params, min_n)
 
     # Execute queries for neighbors
     neighbor_results = []
     for neighbor_school in neighbors:
         neighbor_params = query_params.copy()
         neighbor_params["school"] = neighbor_school
-        neighbor_result = execute_safe_query(df, neighbor_params, min_n)
+        neighbor_result = execute_query(df, neighbor_params, min_n)
 
         # Check if any wave has non-suppressed results
         has_data = any(not wave_result.get("suppressed", True) for wave_result in neighbor_result.values())

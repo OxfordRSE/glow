@@ -3,7 +3,7 @@
   "method": "POST",
   "path": "/api/query",
   "status": 403,
-  "request_model": "SafeQueryRequest",
+  "request_model": "QueryRequest",
   "response_model": "ErrorDetailResponse",
   "request": {
     "school_id": 999,

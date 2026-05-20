@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { authStore } from '$lib/stores';
-  import { listSchools, safeQuery, describeData, type School, type SafeQueryResponse, type DescribeDataResponse, type VariableOption, type AggregationOption, type FilterOption } from '$lib/api';
+  import { listSchools, query, describeData, type School, type QueryResponse, type DescribeDataResponse, type VariableOption, type AggregationOption, type FilterOption } from '$lib/api';
   import ChartCard from '$lib/components/ChartCard.svelte';
   import type { ChartJsData } from '$lib/chartUtils';
   import { createI18n, locale } from '$lib/i18n';
@@ -52,7 +52,7 @@
   let selectedFilters = $state<Record<string, string[]>>({});
   let selectedWaves = $state<string[]>([]);  // Wave is now first-class
   
-  let queryResult = $state<SafeQueryResponse | null>(null);
+  let queryResult = $state<QueryResponse | null>(null);
   let queryLoading = $state(false);
   let queryError = $state<string | null>(null);
 
@@ -138,7 +138,7 @@
       // Class aggregation not allowed with neighbors (and neighbors are always included)
       const aggregations = selectedAggregations.filter(a => a !== 'class');
 
-      queryResult = await safeQuery(token, {
+      queryResult = await query(token, {
         school_id: selectedSchoolId,
         variable: selectedVariable,
         waves: selectedWaves,
@@ -154,7 +154,7 @@
     }
   }
 
-  function safeQueryToChartData(response: SafeQueryResponse): ChartJsData {
+  function queryToChartData(response: QueryResponse): ChartJsData {
     const { focus_school, neighbors, waves } = response;
 
     // If all waves are suppressed for focus school, return empty
@@ -391,7 +391,7 @@
     }
   }
 
-  function safeQueryToCSV(response: SafeQueryResponse): string {
+  function queryToCSV(response: QueryResponse): string {
     const { focus_school, neighbors, waves } = response;
     const aggregations = response.aggregations;
 
@@ -438,8 +438,8 @@
     return rows.join('\n');
   }
 
-  const chartData = $derived(queryResult ? safeQueryToChartData(queryResult) : { labels: [], datasets: [] });
-  const chartCSV = $derived(queryResult ? safeQueryToCSV(queryResult) : '');
+  const chartData = $derived(queryResult ? queryToChartData(queryResult) : { labels: [], datasets: [] });
+  const chartCSV = $derived(queryResult ? queryToCSV(queryResult) : '');
   const chartType = $derived.by(() => {
     if (!queryResult) return 'bar' as const;
     // Multiple waves use line chart, single wave uses horizontal bar

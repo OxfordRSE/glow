@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from glow_api.models import QueryPlan, QueryResult, UserScope
+from glow_api.models import QueryPlan, QueryPlanResult, UserScope
 from glow_api.query_v2 import execute_query
 
 MIN_N_FOR_DOCS = 5
@@ -226,7 +226,7 @@ def execute_example(
     *,
     scope: UserScope | None = None,
     min_n: int = MIN_N_FOR_DOCS,
-) -> QueryResult:
+) -> QueryPlanResult:
     return execute_query(df, example.plan, scope or UserScope(), min_n)
 
 
@@ -240,7 +240,7 @@ def _sort_records(df: pd.DataFrame, sort_by: tuple[str, ...]) -> pd.DataFrame:
     return df.sort_values(list(sort_by), kind="stable").reset_index(drop=True)
 
 
-def assert_example_result(example: QueryExample, result: QueryResult) -> None:
+def assert_example_result(example: QueryExample, result: QueryPlanResult) -> None:
     actual_values = _sort_records(parse_result_csv(result.csv), example.sort_by)
     actual_counts = _sort_records(parse_result_csv(result.count_csv), example.sort_by)
     expected_values = _sort_records(pd.DataFrame(example.expected_rows), example.sort_by)

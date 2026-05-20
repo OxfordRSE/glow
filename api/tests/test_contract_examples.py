@@ -14,8 +14,8 @@ MODEL_MAP = {
     "SchoolListResponse": models.SchoolListResponse,
     "ColumnsResponse": models.ColumnsResponse,
     "DescribeDataResponse": models.DescribeDataResponse,
-    "SafeQueryRequest": models.SafeQueryRequest,
-    "SafeQueryResponse": models.SafeQueryResponse,
+    "QueryRequest": models.QueryRequest,
+    "QueryResponse": models.QueryResponse,
     "ErrorDetailResponse": models.ErrorDetailResponse,
 }
 

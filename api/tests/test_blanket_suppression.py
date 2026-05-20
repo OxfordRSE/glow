@@ -346,9 +346,9 @@ S012,Focus School Academy,7,B,M,2
 class TestBlanketSuppressionIntegration:
     """Test blanket suppression integrated with the query execution pipeline."""
 
-    def test_safe_query_returns_data(self, safe_cohort_df):
-        """A safe query should return data normally."""
-        from glow_api.blanket_suppression import execute_safe_query
+    def test_query_returns_data(self, safe_cohort_df):
+        """A query should return data normally."""
+        from glow_api.blanket_suppression import execute_query
 
         query_params = {
             "school": "Focus School Academy",
@@ -358,7 +358,7 @@ class TestBlanketSuppressionIntegration:
             "filters": {},
         }
         
-        result = execute_safe_query(
+        result = execute_query(
             df=safe_cohort_df,
             query_params=query_params,
             min_n=5
@@ -371,9 +371,9 @@ class TestBlanketSuppressionIntegration:
         assert "data" in wave_result, "Result should contain data"
         assert len(wave_result["data"]) > 0, "Data should not be empty"
 
-    def test_unsafe_query_returns_suppression_message(self, unsafe_cohort_df):
-        """An unsafe query should return a polite suppression message."""
-        from glow_api.blanket_suppression import execute_safe_query
+    def test_unquery_returns_suppression_message(self, unsafe_cohort_df):
+        """An unquery should return a polite suppression message."""
+        from glow_api.blanket_suppression import execute_query
 
         query_params = {
             "school": "Focus School Academy",
@@ -383,7 +383,7 @@ class TestBlanketSuppressionIntegration:
             "filters": {},
         }
         
-        result = execute_safe_query(
+        result = execute_query(
             df=unsafe_cohort_df,
             query_params=query_params,
             min_n=5
@@ -392,13 +392,13 @@ class TestBlanketSuppressionIntegration:
         # Result is now wave-indexed
         assert "1" in result, "Result should contain wave '1'"
         wave_result = result["1"]
-        assert wave_result["suppressed"] is True, "Unsafe query should be suppressed"
+        assert wave_result["suppressed"] is True, "Unquery should be suppressed"
         assert "message" in wave_result, "Result should contain suppression message"
         assert "data" not in wave_result or wave_result["data"] == [], "Suppressed query should not return data"
 
     def test_neighbor_school_suppression_drops_from_chart(self):
         """If a neighbor school is suppressed, it should be dropped from comparison."""
-        from glow_api.blanket_suppression import execute_safe_query_with_neighbors
+        from glow_api.blanket_suppression import execute_query_with_neighbors
 
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
 S001,Focus School Academy,7,M,3
@@ -435,7 +435,7 @@ S023,State Local High,7,F,5
             "neighbors": ["Neighbouring School", "State Local High"],  # Neighbouring School is unsafe, State Local High is safe
         }
         
-        result = execute_safe_query_with_neighbors(
+        result = execute_query_with_neighbors(
             df=df,
             query_params=query_params,
             min_n=5

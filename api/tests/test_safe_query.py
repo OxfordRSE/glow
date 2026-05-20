@@ -1,4 +1,4 @@
-"""Tests for safe query template endpoint with blanket suppression."""
+"""Tests for query template endpoint with blanket suppression."""
 
 import pytest
 from sqlalchemy.orm import Session
@@ -42,10 +42,10 @@ def beta_user(db_session: Session, sample_schools: dict[str, School]) -> dict:
     }
 
 
-class TestSafeQueryEndpoint:
+class TestQueryEndpoint:
     """Test the /query endpoint with blanket suppression."""
 
-    def test_safe_query_requires_authentication(self, auth_client):
+    def test_query_requires_authentication(self, auth_client):
         """Unauthenticated requests should be rejected."""
         response = auth_client.post(
             "/query",
@@ -59,7 +59,7 @@ class TestSafeQueryEndpoint:
         )
         assert response.status_code == 401
 
-    def test_safe_query_simple_mean(self, auth_client, alpha_user, login_as_user):
+    def test_query_simple_mean(self, auth_client, alpha_user, login_as_user):
         """Query mean of a question variable for a school."""
         token = login_as_user(alpha_user["username"])
         
@@ -107,7 +107,7 @@ class TestSafeQueryEndpoint:
                 assert "mean" in result
                 assert "student_n" in result
 
-    def test_safe_query_with_year_group_aggregation(self, auth_client, alpha_user, login_as_user):
+    def test_query_with_year_group_aggregation(self, auth_client, alpha_user, login_as_user):
         """Query with yearGroup aggregation."""
         token = login_as_user(alpha_user["username"])
         
@@ -136,7 +136,7 @@ class TestSafeQueryEndpoint:
                     assert "mean" in result
                     assert "student_n" in result
 
-    def test_safe_query_with_wave_filter(self, auth_client, alpha_user, login_as_user):
+    def test_query_with_wave_filter(self, auth_client, alpha_user, login_as_user):
         """Query with wave filter."""
         token = login_as_user(alpha_user["username"])
         
@@ -158,7 +158,7 @@ class TestSafeQueryEndpoint:
         # Should return valid response (suppressed or not)
         assert "focus_school" in data
 
-    def test_safe_query_with_class_aggregation(self, auth_client, alpha_user, login_as_user):
+    def test_query_with_class_aggregation(self, auth_client, alpha_user, login_as_user):
         """Query with class aggregation (focus school only)."""
         token = login_as_user(alpha_user["username"])
         
@@ -187,7 +187,7 @@ class TestSafeQueryEndpoint:
                     assert "mean" in result
                     assert "student_n" in result
 
-    def test_safe_query_with_neighbors(self, auth_client, alpha_user, login_as_user, db_session, sample_schools):
+    def test_query_with_neighbors(self, auth_client, alpha_user, login_as_user, db_session, sample_schools):
         """Query with neighbor schools included."""
         # Set up Focus School Academy and Neighbouring School as neighbors
         alpha_school = sample_schools["Focus School Academy"]
@@ -220,7 +220,7 @@ class TestSafeQueryEndpoint:
         assert "neighbors" in data
         assert isinstance(data["neighbors"], list)
 
-    def test_safe_query_derived_score(self, auth_client, alpha_user, login_as_user):
+    def test_query_derived_score(self, auth_client, alpha_user, login_as_user):
         """Query a derived score variable."""
         token = login_as_user(alpha_user["username"])
         
@@ -244,7 +244,7 @@ class TestSafeQueryEndpoint:
         # Should process derived score like any other variable
         assert "focus_school" in data
 
-    def test_safe_query_blanket_suppression_triggers(self, auth_client, alpha_user, login_as_user):
+    def test_query_blanket_suppression_triggers(self, auth_client, alpha_user, login_as_user):
         """Verify blanket suppression is triggered for unsafe cohorts."""
         token = login_as_user(alpha_user["username"])
         
@@ -272,7 +272,7 @@ class TestSafeQueryEndpoint:
                 assert wave_result["suppression_message"] is not None
                 assert wave_result["results"] is None
 
-    def test_safe_query_neighbor_suppressed_dropped(self, auth_client, alpha_user, login_as_user, db_session, sample_schools):
+    def test_query_neighbor_suppressed_dropped(self, auth_client, alpha_user, login_as_user, db_session, sample_schools):
         """Suppressed neighbor schools should be dropped from results."""
         # Set up neighbors
         alpha_school = sample_schools["Focus School Academy"]
@@ -304,7 +304,7 @@ class TestSafeQueryEndpoint:
             assert neighbor["results"] is not None
             assert not neighbor.get("suppressed", False)
 
-    def test_safe_query_invalid_variable(self, auth_client, alpha_user, login_as_user):
+    def test_query_invalid_variable(self, auth_client, alpha_user, login_as_user):
         """Invalid variable should return error."""
         token = login_as_user(alpha_user["username"])
         
@@ -323,7 +323,7 @@ class TestSafeQueryEndpoint:
         assert response.status_code == 400
         assert "variable" in response.json()["detail"].lower()
 
-    def test_safe_query_invalid_aggregation(self, auth_client, alpha_user, login_as_user):
+    def test_query_invalid_aggregation(self, auth_client, alpha_user, login_as_user):
         """Invalid aggregation dimension should return error."""
         token = login_as_user(alpha_user["username"])
         
@@ -341,7 +341,7 @@ class TestSafeQueryEndpoint:
         
         assert response.status_code == 400
 
-    def test_safe_query_user_can_only_query_own_school(self, auth_client, alpha_user, beta_user, login_as_user):
+    def test_query_user_can_only_query_own_school(self, auth_client, alpha_user, beta_user, login_as_user):
         """Non-admin user should only query their own school."""
         token = login_as_user(alpha_user["username"])
         
@@ -360,7 +360,7 @@ class TestSafeQueryEndpoint:
         
         assert response.status_code == 403
 
-    def test_safe_query_admin_can_query_any_school(self, auth_client, admin_token, alpha_user):
+    def test_query_admin_can_query_any_school(self, auth_client, admin_token, alpha_user):
         """Admin user can query any school."""
         response = auth_client.post(
             "/query",
@@ -376,7 +376,7 @@ class TestSafeQueryEndpoint:
         
         assert response.status_code == 200
 
-    def test_safe_query_class_aggregation_not_allowed_for_neighbors(self, auth_client, alpha_user, login_as_user):
+    def test_query_class_aggregation_not_allowed_for_neighbors(self, auth_client, alpha_user, login_as_user):
         """Class aggregation should not be allowed when including neighbors."""
         token = login_as_user(alpha_user["username"])
         

@@ -669,7 +669,7 @@
     <div>
       <h2 class="text-xl font-semibold text-gray-800">Query Builder</h2>
       <p class="text-sm text-gray-600 mt-1">
-        Build a safe query pipeline over the scoped student-wave table. The server keeps `uid`
+        Build a query pipeline over the scoped student-wave table. The server keeps `uid`
         lineage hidden, computes exact distinct-student Ns for every result cell, and suppresses
         small cohorts automatically.
       </p>

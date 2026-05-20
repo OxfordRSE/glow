@@ -3,8 +3,8 @@
   "method": "POST",
   "path": "/api/query",
   "status": 200,
-  "request_model": "SafeQueryRequest",
-  "response_model": "SafeQueryResponse",
+  "request_model": "QueryRequest",
+  "response_model": "QueryResponse",
   "request": {
     "school_id": 2,
     "variable": "score",

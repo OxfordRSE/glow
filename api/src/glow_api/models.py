@@ -48,15 +48,15 @@ class WaveChangeResult(BaseModel):
     suppressions: dict[str, dict[int, SuppressionCode]]
 
 
-class QueryResult(BaseModel):
+class QueryPlanResult(BaseModel):
     """Wave-indexed result of a query plan execution.
     
     Each wave produces its own result, keyed by wave value.
     """
-    results: dict[str, "QueryResultForWave"]
+    results: dict[str, "QueryPlanResultForWave"]
 
 
-class QueryResultForWave(BaseModel):
+class QueryPlanResultForWave(BaseModel):
     """Result of a query plan execution for a single wave."""
     
     csv: str
@@ -361,8 +361,8 @@ class ColumnsResponse(RootModel[list[str]]):
 # ---------------------------------------------------------------------------
 
 
-class SafeQueryRequest(BaseModel):
-    """Request for a safe query with blanket suppression.
+class QueryRequest(BaseModel):
+    """Request for a query with blanket suppression.
     
     All queries must specify at least one wave. Results are returned
     separately for each wave.
@@ -377,13 +377,13 @@ class SafeQueryRequest(BaseModel):
     neighbor_type: Literal["geographical", "statistical"] = "geographical"
 
     @model_validator(mode="after")
-    def validate_waves(self) -> "SafeQueryRequest":
+    def validate_waves(self) -> "QueryRequest":
         if not self.waves:
             raise ValueError("At least one wave must be specified.")
         return self
 
 
-class SafeQueryResult(BaseModel):
+class QueryResult(BaseModel):
     """Wave-indexed results for a single school with optional suppression.
     
     Each wave produces its own result, keyed by wave value.
@@ -391,11 +391,11 @@ class SafeQueryResult(BaseModel):
     
     school_id: int
     school_name: str
-    results: dict[str, "SafeQueryResultForWave"]
+    results: dict[str, "QueryResultForWave"]
 
 
-class SafeQueryRow(BaseModel):
-    """A single row in a safe query result.
+class QueryRow(BaseModel):
+    """A single row in a query result.
     
     Contains mean and student count, plus any grouping columns.
     Additional fields are allowed to support dynamic group_by columns.
@@ -408,22 +408,22 @@ class SafeQueryRow(BaseModel):
     model_config = {"extra": "allow"}
 
 
-class SafeQueryResultForWave(BaseModel):
+class QueryResultForWave(BaseModel):
     """Single school result for a specific wave."""
     
     suppressed: bool
     suppression_message: Optional[str] = None
-    results: Optional[list[SafeQueryRow]] = None  # List of result rows (group_by cols + mean + student_n)
+    results: Optional[list[QueryRow]] = None  # List of result rows (group_by cols + mean + student_n)
 
 
-class SafeQueryResponse(BaseModel):
-    """Response for a safe query including focus school and neighbors.
+class QueryResponse(BaseModel):
+    """Response for a query including focus school and neighbors.
     
     Results are wave-indexed - each school has separate results for each wave.
     """
     
-    focus_school: SafeQueryResult
-    neighbors: list[SafeQueryResult] = Field(default_factory=list)
+    focus_school: QueryResult
+    neighbors: list[QueryResult] = Field(default_factory=list)
     variable: str
     waves: list[str]
     aggregations: list[str]

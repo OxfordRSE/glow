@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from glow_api.auth import get_current_user
-from glow_api.blanket_suppression import execute_safe_query_with_neighbors
+from glow_api.blanket_suppression import execute_query_with_neighbors
 from glow_api.data import DataStore, get_datastore
 from glow_api.database import get_db, get_school_by_id
-from glow_api.models import SafeQueryRequest, SafeQueryResponse, SafeQueryResult, UserRead
+from glow_api.models import QueryRequest, QueryResponse, QueryResult, QueryResultForWave, UserRead
 from glow_api.query_v2 import build_query_catalog
 from glow_api.settings import settings
 
@@ -212,20 +212,20 @@ ALLOWED_VARIABLES = sorted([
     "bw_wbeing_7"
 ], key=sort_key)
 
-ALLOWED_AGGREGATIONS = ["yearGroup", "d_ethnicity", "d_sex", "wave", "class"]
+ALLOWED_AGGREGATIONS = ["yearGroup", "d_ethnicity", "d_sex", "class"]
 
 ALLOWED_FILTERS = ["yearGroup", "d_ethnicity", "d_sex", "wave", "class"]
 
 
-@router.post("", response_model=SafeQueryResponse, include_in_schema=False)
-@router.post("/", response_model=SafeQueryResponse)
-def safe_query(
-    request: SafeQueryRequest,
+@router.post("", response_model=QueryResponse, include_in_schema=False)
+@router.post("/", response_model=QueryResponse)
+def query(
+    request: QueryRequest,
     current_user: UserRead = Depends(get_current_user),
     db: Session = Depends(get_db),
     datastore: DataStore = Depends(get_datastore),
-) -> SafeQueryResponse:
-    """Execute a safe query with blanket suppression.
+) -> QueryResponse:
+    """Execute a query with blanket suppression.
     
     This endpoint:
     - Validates that the user has access to the requested school
@@ -295,7 +295,7 @@ def safe_query(
             detail=f"Variable '{request.variable}' not found in data",
         )
 
-    # Execute safe query with blanket suppression (wave-indexed)
+    # Execute query with blanket suppression (wave-indexed)
     query_params = {
         "school": focus_school.name,
         "variable": request.variable,
@@ -305,24 +305,22 @@ def safe_query(
         "neighbors": [n.name for n in neighbor_schools],
     }
 
-    result = execute_safe_query_with_neighbors(
+    result = execute_query_with_neighbors(
         df=df,
         query_params=query_params,
         min_n=settings.MIN_N,
     )
 
     # Format focus school result (wave-indexed)
-    from glow_api.models import SafeQueryResultForWave
-    
     focus_wave_results = {}
     for wave, wave_data in result["focus"].items():
-        focus_wave_results[wave] = SafeQueryResultForWave(
+        focus_wave_results[wave] = QueryResultForWave(
             suppressed=wave_data["suppressed"],
             suppression_message=wave_data.get("message"),
             results=wave_data.get("data"),
         )
     
-    focus_result = SafeQueryResult(
+    focus_result = QueryResult(
         school_id=focus_school.id,
         school_name=focus_school.name,
         results=focus_wave_results,
@@ -336,21 +334,21 @@ def safe_query(
         if neighbor_school:
             neighbor_wave_results = {}
             for wave, wave_data in neighbor_data["results"].items():
-                neighbor_wave_results[wave] = SafeQueryResultForWave(
+                neighbor_wave_results[wave] = QueryResultForWave(
                     suppressed=wave_data["suppressed"],
                     suppression_message=wave_data.get("message"),
                     results=wave_data.get("data"),
                 )
             
             neighbor_results.append(
-                SafeQueryResult(
+                QueryResult(
                     school_id=neighbor_school.id,
                     school_name=neighbor_school.name,
                     results=neighbor_wave_results,
                 )
             )
 
-    return SafeQueryResponse(
+    return QueryResponse(
         focus_school=focus_result,
         neighbors=neighbor_results,
         variable=request.variable,

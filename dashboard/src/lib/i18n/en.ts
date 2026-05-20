@@ -402,7 +402,7 @@ export const en = {
       gettingStartedExplore:
         "Use the Explore page to query wellbeing data with privacy-safe blanket suppression.",
       gettingStartedQuery:
-        "Use the Query Builder to create custom suppression-safe query plans.",
+        "Use the Query Builder to create custom suppression-query plans.",
       gettingStartedTable:
         "Charts support Show Table for a tabular view and CSV download for raw results.",
       gettingStartedSuppression:

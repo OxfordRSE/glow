@@ -19,8 +19,8 @@ export const mockSchools = getExample('schools.user-default')?.response
 /**
  * @deprecated Use withApiResponses({ 'POST /api/query': 'query.default' }) instead
  */
-export function generateSafeQueryResult() {
-  console.warn('generateSafeQueryResult is deprecated. Use contract examples instead.')
+export function generateQueryResult() {
+  console.warn('generateQueryResult is deprecated. Use contract examples instead.')
   return getExample('query.default')?.response
 }
 

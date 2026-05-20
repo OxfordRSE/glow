@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module version="4">
+<module external.system.id="pyproject.toml" type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <orderEntry type="jdk" jdkName="(docker) Glow API" jdkType="Python SDK" />
+    <content url="file://$MODULE_DIR$/api">
+      <sourceFolder url="file://$MODULE_DIR$/api/src" />
+      <excludeFolder url="file://$MODULE_DIR$/api/.venv" />
+    </content>
+    <orderEntry type="jdk" jdkName="Python 3.12 (api)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>
