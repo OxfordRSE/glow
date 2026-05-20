@@ -7,15 +7,15 @@ cd "$ROOT_DIR"
 cp testdata/demo_data.csv data/data.csv
 rm -f data/auth.db data/auth.db-shm data/auth.db-wal
 
-export IB_OX_SECRET_KEY="${IB_OX_SECRET_KEY:-smoke-test-secret}"
+export GLOW_SECRET_KEY="${GLOW_SECRET_KEY:-smoke-test-secret}"
 
 # Use canonical compose.yml + test overrides
 docker compose -f compose.yml -f compose.test.yml down -v --remove-orphans
 docker compose -f compose.yml -f compose.test.yml up --build -d --wait
 
 # Healthcheck now guarantees API is ready, so seed users immediately
-docker compose -f compose.yml -f compose.test.yml exec -T api ib-ox-api users create --admin --password admin admin
-docker compose -f compose.yml -f compose.test.yml exec -T api ib-ox-api users create \
+docker compose -f compose.yml -f compose.test.yml exec -T api glow-api users create --admin --password admin admin
+docker compose -f compose.yml -f compose.test.yml exec -T api glow-api users create \
   --password alpha-user \
   --scope '{"filters":{"school":["Focus School Academy"]}}' \
   alpha-user

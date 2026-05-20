@@ -7,13 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from ib_ox_api import __version__
-from ib_ox_api.auth import authenticate_user, create_access_token
-from ib_ox_api.data import datastore
-from ib_ox_api.database import run_migrations, get_db
-from ib_ox_api.models import Token
-from ib_ox_api.routers import admin, auth, data, query, schools
-from ib_ox_api.settings import settings
+from glow_api import __version__
+from glow_api.auth import authenticate_user, create_access_token
+from glow_api.data import datastore
+from glow_api.database import run_migrations, get_db
+from glow_api.models import Token
+from glow_api.routers import admin, auth, data, query, schools
+from glow_api.settings import settings
 
 
 def configure_logging() -> None:
@@ -34,7 +34,7 @@ def configure_logging() -> None:
                 }
             },
             "loggers": {
-                "ib_ox_api": {
+                "glow_api": {
                     "handlers": ["console"],
                     "level": "INFO",
                     "propagate": False,
@@ -57,8 +57,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="IB-Oxford API",
-    description="Read-only API for IB-Oxford longitudinal questionnaire data",
+    title="GLOW API",
+    description="Read-only API for GLOW longitudinal questionnaire data",
     version=__version__,
     lifespan=lifespan,
     docs_url="/docs",

@@ -1,7 +1,7 @@
 [project]
-name = "ib-ox-api"
+name = "glow-api"
 version = "0.1.0"
-description = "Read-only API for IB-Oxford longitudinal questionnaire data"
+description = "Read-only API for GLOW longitudinal questionnaire data"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
@@ -31,7 +31,7 @@ dev = [
 ]
 
 [project.scripts]
-ib-ox-api = "ib_ox_api.cli:cli"
+glow-api = "glow_api.cli:cli"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

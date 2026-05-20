@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 
 import pandas as pd
 
-from ib_ox_api.models import (
+from glow_api.models import (
     Filter,
     FilterOp,
     FrequencyQuery,
@@ -16,7 +16,7 @@ from ib_ox_api.models import (
     WaveChangeQuery,
     WaveChangeResult,
 )
-from ib_ox_api.suppression import suppress_frequency_table, suppress_means_table
+from glow_api.suppression import suppress_frequency_table, suppress_means_table
 
 # Columns allowed in group_by (categorical)
 CATEGORICAL_WHITELIST: set[str] = {
@@ -31,7 +31,7 @@ CATEGORICAL_WHITELIST: set[str] = {
 }
 
 # Questionnaire item columns from the #BeeWell GM Survey model
-# (ib-ox-dummies examples/beewell_model.toml).
+# (glow-dummies examples/beewell_model.toml).
 # Each tuple is (column_prefix, number_of_items).
 _BW_QUESTIONNAIRES: list[tuple[str, int]] = [
     ("bw_migration", 3),
@@ -457,7 +457,7 @@ def execute_wave_change_query(
     changes_df = merged[keep_cols].copy()
 
     # Apply suppression via suppress_means_table (reuses the same logic)
-    from ib_ox_api.suppression import suppress_means_table
+    from glow_api.suppression import suppress_means_table
 
     means_df, counts_df, suppressions = suppress_means_table(
         df=changes_df,

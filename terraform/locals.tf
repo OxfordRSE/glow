@@ -1,5 +1,5 @@
 locals {
-  project_name = "ib-ox"
+  project_name = "glow"
 
   tags = {
     Project      = var.app_name

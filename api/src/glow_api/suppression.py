@@ -1,6 +1,6 @@
 import pandas as pd
 
-from ib_ox_api.models import SuppressionCode
+from glow_api.models import SuppressionCode
 
 
 def count_students(df: pd.DataFrame) -> int:

@@ -1,4 +1,4 @@
-# Canonical service specification for ib-ox-core
+# Canonical service specification for glow-core
 # Used by: local dev, CI smoke tests
 # Production uses same images with different env/infra
 
@@ -7,17 +7,19 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
-    command: uvicorn ib_ox_api.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn glow_api.main:app --host 0.0.0.0 --port 8000 --reload
     working_dir: /app
     environment:
-      IB_OX_DATA_PATH: /data/data.csv
-      IB_OX_MIN_N: ${IB_OX_MIN_N:-5}
-      IB_OX_SECRET_KEY: ${IB_OX_SECRET_KEY:-change-me-in-production}
-      IB_OX_DATABASE_URL: sqlite:////data/auth.db
-      IB_OX_CORS_ORIGINS: '["http://localhost:5173"]'
+      GLOW_DATA_PATH: /data/data.csv
+      GLOW_MIN_N: ${GLOW_MIN_N:-5}
+      GLOW_SECRET_KEY: ${GLOW_SECRET_KEY:-change-me-in-production}
+      GLOW_DATABASE_URL: sqlite:////data/auth.db
+      GLOW_CORS_ORIGINS: '["http://localhost:5173"]'
     volumes:
       - ./data:/data
       - ./api:/app
+    networks:
+      - app
     restart: unless-stopped
     healthcheck:
       test:
@@ -43,6 +45,8 @@ services:
     environment:
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: "true"
+    networks:
+      - app
     restart: unless-stopped
 
   proxy:
@@ -51,12 +55,12 @@ services:
       - "5173:5173"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - app
     restart: unless-stopped
-    depends_on:
-      api:
-        condition: service_healthy
-      dashboard:
-        condition: service_started
+
+networks:
+  app:
 
 volumes:
   dashboard_node_modules:

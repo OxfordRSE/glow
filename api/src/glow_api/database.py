@@ -10,8 +10,8 @@ from alembic.config import Config
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from ib_ox_api.metadata_models import Base, School, User
-from ib_ox_api.settings import settings
+from glow_api.metadata_models import Base, School, User
+from glow_api.settings import settings
 
 # Create engine for metadata database
 engine = create_engine(

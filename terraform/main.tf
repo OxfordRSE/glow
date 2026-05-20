@@ -9,7 +9,7 @@ terraform {
 
   backend "s3" {
     # Populated by deploy.sh via -backend-config flags
-    key    = "ib-ox-core/terraform.tfstate"
+    key    = "glow-core/terraform.tfstate"
     region = "eu-west-2"
   }
 }

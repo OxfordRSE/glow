@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["*"]
 
     model_config = SettingsConfigDict(
-        env_prefix="IB_OX_",
+        env_prefix="GLOW_",
         env_file=".env",
         env_file_encoding="utf-8",
     )
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
         if self.SECRET_KEY == "change-me-in-production":
             warnings.warn(
                 "SECRET_KEY is set to the default insecure value. "
-                "Set IB_OX_SECRET_KEY to a strong random secret before deploying.",
+                "Set GLOW_SECRET_KEY to a strong random secret before deploying.",
                 UserWarning,
                 stacklevel=2,
             )

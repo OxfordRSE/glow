@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from ib_ox_api.settings import settings
+from glow_api.settings import settings
 
 logger = logging.getLogger(__name__)
 

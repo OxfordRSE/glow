@@ -1,6 +1,6 @@
-# ib-ox-core
+# glow-core
 
-API and Dashboard for IB-Oxford longitudinal questionnaire data.
+API and Dashboard for GLOW longitudinal questionnaire data.
 
 ## Overview
 
@@ -26,7 +26,7 @@ For the most consistent development experience:
 5. Place your data file at `data/data.csv` (or copy from `testdata/demo_data.csv`)
 6. Create users:
    ```bash
-   docker compose exec api ib-ox-api users create --admin admin
+   docker compose exec api glow-api users create --admin admin
    ```
 
 The dashboard will be available at <http://localhost:5173> and the API at <http://localhost:5173/api>.
@@ -43,7 +43,7 @@ The devcontainer provides:
 
 ```bash
 # Set a strong JWT secret
-export IB_OX_SECRET_KEY="your-strong-secret-here"
+export GLOW_SECRET_KEY="your-strong-secret-here"
 
 # Place your data file (CSV or Parquet) at data/data.csv
 # The API defaults to /data/data.csv inside the container
@@ -52,7 +52,7 @@ export IB_OX_SECRET_KEY="your-strong-secret-here"
 docker compose up --build
 
 # Create the first admin user (in a separate terminal)
-docker compose exec api ib-ox-api users create --admin admin
+docker compose exec api glow-api users create --admin admin
 ```
 
 The dashboard will be available at <http://localhost:5173>.
@@ -63,14 +63,14 @@ The dashboard will be available at <http://localhost:5173>.
 
 | Variable | Default | Description |
 |---|---|---|
-| `IB_OX_DATA_PATH` | `data/data.csv` | Path to the CSV or Parquet data file |
-| `IB_OX_DATA_REFRESH_HOURS` | `24` | How often to reload data from disk |
-| `IB_OX_MIN_N` | `5` | Minimum distinct student count for suppression |
-| `IB_OX_SECRET_KEY` | *(insecure default)* | JWT signing secret — **must be set in production** |
-| `IB_OX_ALGORITHM` | `HS256` | JWT algorithm |
-| `IB_OX_ACCESS_TOKEN_EXPIRE_MINUTES` | `480` | Token lifetime (8 hours) |
-| `IB_OX_DATABASE_URL` | `sqlite:///./auth.db` | SQLAlchemy database URL |
-| `IB_OX_CORS_ORIGINS` | `["*"]` | JSON list of allowed CORS origins |
+| `GLOW_DATA_PATH` | `data/data.csv` | Path to the CSV or Parquet data file |
+| `GLOW_DATA_REFRESH_HOURS` | `24` | How often to reload data from disk |
+| `GLOW_MIN_N` | `5` | Minimum distinct student count for suppression |
+| `GLOW_SECRET_KEY` | *(insecure default)* | JWT signing secret — **must be set in production** |
+| `GLOW_ALGORITHM` | `HS256` | JWT algorithm |
+| `GLOW_ACCESS_TOKEN_EXPIRE_MINUTES` | `480` | Token lifetime (8 hours) |
+| `GLOW_DATABASE_URL` | `sqlite:///./auth.db` | SQLAlchemy database URL |
+| `GLOW_CORS_ORIGINS` | `["*"]` | JSON list of allowed CORS origins |
 
 ### Endpoints
 
@@ -93,28 +93,28 @@ Interactive documentation is available at `/docs` (Swagger UI) and `/redoc`.
 
 ```bash
 # Initialise the database
-ib-ox-api db init
+glow-api db init
 
 # List users
-ib-ox-api users list
+glow-api users list
 
 # Create a regular user
-ib-ox-api users create alice
+glow-api users create alice
 
 # Create an admin user
-ib-ox-api users create --admin bob
+glow-api users create --admin bob
 
 # Update a user
-ib-ox-api users update alice --scope '{"filters": {"school": ["Greenwood"]}}'
+glow-api users update alice --scope '{"filters": {"school": ["Greenwood"]}}'
 
 # Delete a user
-ib-ox-api users delete alice
+glow-api users delete alice
 ```
 
 ### Suppression
 
 N is counted as **distinct students (uid)**, not rows. 
-Any materialized result cell where the contributing student count is less than `IB_OX_MIN_N` is suppressed
+Any materialized result cell where the contributing student count is less than `GLOW_MIN_N` is suppressed
 (set to empty in the CSV output) and recorded in the `suppressions` field of the response.
 
 ### Whitelisted columns
@@ -142,7 +142,7 @@ Safety properties:
 - `uid` is kept internally for suppression counts but is never a legal public grouping field
 - unsupported columns fail even when they appear late in an otherwise valid plan
 - aggregation is terminal
-- every output metric carries an exact distinct-student count and is suppressed when `N < IB_OX_MIN_N`
+- every output metric carries an exact distinct-student count and is suppressed when `N < GLOW_MIN_N`
 
 Developer documentation and examples live in [docs/query-builder.md](docs/query-builder.md).
 
@@ -205,8 +205,8 @@ cd api
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[test]"
-ib-ox-api db init
-uvicorn ib_ox_api.main:app --reload
+glow-api db init
+uvicorn glow_api.main:app --reload
 pytest
 ```
 
@@ -224,7 +224,7 @@ See `terraform/` for infrastructure definitions (ECS Fargate + ALB + ECR + EFS).
 
 ```bash
 # Deploy version 0.1.0 (base semver must match API version in pyproject.toml)
-export IB_OX_SECRET_KEY="your-production-secret"
+export GLOW_SECRET_KEY="your-production-secret"
 ./deploy.sh 0.1.0
 
 # Or with a pre-release suffix
@@ -245,7 +245,7 @@ The `deploy.sh` script:
 
 | Variable | Description |
 |---|---|
-| `IB_OX_SECRET_KEY` | JWT secret for production |
+| `GLOW_SECRET_KEY` | JWT secret for production |
 | `AWS_REGION` | AWS region (default: `eu-west-2`) |
 
 ### Terraform variables
@@ -262,17 +262,17 @@ See `terraform/variables.tf` for all available variables. Key ones:
 
 ## Data Format
 
-Data must be in the format produced by [ib-ox-dummies](https://github.com/OxfordRSE/ib-ox-dummies) — a student×wave long format with columns including:
+Data must be in the format produced by [glow-dummies](https://github.com/OxfordRSE/glow-dummies) — a student×wave long format with columns including:
 
 - `uid` — student identifier (used for N counting in suppression)
 - `wave` — survey wave number
 - `school`, `yearGroup`, `class` — school structure
 - `sex`, `ethnicity` — demographics
 - `d_age`, `d_city`, `d_country` — derived/custom fields
-- Questionnaire items from the [#BeeWell GM Survey](https://beewellprogramme.org) (e.g. `bw_wbeing_1`–`bw_wbeing_7` for SWEMWBS wellbeing, `bw_emodies_1`–`bw_emodies_10` for emotional difficulties, and ~120 further items — see [beewell_model.toml](https://github.com/OxfordRSE/ib-ox-dummies/blob/main/examples/beewell_model.toml) for the complete list)
+- Questionnaire items from the [#BeeWell GM Survey](https://beewellprogramme.org) (e.g. `bw_wbeing_1`–`bw_wbeing_7` for SWEMWBS wellbeing, `bw_emodies_1`–`bw_emodies_10` for emotional difficulties, and ~120 further items — see [beewell_model.toml](https://github.com/OxfordRSE/glow-dummies/blob/main/examples/beewell_model.toml) for the complete list)
 
 Generate sample data:
 
 ```bash
-ib_ox_dummies --config examples/beewell_model.toml --seed 42 --output csv > data/data.csv
+glow_dummies --config examples/beewell_model.toml --seed 42 --output csv > data/data.csv
 ```

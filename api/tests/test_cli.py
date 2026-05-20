@@ -1,12 +1,12 @@
-"""Tests for the ib-ox-api admin CLI."""
+"""Tests for the glow-api admin CLI."""
 
 import json
 
 from click.testing import CliRunner
 from sqlalchemy.orm import sessionmaker
 
-import ib_ox_api.cli as cli_module
-from ib_ox_api.metadata_models import User
+import glow_api.cli as cli_module
+from glow_api.metadata_models import User
 
 
 def test_db_init_runs_migrations(monkeypatch):

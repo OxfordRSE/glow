@@ -13,10 +13,10 @@ import random
 import sys
 from pathlib import Path
 
-# Add parent directory to path so we can import ib_ox_api
+# Add parent directory to path so we can import glow_api
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from ib_ox_api.database import (
+from glow_api.database import (
     SessionLocal,
     list_schools,
     set_geographical_neighbors,

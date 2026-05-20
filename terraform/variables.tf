@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "app_name" {
   description = "Application name (used as prefix for all resources)"
   type        = string
-  default     = "ib-ox-core"
+  default     = "glow-core"
 }
 
 variable "image_tag" {

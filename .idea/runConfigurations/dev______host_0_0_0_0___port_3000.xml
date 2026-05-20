@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="dev -- --host 0.0.0.0 --port 3000" type="js.build_tools.npm" nameIsGenerated="true">
+    <package-json value="$PROJECT_DIR$/dashboard/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="dev" />
+    </scripts>
+    <arguments value="-- --host 0.0.0.0 --port 3000" />
+    <node-interpreter value="docker-compose://[$PROJECT_DIR$/compose.yml]:dashboard/node" />
+    <envs />
+    <method v="2" />
+  </configuration>
+</component>

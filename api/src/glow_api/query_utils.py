@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 
 import pandas as pd
 
-from ib_ox_api.models import QueryCatalog
+from glow_api.models import QueryCatalog
 
 # Columns allowed in group_by (categorical)
 CATEGORICAL_WHITELIST: set[str] = {
@@ -19,7 +19,7 @@ CATEGORICAL_WHITELIST: set[str] = {
 }
 
 # Questionnaire item columns from the #BeeWell GM Survey model
-# (ib-ox-dummies examples/beewell_model.toml).
+# (glow-dummies examples/beewell_model.toml).
 # Each tuple is (column_prefix, number_of_items).
 _BW_QUESTIONNAIRES: list[tuple[str, int]] = [
     ("bw_migration", 3),

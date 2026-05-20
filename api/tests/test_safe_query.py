@@ -3,9 +3,9 @@
 import pytest
 from sqlalchemy.orm import Session
 
-from ib_ox_api.auth import get_password_hash
-from ib_ox_api.database import create_user, get_user_by_username
-from ib_ox_api.metadata_models import School
+from glow_api.auth import get_password_hash
+from glow_api.database import create_user, get_user_by_username
+from glow_api.metadata_models import School
 
 
 @pytest.fixture

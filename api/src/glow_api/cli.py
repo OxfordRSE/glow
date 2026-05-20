@@ -1,11 +1,11 @@
-"""Admin CLI for ib-ox-api.
+"""Admin CLI for glow-api.
 
 Usage:
-    python -m ib_ox_api.cli users list
-    python -m ib_ox_api.cli users create USERNAME
-    python -m ib_ox_api.cli users update USERNAME
-    python -m ib_ox_api.cli users delete USERNAME
-    python -m ib_ox_api.cli db init
+    python -m glow_api.cli users list
+    python -m glow_api.cli users create USERNAME
+    python -m glow_api.cli users update USERNAME
+    python -m glow_api.cli users delete USERNAME
+    python -m glow_api.cli db init
 """
 
 import json
@@ -13,8 +13,8 @@ import sys
 
 import click
 
-from ib_ox_api.auth import get_password_hash
-from ib_ox_api.database import (
+from glow_api.auth import get_password_hash
+from glow_api.database import (
     SessionLocal,
     create_user,
     delete_user,
@@ -26,12 +26,12 @@ from ib_ox_api.database import (
     get_school_by_name,
     list_schools,
 )
-from ib_ox_api.metadata_models import User
+from glow_api.metadata_models import User
 
 
 @click.group()
 def cli() -> None:
-    """IB-Oxford API admin CLI."""
+    """GLOW API admin CLI."""
 
 
 # ---------------------------------------------------------------------------

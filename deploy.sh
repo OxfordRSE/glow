@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh — Idempotent deploy script for ib-ox-core
+# deploy.sh — Idempotent deploy script for glow-core
 # Usage: ./deploy.sh [version]
 #   version: e.g. 0.1.0 or 0.1.0-beta2 (must match API version 0.1.0)
 #            if omitted, you must set IMAGE_TAG env var.
@@ -10,7 +10,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="${SCRIPT_DIR}/terraform"
-APP_NAME="ib-ox-core"
+APP_NAME="glow-core"
 AWS_REGION="${AWS_REGION:-eu-west-2}"
 S3_LOCKFILE_KEY="${APP_NAME}/lockfile.json"
 LOCKFILE_LOCAL="${SCRIPT_DIR}/.deploy-lock.json"
@@ -106,7 +106,7 @@ ensure_s3_bucket() {
 
 check_lockfile() {
   local bucket="$1"
-  local remote_lockfile="/tmp/ib-ox-core-remote-lock.json"
+  local remote_lockfile="/tmp/glow-core-remote-lock.json"
 
   _lockfile_summary() {
     local f="$1"
@@ -212,7 +212,7 @@ terraform_apply() {
   info "Applying Terraform changes (Terraform will prompt for confirmation)..."
   terraform -chdir="${TERRAFORM_DIR}" apply \
     -var="image_tag=${image_tag}" \
-    -var="api_secret_key=${IB_OX_SECRET_KEY:?IB_OX_SECRET_KEY env var required}" \
+    -var="api_secret_key=${GLOW_SECRET_KEY:?GLOW_SECRET_KEY env var required}" \
     -var="aws_region=${AWS_REGION}"
   info "Terraform apply complete."
 }

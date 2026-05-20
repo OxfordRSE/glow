@@ -3,7 +3,7 @@ import { writable } from "svelte/store";
 import { en, type Messages } from "./en";
 
 const messages = { en };
-const STORAGE_KEY = "ib-ox-dashboard-locale";
+const STORAGE_KEY = "glow-dashboard-locale";
 const PHASE_PREFIX_RE = /^(baseline|comparison|change)_(.+)$/;
 
 export type Locale = keyof typeof messages;

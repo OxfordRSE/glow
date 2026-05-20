@@ -3,8 +3,8 @@
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from ib_ox_api.contract_examples import iter_contract_examples
-from ib_ox_api import models
+from glow_api.contract_examples import iter_contract_examples
+from glow_api import models
 
 
 # Map of model names to actual model classes

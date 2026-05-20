@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from ib_ox_api.auth import get_current_user
-from ib_ox_api.data import DataStore, get_datastore
-from ib_ox_api.models import (
+from glow_api.auth import get_current_user
+from glow_api.data import DataStore, get_datastore
+from glow_api.models import (
     AggregationOption,
     ColumnsResponse,
     DescribeDataResponse,
@@ -10,7 +10,7 @@ from ib_ox_api.models import (
     UserRead,
     VariableOption,
 )
-from ib_ox_api.query_v2 import build_query_catalog
+from glow_api.query_v2 import build_query_catalog
 
 router = APIRouter(prefix="/data", tags=["data"])
 

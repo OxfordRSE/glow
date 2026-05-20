@@ -1,4 +1,4 @@
-"""Pytest fixtures for ib-ox-api tests."""
+"""Pytest fixtures for glow-api tests."""
 
 import io
 import json
@@ -10,12 +10,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from ib_ox_api.auth import get_current_user, get_password_hash
-from ib_ox_api.data import DataStore
-from ib_ox_api.database import create_user, create_school, get_db
-from ib_ox_api.metadata_models import Base, User, School
-from ib_ox_api.main import app
-from ib_ox_api.settings import settings
+from glow_api.auth import get_current_user, get_password_hash
+from glow_api.data import DataStore
+from glow_api.database import create_user, create_school, get_db
+from glow_api.metadata_models import Base, User, School
+from glow_api.main import app
+from glow_api.settings import settings
 
 # ---------------------------------------------------------------------------
 # Sample DataFrame used across tests
@@ -116,7 +116,7 @@ def admin_user(db_session, sample_schools):
 def sample_df():
     df = _make_df(SAMPLE_CSV)
     # Compute derived scores like the real DataStore does
-    from ib_ox_api.data import DataStore
+    from glow_api.data import DataStore
     ds = DataStore.__new__(DataStore)
     df = ds._compute_derived_scores(df)
     return df
@@ -135,7 +135,7 @@ def tiny_df():
 @pytest.fixture(scope="function")
 def client(db_session, sample_user, sample_schools, sample_df):
     """TestClient with DB and datastore overridden."""
-    from ib_ox_api.models import UserRead
+    from glow_api.models import UserRead
 
     # Override DB dependency
     def override_get_db():
@@ -164,7 +164,7 @@ def client(db_session, sample_user, sample_schools, sample_df):
             is_admin=False,
         )
 
-    from ib_ox_api.data import get_datastore
+    from glow_api.data import get_datastore
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
@@ -181,7 +181,7 @@ def auth_client(db_session, sample_user, sample_schools, sample_df):
     """TestClient WITHOUT auth override — uses real JWT flow."""
     import threading
 
-    from ib_ox_api.data import get_datastore
+    from glow_api.data import get_datastore
 
     fake_store = DataStore.__new__(DataStore)
     fake_store._df = sample_df
@@ -207,7 +207,7 @@ def auth_client(db_session, sample_user, sample_schools, sample_df):
 @pytest.fixture(scope="function")
 def admin_client(db_session, admin_user, sample_schools, sample_df):
     """TestClient with an authenticated admin user."""
-    from ib_ox_api.models import UserRead
+    from glow_api.models import UserRead
 
     def override_get_db():
         yield db_session
@@ -230,8 +230,8 @@ def admin_client(db_session, admin_user, sample_schools, sample_df):
             is_admin=True,
         )
 
-    import ib_ox_api.data as data_module
-    import ib_ox_api.main as main_module
+    import glow_api.data as data_module
+    import glow_api.main as main_module
 
     original_data_ds = data_module.datastore
     original_main_ds = main_module.datastore
@@ -254,7 +254,7 @@ def login_as_user(auth_client, db_session):
     """Helper to login as a specific user and return JWT token."""
     def _login(username: str) -> str:
         # Get user from DB to check password
-        from ib_ox_api.database import get_user_by_username
+        from glow_api.database import get_user_by_username
         user = get_user_by_username(db_session, username)
         if not user:
             raise ValueError(f"User {username} not found")

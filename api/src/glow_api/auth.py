@@ -8,10 +8,10 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from ib_ox_api.database import get_db, get_user_by_username
-from ib_ox_api.metadata_models import User
-from ib_ox_api.models import TokenData, UserRead
-from ib_ox_api.settings import settings
+from glow_api.database import get_db, get_user_by_username
+from glow_api.metadata_models import User
+from glow_api.models import TokenData, UserRead
+from glow_api.settings import settings
 
 pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ib_ox_api.auth import get_current_user, get_password_hash
-from ib_ox_api.database import (
+from glow_api.auth import get_current_user, get_password_hash
+from glow_api.database import (
     create_school,
     create_user,
     delete_school,
@@ -18,7 +18,7 @@ from ib_ox_api.database import (
     update_school,
     update_user,
 )
-from ib_ox_api.models import (
+from glow_api.models import (
     SchoolCreate,
     SchoolRead,
     SchoolUpdate,
@@ -65,7 +65,8 @@ def list_all_users(
     return result
 
 
-@router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post("/users/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 def create_new_user(
         payload: UserCreate,
         _: UserRead = Depends(_require_admin),
@@ -166,7 +167,8 @@ def list_all_schools(
     ]
 
 
-@router.post("/schools", response_model=SchoolRead, status_code=status.HTTP_201_CREATED)
+@router.post("/schools/", response_model=SchoolRead, status_code=status.HTTP_201_CREATED)
+@router.post("/schools", response_model=SchoolRead, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 def create_new_school(
         payload: SchoolCreate,
         _: UserRead = Depends(_require_admin),

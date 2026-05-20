@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ib_ox_api.auth import get_current_user
-from ib_ox_api.database import get_db, list_schools
-from ib_ox_api.models import SchoolListResponse, SchoolRead, UserRead
+from glow_api.auth import get_current_user
+from glow_api.database import get_db, list_schools
+from glow_api.models import SchoolListResponse, SchoolRead, UserRead
 
 router = APIRouter(prefix="/schools", tags=["schools"])
 

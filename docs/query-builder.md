@@ -1,6 +1,6 @@
 # Query Builder
 
-This document is generated from the executable query examples in `api/src/ib_ox_api/query_examples.py`.
+This document is generated from the executable query examples in `api/src/glow_api/query_examples.py`.
 
 All results below were generated against the shared test fixture dataset with `min_n = 5`.
 

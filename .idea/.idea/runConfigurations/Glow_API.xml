@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="API" type="Python.FastAPI">
-    <option name="additionalOptions" value="--reload --host 0.0.0.0 --port 8000" />
+  <configuration default="false" name="Glow API" type="Python.FastAPI">
+    <option name="additionalOptions" value="--reload --port 8000 --host 0.0.0.0" />
     <option name="debugJustMyCode" value="true" />
-    <option name="file" value="$PROJECT_DIR$/api/src/glow_api/main.py" />
+    <option name="file" value="$PROJECT_DIR$/glow/api/src/glow_api/main.py" />
     <module name="glow-api" />
     <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />

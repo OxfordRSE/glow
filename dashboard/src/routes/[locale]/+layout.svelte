@@ -93,7 +93,7 @@
         <div class="flex h-16 items-center justify-between">
           <div class="flex items-center gap-8">
             <a href="/{currentLocale}" class="flex items-center gap-2">
-              <span class="text-xl font-bold text-blue-700">IB-Oxford</span>
+              <span class="text-xl font-bold text-blue-700">GLOW</span>
               <span class="text-sm text-gray-400 hidden sm:block">{i18n.t('nav.dashboard')}</span>
             </a>
             <div class="hidden md:flex items-center gap-1">

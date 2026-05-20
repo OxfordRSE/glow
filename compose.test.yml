@@ -6,7 +6,7 @@ services:
   api:
     environment:
       # Use deterministic secret for tests
-      IB_OX_SECRET_KEY: smoke-test-secret
+      GLOW_SECRET_KEY: smoke-test-secret
       # Stricter healthcheck for CI
     healthcheck:
       interval: 5s

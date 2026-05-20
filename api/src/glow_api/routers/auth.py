@@ -2,14 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from ib_ox_api.auth import authenticate_user, create_access_token
-from ib_ox_api.database import get_db
-from ib_ox_api.models import Token
+from glow_api.auth import authenticate_user, create_access_token
+from glow_api.database import get_db
+from glow_api.models import Token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login/", response_model=Token)
+@router.post("/login", response_model=Token, include_in_schema=False)
 def login(
         form_data: OAuth2PasswordRequestForm = Depends(),
         db: Session = Depends(get_db),

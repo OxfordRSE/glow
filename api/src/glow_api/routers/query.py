@@ -3,13 +3,13 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ib_ox_api.auth import get_current_user
-from ib_ox_api.blanket_suppression import execute_safe_query_with_neighbors
-from ib_ox_api.data import DataStore, get_datastore
-from ib_ox_api.database import get_db, get_school_by_id
-from ib_ox_api.models import SafeQueryRequest, SafeQueryResponse, SafeQueryResult, UserRead
-from ib_ox_api.query_v2 import build_query_catalog
-from ib_ox_api.settings import settings
+from glow_api.auth import get_current_user
+from glow_api.blanket_suppression import execute_safe_query_with_neighbors
+from glow_api.data import DataStore, get_datastore
+from glow_api.database import get_db, get_school_by_id
+from glow_api.models import SafeQueryRequest, SafeQueryResponse, SafeQueryResult, UserRead
+from glow_api.query_v2 import build_query_catalog
+from glow_api.settings import settings
 
 router = APIRouter(prefix="/query", tags=["query"])
 
@@ -217,6 +217,7 @@ ALLOWED_AGGREGATIONS = ["yearGroup", "d_ethnicity", "d_sex", "wave", "class"]
 ALLOWED_FILTERS = ["yearGroup", "d_ethnicity", "d_sex", "wave", "class"]
 
 
+@router.post("", response_model=SafeQueryResponse, include_in_schema=False)
 @router.post("/", response_model=SafeQueryResponse)
 def safe_query(
     request: SafeQueryRequest,
@@ -311,7 +312,7 @@ def safe_query(
     )
 
     # Format focus school result (wave-indexed)
-    from ib_ox_api.models import SafeQueryResultForWave
+    from glow_api.models import SafeQueryResultForWave
     
     focus_wave_results = {}
     for wave, wave_data in result["focus"].items():

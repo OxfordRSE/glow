@@ -1,4 +1,4 @@
-"""Tests for the IB-Oxford API."""
+"""Tests for the GLOW API."""
 
 import io
 
@@ -51,20 +51,20 @@ def test_get_columns(client):
 
 
 def test_suppression_count_students(sample_df):
-    from ib_ox_api.suppression import count_students
+    from glow_api.suppression import count_students
 
     assert count_students(sample_df) == 10
 
 
 def test_suppression_count_students_no_uid():
-    from ib_ox_api.suppression import count_students
+    from glow_api.suppression import count_students
 
     no_uid_df = pd.DataFrame({"school": ["A", "B", "C"], "score": [1, 2, 3]})
     assert count_students(no_uid_df) == 3
 
 
 def test_suppression_frequency_no_group_by_above_min_n(sample_df):
-    from ib_ox_api.suppression import suppress_frequency_table
+    from glow_api.suppression import suppress_frequency_table
 
     result_df, suppressions = suppress_frequency_table(
         sample_df, group_cols=[], value_col=None, min_n=5
@@ -76,7 +76,7 @@ def test_suppression_frequency_no_group_by_above_min_n(sample_df):
 
 
 def test_suppression_frequency_no_group_by_below_min_n(tiny_df):
-    from ib_ox_api.suppression import suppress_frequency_table
+    from glow_api.suppression import suppress_frequency_table
 
     result_df, suppressions = suppress_frequency_table(
         tiny_df, group_cols=[], value_col=None, min_n=5
@@ -86,7 +86,7 @@ def test_suppression_frequency_no_group_by_below_min_n(tiny_df):
 
 
 def test_suppression_frequency_below_min_n(tiny_df):
-    from ib_ox_api.suppression import suppress_frequency_table
+    from glow_api.suppression import suppress_frequency_table
 
     result_df, suppressions = suppress_frequency_table(
         tiny_df, group_cols=["school"], value_col=None, min_n=5
@@ -96,7 +96,7 @@ def test_suppression_frequency_below_min_n(tiny_df):
 
 
 def test_suppression_frequency_above_min_n(sample_df):
-    from ib_ox_api.suppression import suppress_frequency_table
+    from glow_api.suppression import suppress_frequency_table
 
     alpha_df = sample_df[sample_df["school"] == "Focus School Academy"]
     result_df, suppressions = suppress_frequency_table(
@@ -107,7 +107,7 @@ def test_suppression_frequency_above_min_n(sample_df):
 
 
 def test_suppression_means_below_min_n(tiny_df):
-    from ib_ox_api.suppression import suppress_means_table
+    from glow_api.suppression import suppress_means_table
 
     means_df, _, suppressions = suppress_means_table(
         tiny_df, group_cols=["school"], value_cols=["bw_wbeing_1"], min_n=5
@@ -117,7 +117,7 @@ def test_suppression_means_below_min_n(tiny_df):
 
 
 def test_suppression_means_above_min_n(sample_df):
-    from ib_ox_api.suppression import suppress_means_table
+    from glow_api.suppression import suppress_means_table
 
     means_df, _, suppressions = suppress_means_table(
         sample_df, group_cols=["school"], value_cols=["bw_wbeing_1"], min_n=3
@@ -127,8 +127,8 @@ def test_suppression_means_above_min_n(sample_df):
 
 
 def test_user_scope_applied(sample_df):
-    from ib_ox_api.models import UserScope
-    from ib_ox_api.query import apply_user_scope
+    from glow_api.models import UserScope
+    from glow_api.query import apply_user_scope
 
     scope = UserScope(filters={"school": ["Focus School Academy"]})
     filtered = apply_user_scope(sample_df, scope)

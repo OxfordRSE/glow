@@ -6,8 +6,8 @@ from typing import Any
 
 import pandas as pd
 
-from ib_ox_api.models import QueryPlan, QueryResult, UserScope
-from ib_ox_api.query_v2 import execute_query
+from glow_api.models import QueryPlan, QueryResult, UserScope
+from glow_api.query_v2 import execute_query
 
 MIN_N_FOR_DOCS = 5
 MAX_DOC_ROWS = 8
@@ -344,7 +344,7 @@ def render_examples_markdown(df: pd.DataFrame, *, min_n: int = MIN_N_FOR_DOCS) -
         "# Query Builder",
         "",
         "This document is generated from the executable query examples in "
-        "`api/src/ib_ox_api/query_examples.py`.",
+        "`api/src/glow_api/query_examples.py`.",
         "",
         f"All results below were generated against the shared test fixture dataset with `min_n = {min_n}`.",
         "",

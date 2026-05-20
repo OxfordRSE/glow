@@ -389,7 +389,7 @@ export const en = {
     },
     dashboard: {
       title: "Dashboard",
-      subtitle: "Overview of IB-Oxford longitudinal questionnaire data.",
+      subtitle: "Overview of GLOW longitudinal questionnaire data.",
       loadErrorHelp:
         "If no data is loaded on the server, charts will be unavailable. Contact an administrator to ensure the dataset is configured correctly.",
       participantCountBySchool: "Participant Count by School",
@@ -496,7 +496,7 @@ export const en = {
       invalidScopeJson: "Invalid scope JSON.",
     },
     login: {
-      title: "IB-Oxford",
+      title: "GLOW",
       subtitle: "Longitudinal Data Dashboard",
       signIn: "Sign In",
       username: "Username",
@@ -504,7 +504,7 @@ export const en = {
       usernamePlaceholder: "your.username",
       passwordPlaceholder: "••••••••",
       signingIn: "Signing in…",
-      footer: "IB-Oxford Wellbeing Research · Read-only access",
+      footer: "GLOW Wellbeing Research · Read-only access",
       invalidCredentials: "Invalid username or password.",
       loginFailed: "Login failed. Please try again.",
     },

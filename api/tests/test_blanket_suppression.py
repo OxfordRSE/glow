@@ -103,7 +103,7 @@ class TestBlanketSuppressionChecker:
 
     def test_safe_cohort_no_suppression(self, safe_cohort_df):
         """When all groups have n >= MIN_N, no suppression should occur."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         min_n = 5
         group_by = ["yearGroup", "d_sex"]
@@ -119,7 +119,7 @@ class TestBlanketSuppressionChecker:
 
     def test_unsafe_cohort_triggers_suppression(self, unsafe_cohort_df):
         """When any group has 0 < n < MIN_N, entire result should be suppressed."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         min_n = 5
         group_by = ["yearGroup", "d_sex"]
@@ -135,7 +135,7 @@ class TestBlanketSuppressionChecker:
 
     def test_zero_size_groups_are_safe(self):
         """Empty groups (n=0) are safe and should not trigger suppression."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         # All students are in yearGroup 7, so yearGroup 8 groups will have n=0
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
@@ -166,7 +166,7 @@ S010,Focus School Academy,7,F,3
 
     def test_multi_school_isolation(self, multi_school_df):
         """Each school's suppression should be checked independently."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         min_n = 5
         group_by = ["yearGroup", "d_sex"]
@@ -191,7 +191,7 @@ S010,Focus School Academy,7,F,3
 
     def test_no_grouping_overall_count(self):
         """When group_by is empty, check overall school count."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         # Small school with only 3 students
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
@@ -218,7 +218,7 @@ class TestBlanketSuppressionWithWaveAggregation:
 
     def test_wave_aggregation_all_waves_safe(self):
         """When aggregating by wave and all wave groups are safe."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         df = _make_df("""uid,school,wave,yearGroup,bw_wbeing_1
 S001,Focus School Academy,1,7,3
@@ -247,7 +247,7 @@ S010,Focus School Academy,2,7,3
 
     def test_wave_aggregation_one_wave_unsafe(self):
         """When aggregating by wave and one wave has small n."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         df = _make_df("""uid,school,wave,yearGroup,bw_wbeing_1
 S001,Focus School Academy,1,7,3
@@ -278,7 +278,7 @@ class TestBlanketSuppressionWithClassFilter:
 
     def test_class_filter_safe(self):
         """When filtering to a specific class with safe n."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         df = _make_df("""uid,school,yearGroup,class,d_sex,bw_wbeing_1
 S001,Focus School Academy,7,A,M,3
@@ -311,7 +311,7 @@ S012,Focus School Academy,7,B,M,2
 
     def test_class_filter_unsafe(self):
         """When filtering to a specific class with unsafe n."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         df = _make_df("""uid,school,yearGroup,class,d_sex,bw_wbeing_1
 S001,Focus School Academy,7,A,M,3
@@ -348,7 +348,7 @@ class TestBlanketSuppressionIntegration:
 
     def test_safe_query_returns_data(self, safe_cohort_df):
         """A safe query should return data normally."""
-        from ib_ox_api.blanket_suppression import execute_safe_query
+        from glow_api.blanket_suppression import execute_safe_query
 
         query_params = {
             "school": "Focus School Academy",
@@ -373,7 +373,7 @@ class TestBlanketSuppressionIntegration:
 
     def test_unsafe_query_returns_suppression_message(self, unsafe_cohort_df):
         """An unsafe query should return a polite suppression message."""
-        from ib_ox_api.blanket_suppression import execute_safe_query
+        from glow_api.blanket_suppression import execute_safe_query
 
         query_params = {
             "school": "Focus School Academy",
@@ -398,7 +398,7 @@ class TestBlanketSuppressionIntegration:
 
     def test_neighbor_school_suppression_drops_from_chart(self):
         """If a neighbor school is suppressed, it should be dropped from comparison."""
-        from ib_ox_api.blanket_suppression import execute_safe_query_with_neighbors
+        from glow_api.blanket_suppression import execute_safe_query_with_neighbors
 
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
 S001,Focus School Academy,7,M,3
@@ -469,7 +469,7 @@ class TestBlanketSuppressionEdgeCases:
 
     def test_empty_dataframe(self):
         """Empty DataFrame should be treated as safe (no data to suppress)."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
 """)
@@ -486,7 +486,7 @@ class TestBlanketSuppressionEdgeCases:
 
     def test_school_not_in_data(self):
         """Requesting a school not in the data should return empty/safe."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
 S001,Focus School Academy,7,M,3
@@ -504,7 +504,7 @@ S002,Focus School Academy,7,M,4
 
     def test_min_n_zero_always_safe(self):
         """MIN_N=0 should make everything safe (no suppression)."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
 S001,Focus School Academy,7,M,3
@@ -521,7 +521,7 @@ S001,Focus School Academy,7,M,3
 
     def test_min_n_one_only_suppresses_zero(self):
         """MIN_N=1 should only suppress n=0 (but we treat n=0 as safe)."""
-        from ib_ox_api.blanket_suppression import check_blanket_suppression
+        from glow_api.blanket_suppression import check_blanket_suppression
 
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
 S001,Focus School Academy,7,M,3

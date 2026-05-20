@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
-from ib_ox_api.models import (
+from glow_api.models import (
     FilterOp,
     QueryAggregateStep,
     QueryBucketBand,
@@ -21,7 +21,7 @@ from ib_ox_api.models import (
     SuppressionCode,
     UserScope,
 )
-from ib_ox_api.query import (
+from glow_api.query import (
     CATEGORICAL_WHITELIST,
     NUMERIC_WHITELIST,
     _apply_single_filter,
@@ -439,7 +439,7 @@ def execute_query(
     
     Returns a wave-indexed dictionary of results.
     """
-    from ib_ox_api.models import Filter
+    from glow_api.models import Filter
     
     results = {}
     

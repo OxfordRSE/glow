@@ -180,11 +180,11 @@ resource "aws_ecs_task_definition" "main" {
         protocol      = "tcp"
       }]
       environment = [
-        { name = "IB_OX_DATA_PATH", value = "/data/data.csv" },
-        { name = "IB_OX_MIN_N", value = tostring(var.api_min_n) },
-        { name = "IB_OX_SECRET_KEY", value = var.api_secret_key },
-        { name = "IB_OX_DATABASE_URL", value = "sqlite:////data/auth.db" },
-        { name = "IB_OX_CORS_ORIGINS", value = jsonencode(["*"]) }
+        { name = "GLOW_DATA_PATH", value = "/data/data.csv" },
+        { name = "GLOW_MIN_N", value = tostring(var.api_min_n) },
+        { name = "GLOW_SECRET_KEY", value = var.api_secret_key },
+        { name = "GLOW_DATABASE_URL", value = "sqlite:////data/auth.db" },
+        { name = "GLOW_CORS_ORIGINS", value = jsonencode(["*"]) }
       ]
       mountPoints = [{
         sourceVolume  = "api-data"
