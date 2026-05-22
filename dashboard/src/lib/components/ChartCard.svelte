@@ -50,7 +50,7 @@
   }: Props = $props();
 
   const i18n = $derived(createI18n($locale));
-  let showTable = $state(false);
+  let showTable = $state(true);
 
   function handleDownload() {
     downloadCSV(`${filename}.csv`, csv);

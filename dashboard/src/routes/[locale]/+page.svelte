@@ -379,22 +379,14 @@
         const neighborWaveData = neighbor.results[wave];
         if (neighborWaveData && !neighborWaveData.suppressed && neighborWaveData.results && neighborWaveData.results.length > 0) {
           const neighborValues = neighborWaveData.results.map(r => r.mean as number);
-          const colors = [
-            'rgba(156, 163, 175, 0.5)',
-            'rgba(156, 163, 175, 0.4)',
-            'rgba(156, 163, 175, 0.3)',
-          ];
-          const borderColors = [
-            'rgba(156, 163, 175, 0.8)',
-            'rgba(156, 163, 175, 0.7)',
-            'rgba(156, 163, 175, 0.6)',
-          ];
+          const color = 'rgba(156, 163, 175, 0.5)';
+          const borderColor = 'rgba(156, 163, 175, 0.8)';
 
           datasets.push({
             label: `${i18n.t('chart.neighbour')} ${idx + 1}`,
             data: neighborValues,
-            backgroundColor: colors[idx % colors.length],
-            borderColor: borderColors[idx % borderColors.length],
+            backgroundColor: color,
+            borderColor: borderColor,
             borderWidth: 2,
           });
         }
@@ -430,13 +422,13 @@
     });
 
     // Add neighbor rows for each wave
-    neighbors.forEach(neighbor => {
+    neighbors.forEach((neighbor, neighbor_idx) => {
       waves.forEach(wave => {
         const waveData = neighbor.results[wave];
         if (waveData && !waveData.suppressed && waveData.results) {
-          waveData.results.forEach((row, idx) => {
+          waveData.results.forEach(row => {
             const csvRow = [
-              `${i18n.t('chart.neighbour')} ${idx + 1}`,
+              `${i18n.t('chart.neighbour')} ${neighbor_idx + 1}`,
               wave,
               ...aggregations.map(agg => row[agg]),
               (row.mean as number).toFixed(2),
@@ -464,7 +456,7 @@
   );
 
   const variableLabel = $derived(
-    variables.find(v => v.value === selectedVariable)?.label ?? selectedVariable
+    variables.find(v => v.value === queryResult?.variable)?.value
   );
 
 </script>
@@ -509,6 +501,7 @@
               id="variable-select"
               bind:value={selectedVariable}
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onchange={executeQuery}
             >
               {#each variables as variable}
                 <option value={variable.value}>{variable.label} [{variable.value}]</option>
@@ -525,7 +518,10 @@
                   <input
                     type="checkbox"
                     checked={selectedAggregations.includes(option.value)}
-                    onchange={() => toggleAggregation(option.value)}
+                    onchange={() => {
+                      toggleAggregation(option.value);
+                      executeQuery();
+                    }}
                     class="mr-2"
                   />
                   <span class="text-sm">{option.label}</span>
@@ -544,7 +540,10 @@
                   class="px-3 py-1.5 text-sm rounded-md border transition-colors {selectedWaves.includes(wave)
                     ? 'bg-blue-500 text-white border-blue-600'
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}"
-                  onclick={() => toggleWave(wave)}
+                  onclick={() => {
+                    toggleWave(wave);
+                    executeQuery();
+                  }}
                 >
                   Wave {wave}
                 </button>
@@ -565,7 +564,10 @@
                       class="px-2 py-1 text-xs rounded-md border transition-colors {selectedFilters[filter.value]?.includes(value)
                         ? 'bg-blue-500 text-white border-blue-600'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}"
-                      onclick={() => toggleFilter(filter.value, value)}
+                      onclick={() => {
+                        toggleFilter(filter.value, value);
+                        executeQuery();
+                      }}
                     >
                       {value}
                     </button>
@@ -585,6 +587,7 @@
                   value="geographical"
                   bind:group={neighborType}
                   class="mr-2"
+                  onchange={executeQuery}
                 />
                 <span class="text-sm">{i18n.t('explore.geographical')}</span>
               </label>
@@ -594,6 +597,7 @@
                   value="statistical"
                   bind:group={neighborType}
                   class="mr-2"
+                  onchange={executeQuery}
                 />
                 <span class="text-sm">{i18n.t('explore.statistical')}</span>
               </label>
@@ -639,7 +643,7 @@
             </div>
           {:else}
             <ChartCard
-              title="{variableLabel}"
+              title={i18n.t(`api.${variableLabel}`)}
               type={chartType}
               data={chartData}
               csv={chartCSV}
@@ -658,6 +662,11 @@
               </div>
             {/if}
           {/if}
+        {:else if queryLoading}
+          <div class="card text-center py-12">
+            <p class="text-gray-500 mb-2">{i18n.t('explore.querying')}...</p>
+            <p class="text-sm text-gray-400">{i18n.t('explore.privacyProtection')}</p>
+          </div>
         {:else}
           <div class="card text-center py-12">
             <p class="text-gray-500 mb-2">{i18n.t('explore.selectQueryParams')}</p>

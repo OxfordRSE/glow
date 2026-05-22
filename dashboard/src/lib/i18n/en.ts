@@ -410,16 +410,6 @@ export const en = {
     gettingStartedAdmin:
         "As an admin, you can manage users and their pre-filters.",
   },
-  queryPage: {
-    title: "Query Builder",
-    subtitle:
-        "Compose safe analytical plans that can filter, derive scores, pair waves, bucket cohorts, and aggregate with built-in suppression.",
-    loadingCatalog: "Loading query catalog...",
-  },
-  queryBuilder: {
-    resultTitle: "Query Result",
-    executionProvenance: "Execution Provenance",
-  },
   explore: {
     title: "Explore Data",
     subtitle: "Query wellbeing data with blanket suppression for privacy protection",
