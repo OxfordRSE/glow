@@ -38,7 +38,7 @@ export function setLocale(nextLocale: string | Locale) {
 }
 
 function lookupText(
-  dictionary: Messages["text"],
+  dictionary: Messages,
   key: string,
 ): string | undefined {
   let current: unknown = dictionary;
@@ -113,7 +113,7 @@ export function createI18n(activeLocale: Locale) {
   return {
     locale: activeLocale,
     t(key: string, params?: Record<string, string | number>) {
-      const template = lookupText(dictionary.text, key);
+      const template = lookupText(dictionary, key);
       return template ? interpolate(template, params) : key;
     },
     columnLabel(column: string) {
@@ -126,8 +126,8 @@ export function createI18n(activeLocale: Locale) {
     },
     chartFormatters: {
       columnLabel: (column: string) => formatColumnLabel(column, dictionary),
-      countLabel: lookupText(dictionary.text, "chart.count") ?? "Count",
-      meanLabel: lookupText(dictionary.text, "chart.mean") ?? "Mean",
+      countLabel: lookupText(dictionary, "chart.count") ?? "Count",
+      meanLabel: lookupText(dictionary, "chart.mean") ?? "Mean",
     },
   };
 }

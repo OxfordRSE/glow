@@ -52,7 +52,7 @@
     queryOptions?.waves ?? []
   );
   
-  let selectedVariable = $state('bw_wbeing_1');
+  let selectedVariable = $state<string>('');
   let selectedAggregations = $state<string[]>([]);
   let selectedFilters = $state<Record<string, string[]>>({});
   let selectedWaves = $state<string[]>([]);  // Wave is now first-class
@@ -511,7 +511,7 @@
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {#each variables as variable}
-                <option value={variable.value}>{variable.label}</option>
+                <option value={variable.value}>{variable.label} [{variable.value}]</option>
               {/each}
             </select>
           </div>
