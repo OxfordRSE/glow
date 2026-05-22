@@ -142,7 +142,6 @@ class QueryResult(BaseModel):
     """
 
     school_id: int
-    school_name: str
     results: dict[str, "QueryResultForWave"]
 
 

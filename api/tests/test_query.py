@@ -83,7 +83,6 @@ class TestQueryEndpoint:
         # Should have focus school data
         assert "focus_school" in data
         assert data["focus_school"]["school_id"] == alpha_user["school_id"]
-        assert data["focus_school"]["school_name"] == alpha_user["school_name"]
 
         # Should have wave-indexed results
         assert "results" in data["focus_school"]

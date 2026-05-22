@@ -203,7 +203,7 @@
         });
         
         datasets.push({
-          label: focus_school.school_name,
+          label: "Us",
           data: focusData,
           backgroundColor: 'rgba(59, 130, 246, 0.8)',
           borderColor: 'rgba(59, 130, 246, 1)',
@@ -236,7 +236,7 @@
           ];
           
           datasets.push({
-            label: neighbor.school_name,
+            label: `${i18n.t('chart.neighbour')} ${idx + 1}`,
             data: neighborData,
             backgroundColor: colors[idx % colors.length],
             borderColor: borderColors[idx % borderColors.length],
@@ -294,7 +294,7 @@
           ];
           
           datasets.push({
-            label: `${focus_school.school_name} - ${aggCombo}`,
+            label: `Us - ${aggCombo}`,
             data,
             backgroundColor: colors[aggIdx % colors.length],
             borderColor: borderColors[aggIdx % borderColors.length],
@@ -335,7 +335,7 @@
             ];
             
             datasets.push({
-              label: `${neighbor.school_name} - ${aggCombo}`,
+              label: `${i18n.t('chart.neighbour')} ${neighborIdx + 1} - ${aggCombo}`,
               data,
               backgroundColor: colors[neighborIdx % colors.length],
               borderColor: borderColors[neighborIdx % borderColors.length],
@@ -359,7 +359,7 @@
       
       const labels = focusWaveData.results.map(r => {
         if (aggregations.length === 0) {
-          return focus_school.school_name;
+          return "Us";
         }
         return aggregations.map(agg => r[agg]).join(' - ');
       });
@@ -367,7 +367,7 @@
       const focusValues = focusWaveData.results.map(r => r.mean as number);
       
       datasets.push({
-        label: focus_school.school_name,
+        label: "Us",
         data: focusValues,
         backgroundColor: 'rgba(59, 130, 246, 0.8)',
         borderColor: 'rgba(59, 130, 246, 1)',
@@ -391,7 +391,7 @@
           ];
 
           datasets.push({
-            label: neighbor.school_name,
+            label: `${i18n.t('chart.neighbour')} ${idx + 1}`,
             data: neighborValues,
             backgroundColor: colors[idx % colors.length],
             borderColor: borderColors[idx % borderColors.length],
@@ -418,7 +418,7 @@
       if (waveData && !waveData.suppressed && waveData.results) {
         waveData.results.forEach(row => {
           const csvRow = [
-            focus_school.school_name,
+            "Us",
             wave,
             ...aggregations.map(agg => row[agg]),
             (row.mean as number).toFixed(2),
@@ -434,9 +434,9 @@
       waves.forEach(wave => {
         const waveData = neighbor.results[wave];
         if (waveData && !waveData.suppressed && waveData.results) {
-          waveData.results.forEach(row => {
+          waveData.results.forEach((row, idx) => {
             const csvRow = [
-              neighbor.school_name,
+              `${i18n.t('chart.neighbour')} ${idx + 1}`,
               wave,
               ...aggregations.map(agg => row[agg]),
               (row.mean as number).toFixed(2),
@@ -639,7 +639,7 @@
             </div>
           {:else}
             <ChartCard
-              title="{variableLabel} - {queryResult.focus_school.school_name}"
+              title="{variableLabel}"
               type={chartType}
               data={chartData}
               csv={chartCSV}

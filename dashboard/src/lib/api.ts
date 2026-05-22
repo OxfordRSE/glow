@@ -321,7 +321,6 @@ export interface QueryResultForWave {
 
 export interface QueryResult {
   school_id: number;
-  school_name: string;
   results: Record<string, QueryResultForWave>;
 }
 

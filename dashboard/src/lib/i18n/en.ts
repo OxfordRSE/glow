@@ -381,6 +381,7 @@ export const en = {
         "Some values are suppressed to protect student privacy because the cell counts are small.",
     count: "Count",
     mean: "Mean",
+    neighbour: "Neighbour"
   },
   table: {
     noData: "No data available.",

@@ -99,7 +99,6 @@ export const contractExamplesData = [
     "response": {
       "focus_school": {
         "school_id": 1,
-        "school_name": "Focus School Academy",
         "results": {
           "1": {
             "suppressed": false,
@@ -126,7 +125,6 @@ export const contractExamplesData = [
       "neighbors": [
         {
           "school_id": 2,
-          "school_name": "Neighbouring School",
           "results": {
             "1": {
               "suppressed": false,
@@ -251,7 +249,6 @@ export const contractExamplesData = [
     "response": {
       "focus_school": {
         "school_id": 1,
-        "school_name": "Focus School Academy",
         "results": {
           "1": {
             "suppressed": false,
@@ -278,7 +275,6 @@ export const contractExamplesData = [
       "neighbors": [
         {
           "school_id": 2,
-          "school_name": "Neighbouring School",
           "results": {
             "1": {
               "suppressed": false,
@@ -339,7 +335,6 @@ export const contractExamplesData = [
     "response": {
       "focus_school": {
         "school_id": 1,
-        "school_name": "Focus School Academy",
         "results": {
           "1": {
             "suppressed": false,
@@ -378,7 +373,6 @@ export const contractExamplesData = [
       "neighbors": [
         {
           "school_id": 2,
-          "school_name": "Neighbouring School",
           "results": {
             "1": {
               "suppressed": false,
@@ -447,7 +441,6 @@ export const contractExamplesData = [
     "response": {
       "focus_school": {
         "school_id": 2,
-        "school_name": "Neighbouring School",
         "results": {
           "1": {
             "suppressed": false,
@@ -474,7 +467,6 @@ export const contractExamplesData = [
       "neighbors": [
         {
           "school_id": 1,
-          "school_name": "Focus School Academy",
           "results": {
             "1": {
               "suppressed": false,
@@ -529,7 +521,6 @@ export const contractExamplesData = [
     "response": {
       "focus_school": {
         "school_id": 1,
-        "school_name": "Focus School Academy",
         "results": {
           "1": {
             "suppressed": true,
@@ -546,7 +537,6 @@ export const contractExamplesData = [
       "neighbors": [
         {
           "school_id": 2,
-          "school_name": "Neighbouring School",
           "results": {
             "1": {
               "suppressed": false,
