@@ -12,8 +12,6 @@ MODEL_MAP = {
     "TokenResponse": models.Token,
     "UserRead": models.UserRead,
     "SchoolListResponse": models.SchoolListResponse,
-    "ColumnsResponse": models.ColumnsResponse,
-    "DescribeDataResponse": models.DescribeDataResponse,
     "QueryRequest": models.QueryRequest,
     "QueryResponse": models.QueryResponse,
     "ErrorDetailResponse": models.ErrorDetailResponse,
@@ -25,13 +23,15 @@ def test_contract_example_validates(example_id: str, example: dict):
     """Validate that each contract example conforms to its declared model."""
     response_model_name = example.get("response_model")
     request_model_name = example.get("request_model")
-    
+
     # Validate response if model is specified
     if response_model_name:
         model_class = MODEL_MAP.get(response_model_name)
         if not model_class:
-            pytest.fail(f"Unknown response model '{response_model_name}' in example '{example_id}'")
-        
+            pytest.fail(
+                f"Unknown response model '{response_model_name}' in example '{example_id}'"
+            )
+
         response_data = example.get("response")
         try:
             adapter = TypeAdapter(model_class)
@@ -41,13 +41,15 @@ def test_contract_example_validates(example_id: str, example: dict):
                 f"Response validation failed for example '{example_id}' "
                 f"(model: {response_model_name}):\n{e}"
             )
-    
+
     # Validate request if model is specified
     if request_model_name:
         model_class = MODEL_MAP.get(request_model_name)
         if not model_class:
-            pytest.fail(f"Unknown request model '{request_model_name}' in example '{example_id}'")
-        
+            pytest.fail(
+                f"Unknown request model '{request_model_name}' in example '{example_id}'"
+            )
+
         request_data = example.get("request")
         if request_data is not None:  # Allow null requests for GET endpoints
             try:

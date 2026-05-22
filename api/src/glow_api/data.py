@@ -9,6 +9,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from glow_api.settings import settings
 from pydantic import BaseModel
 
+from glow_api.utils import log_duration
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,15 +37,20 @@ class DataStore:
         self._numerical_whitelist: List[str] = []
 
     def _load(self) -> pd.DataFrame:
-        path = self._data_path
-        if path.suffix.lower() in {".parquet", ".pq"}:
-            df = pd.read_parquet(path)
-        else:
-            df = pd.read_csv(path, dtype_backend="numpy_nullable")
+        with log_duration("Load data") as log_data:
+            path = self._data_path
+            if path.suffix.lower() in {".parquet", ".pq"}:
+                df = pd.read_parquet(path)
+            else:
+                df = pd.read_csv(path, dtype_backend="numpy_nullable")
 
-        # Pre-compute derived scores
-        df = self._process_loaded_data(df)
-        return df
+            # Pre-compute derived scores
+            log_data["path"] = path
+            log_data["original_col_count"] = len(df.columns)
+            log_data["row_count"] = len(df)
+            df = self._process_loaded_data(df)
+            log_data["derived_col_count"] = len(df) - log_data["original_col_count"]
+            return df
 
     def _process_loaded_data(self, df: pd.DataFrame) -> pd.DataFrame:
         df = self._compute_derived_scores(df)
@@ -55,11 +62,14 @@ class DataStore:
             "yearGroup",
             "class",
             "sex",
+            "d_sex",
             "ethnicity",
+            "d_ethnicity",
+            "d_age",
             "d_city",
-            "d_country"
+            "d_country",
         ]
-        numerical: List[str] = ["d_age"]
+        numerical: List[str] = []
         for col in df.columns:
             split = col.split("_")
             if len(split) > 1 and split[0] in settings.DATA_PREFIXES:
@@ -69,7 +79,7 @@ class DataStore:
 
     def _compute_derived_scores(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add derived score columns to the DataFrame.
-        
+
         Computes subscale totals and scale totals for all BeeWell questionnaires
         where it makes sense to aggregate items.
         """
@@ -97,7 +107,9 @@ class DataStore:
             logger.debug("Computed %s from %d columns", subscale, len(columns))
 
         if total_scores_computed > 0:
-            logger.info("Computed %d subscale/scale total scores", total_scores_computed)
+            logger.info(
+                "Computed %d subscale/scale total scores", total_scores_computed
+            )
         else:
             logger.warning("No questionnaire columns found to compute total scores")
 
@@ -109,10 +121,14 @@ class DataStore:
         try:
             df = self._load()
         except FileNotFoundError:
-            logger.warning("Data file not found: %s — keeping previous data", self._data_path)
+            logger.warning(
+                "Data file not found: %s — keeping previous data", self._data_path
+            )
             return
         except Exception:
-            logger.exception("Failed to load data from %s — keeping previous data", self._data_path)
+            logger.exception(
+                "Failed to load data from %s — keeping previous data", self._data_path
+            )
             return
         with self._lock:
             self._df = df
@@ -124,7 +140,7 @@ class DataStore:
             return DataFrameWithWhitelists(
                 df=self._df.copy(),
                 categorical_whitelist=self._categorical_whitelist,
-                numerical_whitelist=self._numerical_whitelist
+                numerical_whitelist=self._numerical_whitelist,
             )
 
     def startup(self) -> None:
@@ -146,6 +162,7 @@ class DataStore:
             self._scheduler.shutdown(wait=False)
             logger.info("Data refresh scheduler stopped")
 
+
 # Module-level singleton
 datastore = DataStore(
     data_path=settings.DATA_PATH,
@@ -155,7 +172,7 @@ datastore = DataStore(
 
 def get_datastore() -> DataStore:
     """Dependency function that returns the current datastore instance.
-    
+
     This allows tests to override the datastore by reassigning the module-level
     'datastore' variable, and the routers will pick up the new instance.
     """

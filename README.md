@@ -78,9 +78,8 @@ The dashboard will be available at <http://localhost:5173>.
 |---|---|---|---|
 | `GET` | `/health` | — | Health check |
 | `POST` | `/auth/login` | — | Login (returns JWT) |
-| `GET` | `/data/columns` | User | List available column names |
-| `GET` | `/query/catalog` | User | Query Builder catalog for safe steps and autocomplete |
-| `POST` | `/query` | User | Query Builder plan execution |
+| `GET` | `/schools` | User | List schools with query options |
+| `POST` | `/query` | User | Execute query with blanket suppression |
 | `GET` | `/admin/users` | Admin | List users |
 | `POST` | `/admin/users` | Admin | Create user |
 | `PUT` | `/admin/users/{id}` | Admin | Update user |

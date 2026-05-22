@@ -13,7 +13,23 @@
       "size": "medium",
       "category": "comprehensive",
       "geographical_neighbor_ids": [2],
-      "statistical_neighbor_ids": [2, 3]
+      "statistical_neighbor_ids": [2, 3],
+      "query_options": {
+        "variables": ["bw_wbeing_1", "bw_wbeing_2", "bw_wbeing_3", "bw_wbeing_total"],
+        "waves": ["1", "2"],
+        "aggregations": [
+          {"value": "class", "scope": "focus_only"},
+          {"value": "d_ethnicity", "scope": "shared"},
+          {"value": "d_sex", "scope": "shared"},
+          {"value": "yearGroup", "scope": "shared"}
+        ],
+        "filters": [
+          {"value": "class", "values": ["A", "B", "C"], "scope": "focus_only"},
+          {"value": "d_ethnicity", "values": ["Asian", "Black", "White"], "scope": "shared"},
+          {"value": "d_sex", "values": ["F", "M"], "scope": "shared"},
+          {"value": "yearGroup", "values": ["7"], "scope": "shared"}
+        ]
+      }
     },
     {
       "id": 2,
@@ -21,7 +37,23 @@
       "size": "large",
       "category": "academy",
       "geographical_neighbor_ids": [1],
-      "statistical_neighbor_ids": [1, 3]
+      "statistical_neighbor_ids": [1, 3],
+      "query_options": {
+        "variables": ["bw_wbeing_1", "bw_wbeing_2", "bw_wbeing_3", "bw_wbeing_total"],
+        "waves": ["1"],
+        "aggregations": [
+          {"value": "class", "scope": "focus_only"},
+          {"value": "d_ethnicity", "scope": "shared"},
+          {"value": "d_sex", "scope": "shared"},
+          {"value": "yearGroup", "scope": "shared"}
+        ],
+        "filters": [
+          {"value": "class", "values": ["A", "B", "C"], "scope": "focus_only"},
+          {"value": "d_ethnicity", "values": ["Asian", "Black", "White"], "scope": "shared"},
+          {"value": "d_sex", "values": ["F", "M"], "scope": "shared"},
+          {"value": "yearGroup", "values": ["8"], "scope": "shared"}
+        ]
+      }
     },
     {
       "id": 3,
@@ -29,7 +61,23 @@
       "size": "small",
       "category": "grammar",
       "geographical_neighbor_ids": [],
-      "statistical_neighbor_ids": [1, 2]
+      "statistical_neighbor_ids": [1, 2],
+      "query_options": {
+        "variables": ["bw_wbeing_1", "bw_wbeing_2", "bw_wbeing_3", "bw_wbeing_total"],
+        "waves": ["1"],
+        "aggregations": [
+          {"value": "class", "scope": "focus_only"},
+          {"value": "d_ethnicity", "scope": "shared"},
+          {"value": "d_sex", "scope": "shared"},
+          {"value": "yearGroup", "scope": "shared"}
+        ],
+        "filters": [
+          {"value": "class", "values": ["A", "B"], "scope": "focus_only"},
+          {"value": "d_ethnicity", "values": ["Asian", "White"], "scope": "shared"},
+          {"value": "d_sex", "values": ["F", "M"], "scope": "shared"},
+          {"value": "yearGroup", "values": ["7"], "scope": "shared"}
+        ]
+      }
     }
   ]
 }

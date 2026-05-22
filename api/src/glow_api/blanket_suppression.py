@@ -23,25 +23,25 @@ logger = logging.getLogger(__name__)
 def sanitize_for_json(value):
     """
     Convert numpy types and NaN values to JSON-serializable Python types.
-    
+
     Args:
         value: Any value that might be a numpy type or NaN
-        
+
     Returns:
         JSON-serializable Python value (None for NaN/inf)
     """
     # Handle NaN and inf values
     if pd.isna(value) or (isinstance(value, float) and not np.isfinite(value)):
         return None
-    
+
     # Convert numpy types to Python types
     if isinstance(value, (np.integer, np.floating)):
         return value.item()
-    
+
     # Handle numpy bool
     if isinstance(value, np.bool_):
         return bool(value)
-    
+
     # Return as-is if already a native Python type
     return value
 
@@ -49,18 +49,17 @@ def sanitize_for_json(value):
 def sanitize_data_for_json(data: list[dict]) -> list[dict]:
     """
     Sanitize a list of dictionaries for JSON serialization.
-    
+
     Converts numpy types to Python types and NaN/inf to None.
-    
+
     Args:
         data: List of dictionaries from pandas operations
-        
+
     Returns:
         List of dictionaries with JSON-serializable values
     """
     return [
-        {key: sanitize_for_json(value) for key, value in row.items()}
-        for row in data
+        {key: sanitize_for_json(value) for key, value in row.items()} for row in data
     ]
 
 
@@ -119,7 +118,7 @@ def check_blanket_suppression(
     # We use the 'uid' column to count unique students if it exists,
     # otherwise count rows
     count_col = "uid" if "uid" in school_df.columns else school_df.columns[0]
-    
+
     try:
         counts = school_df.groupby(group_by, dropna=False)[count_col].nunique()
     except KeyError:
@@ -172,12 +171,12 @@ def execute_query(
     waves = query_params.get("waves", [])
     group_by = query_params.get("group_by", [])
     filters = query_params.get("filters", {})
-    
+
     if not waves:
         raise ValueError("At least one wave must be specified")
-    
+
     results = {}
-    
+
     for wave in waves:
         # Apply base filters
         filtered_df = df.copy()
@@ -185,7 +184,9 @@ def execute_query(
             if col in filtered_df.columns:
                 t = filtered_df[col].dtype
                 if isinstance(value, list):
-                    filtered_df = filtered_df[filtered_df[col].isin([t.type(v) for v in value])]
+                    filtered_df = filtered_df[
+                        filtered_df[col].isin([t.type(v) for v in value])
+                    ]
                 else:
                     filtered_df = filtered_df[filtered_df[col] == t.type(value)]
 
@@ -223,7 +224,11 @@ def execute_query(
             if variable in filtered_df.columns:
                 filtered_for_mean = filtered_df.dropna(subset=[variable])
                 mean_val = filtered_for_mean[variable].mean()
-                count = filtered_for_mean["uid"].nunique() if "uid" in filtered_for_mean.columns else len(filtered_for_mean)
+                count = (
+                    filtered_for_mean["uid"].nunique()
+                    if "uid" in filtered_for_mean.columns
+                    else len(filtered_for_mean)
+                )
             else:
                 mean_val = None
                 count = 0
@@ -235,10 +240,18 @@ def execute_query(
             else:
                 # Filter out NA values for the variable before grouping
                 filtered_for_mean = filtered_df.dropna(subset=[variable])
-                grouped = filtered_for_mean.groupby(group_by, dropna=False).agg({
-                    variable: "mean",
-                    "uid": "nunique" if "uid" in filtered_for_mean.columns else "count"
-                }).reset_index()
+                grouped = (
+                    filtered_for_mean.groupby(group_by, dropna=False)
+                    .agg(
+                        {
+                            variable: "mean",
+                            "uid": "nunique"
+                            if "uid" in filtered_for_mean.columns
+                            else "count",
+                        }
+                    )
+                    .reset_index()
+                )
                 grouped.columns = list(group_by) + ["mean", "student_n"]
                 data = sanitize_data_for_json(grouped.to_dict("records"))
 
@@ -246,7 +259,7 @@ def execute_query(
             "suppressed": False,
             "data": data,
         }
-    
+
     return results
 
 
@@ -287,16 +300,13 @@ def execute_query_with_neighbors(
         neighbor_params["school"] = neighbor_school
         neighbor_result = execute_query(df, neighbor_params, min_n)
 
-        # Check if any wave has non-suppressed results
-        has_data = any(not wave_result.get("suppressed", True) for wave_result in neighbor_result.values())
-        
-        if has_data:
-            neighbor_results.append({
+        # Always include neighbors, even if fully suppressed
+        neighbor_results.append(
+            {
                 "school": neighbor_school,
                 "results": neighbor_result,
-            })
-        else:
-            logger.info(f"Neighbor school {neighbor_school} fully suppressed, dropping from comparison")
+            }
+        )
 
     return {
         "focus": focus_result,

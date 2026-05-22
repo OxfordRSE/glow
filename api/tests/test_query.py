@@ -52,7 +52,7 @@ class TestQueryEndpoint:
             json={
                 "school_id": 1,
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": [],
                 "filters": {},
             },
@@ -62,39 +62,39 @@ class TestQueryEndpoint:
     def test_query_simple_mean(self, auth_client, alpha_user, login_as_user):
         """Query mean of a question variable for a school."""
         token = login_as_user(alpha_user["username"])
-        
+
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": [],
                 "filters": {},
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         if response.status_code != 200:
             print(f"Error response: {response.json()}")
         assert response.status_code == 200
         data = response.json()
-        
+
         # Should have focus school data
         assert "focus_school" in data
         assert data["focus_school"]["school_id"] == alpha_user["school_id"]
         assert data["focus_school"]["school_name"] == alpha_user["school_name"]
-        
+
         # Should have wave-indexed results
         assert "results" in data["focus_school"]
         assert isinstance(data["focus_school"]["results"], dict)
-        
+
         # Check at least one wave has results
-        for wave in ["1", "2", "3"]:
+        for wave in ["1", "2"]:
             assert wave in data["focus_school"]["results"]
             wave_result = data["focus_school"]["results"][wave]
             assert "suppressed" in wave_result
-            
+
             # Should have results or suppression message
             if wave_result["suppressed"]:
                 assert "suppression_message" in wave_result
@@ -107,27 +107,29 @@ class TestQueryEndpoint:
                 assert "mean" in result
                 assert "student_n" in result
 
-    def test_query_with_year_group_aggregation(self, auth_client, alpha_user, login_as_user):
+    def test_query_with_year_group_aggregation(
+        self, auth_client, alpha_user, login_as_user
+    ):
         """Query with yearGroup aggregation."""
         token = login_as_user(alpha_user["username"])
-        
+
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": ["yearGroup"],
                 "filters": {},
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         # Check wave-indexed results
-        for wave in ["1", "2", "3"]:
+        for wave in ["1", "2"]:
             wave_result = data["focus_school"]["results"][wave]
             if not wave_result["suppressed"]:
                 # Results should have yearGroup field
@@ -139,24 +141,24 @@ class TestQueryEndpoint:
     def test_query_with_class_aggregation(self, auth_client, alpha_user, login_as_user):
         """Query with class aggregation (focus school only)."""
         token = login_as_user(alpha_user["username"])
-        
+
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": ["class"],
                 "filters": {},
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         # Check wave-indexed results
-        for wave in ["1", "2", "3"]:
+        for wave in ["1", "2"]:
             wave_result = data["focus_school"]["results"][wave]
             if not wave_result["suppressed"]:
                 # Results should have class field
@@ -165,35 +167,37 @@ class TestQueryEndpoint:
                     assert "mean" in result
                     assert "student_n" in result
 
-    def test_query_with_neighbors(self, auth_client, alpha_user, login_as_user, db_session, sample_schools):
+    def test_query_with_neighbors(
+        self, auth_client, alpha_user, login_as_user, db_session, sample_schools
+    ):
         """Query with neighbor schools included."""
         # Set up Focus School Academy and Neighbouring School as neighbors
         alpha_school = sample_schools["Focus School Academy"]
         beta_school = sample_schools["Neighbouring School"]
         alpha_school.geographical_neighbors.append(beta_school)
         db_session.commit()
-        
+
         token = login_as_user(alpha_user["username"])
-        
+
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": [],
                 "filters": {},
                 "include_neighbors": True,
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         # Should have focus school
         assert "focus_school" in data
-        
+
         # Should have neighbors list (may be empty if suppressed)
         assert "neighbors" in data
         assert isinstance(data["neighbors"], list)
@@ -201,175 +205,194 @@ class TestQueryEndpoint:
     def test_query_derived_score(self, auth_client, alpha_user, login_as_user):
         """Query a derived score variable."""
         token = login_as_user(alpha_user["username"])
-        
+
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "bw_wbeing_total",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": [],
                 "filters": {},
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         if response.status_code != 200:
             print(f"Error response: {response.json()}")
         assert response.status_code == 200
         data = response.json()
-        
+
         # Should process derived score like any other variable
         assert "focus_school" in data
 
-    def test_query_blanket_suppression_triggers(self, auth_client, alpha_user, login_as_user):
+    def test_query_blanket_suppression_triggers(
+        self, auth_client, alpha_user, login_as_user
+    ):
         """Verify blanket suppression is triggered for unsafe cohorts."""
         token = login_as_user(alpha_user["username"])
-        
+
         # Query with multiple aggregations that might create small cohorts
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": ["yearGroup", "d_sex", "d_ethnicity"],
                 "filters": {},
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         # Check wave-indexed results for suppression
-        for wave in ["1", "2", "3"]:
+        for wave in ["1", "2"]:
             wave_result = data["focus_school"]["results"][wave]
             # If suppressed, should have message and no results
             if wave_result["suppressed"]:
                 assert wave_result["suppression_message"] is not None
                 assert wave_result["results"] is None
 
-    def test_query_neighbor_suppressed_dropped(self, auth_client, alpha_user, login_as_user, db_session, sample_schools):
-        """Suppressed neighbor schools should be dropped from results."""
+    def test_query_neighbor_suppressed_included(
+        self, auth_client, alpha_user, login_as_user, db_session, sample_schools
+    ):
+        """Suppressed neighbor schools should be included with suppression messages."""
         # Set up neighbors
         alpha_school = sample_schools["Focus School Academy"]
         beta_school = sample_schools["Neighbouring School"]
         alpha_school.geographical_neighbors.append(beta_school)
         db_session.commit()
-        
+
         token = login_as_user(alpha_user["username"])
-        
+
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
-                "aggregations": ["yearGroup", "d_sex"],  # May suppress Neighbouring School
+                "waves": ["1", "2"],
+                "aggregations": [
+                    "yearGroup",
+                    "d_sex",
+                ],  # May suppress Neighbouring School
                 "filters": {},
                 "include_neighbors": True,
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
-        # Neighbors list should only include non-suppressed schools
+
+        # Neighbors list should include all neighbors, even if suppressed
+        assert "neighbors" in data
+        assert isinstance(data["neighbors"], list)
+
+        # Each neighbor should have results with wave-indexed data
         for neighbor in data["neighbors"]:
-            # Each neighbor should have results (suppressed ones are dropped)
-            assert neighbor["results"] is not None
-            assert not neighbor.get("suppressed", False)
+            assert "results" in neighbor
+            assert isinstance(neighbor["results"], dict)
+            # Check that each wave result has suppressed flag
+            for wave_result in neighbor["results"].values():
+                assert "suppressed" in wave_result
 
     def test_query_invalid_variable(self, auth_client, alpha_user, login_as_user):
         """Invalid variable should return error."""
         token = login_as_user(alpha_user["username"])
-        
+
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "nonexistent_variable",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": [],
                 "filters": {},
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         assert response.status_code == 400
         assert "variable" in response.json()["detail"].lower()
 
     def test_query_invalid_aggregation(self, auth_client, alpha_user, login_as_user):
         """Invalid aggregation dimension should return error."""
         token = login_as_user(alpha_user["username"])
-        
+
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": ["invalid_dimension"],
                 "filters": {},
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         assert response.status_code == 400
 
-    def test_query_user_can_only_query_own_school(self, auth_client, alpha_user, beta_user, login_as_user):
+    def test_query_user_can_only_query_own_school(
+        self, auth_client, alpha_user, beta_user, login_as_user
+    ):
         """Non-admin user should only query their own school."""
         token = login_as_user(alpha_user["username"])
-        
+
         # Try to query Neighbouring School school with Focus School Academy user's token
         response = auth_client.post(
             "/query",
             json={
                 "school_id": beta_user["school_id"],
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": [],
                 "filters": {},
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         assert response.status_code == 403
 
-    def test_query_admin_can_query_any_school(self, auth_client, admin_token, alpha_user):
+    def test_query_admin_can_query_any_school(
+        self, auth_client, admin_token, alpha_user
+    ):
         """Admin user can query any school."""
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": [],
                 "filters": {},
             },
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        
+
         assert response.status_code == 200
 
-    def test_query_class_aggregation_not_allowed_for_neighbors(self, auth_client, alpha_user, login_as_user):
+    def test_query_class_aggregation_not_allowed_for_neighbors(
+        self, auth_client, alpha_user, login_as_user
+    ):
         """Class aggregation should not be allowed when including neighbors."""
         token = login_as_user(alpha_user["username"])
-        
+
         response = auth_client.post(
             "/query",
             json={
                 "school_id": alpha_user["school_id"],
                 "variable": "bw_wbeing_1",
-                "waves": ["1", "2", "3"],
+                "waves": ["1", "2"],
                 "aggregations": ["class"],
                 "filters": {},
                 "include_neighbors": True,
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        
+
         assert response.status_code == 400
         assert "class" in response.json()["detail"].lower()

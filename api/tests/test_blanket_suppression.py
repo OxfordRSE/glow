@@ -107,14 +107,14 @@ class TestBlanketSuppressionChecker:
 
         min_n = 5
         group_by = ["yearGroup", "d_sex"]
-        
+
         is_suppressed = check_blanket_suppression(
             df=safe_cohort_df,
             school="Focus School Academy",
             group_by=group_by,
-            min_n=min_n
+            min_n=min_n,
         )
-        
+
         assert is_suppressed is False, "Safe cohort should not be suppressed"
 
     def test_unsafe_cohort_triggers_suppression(self, unsafe_cohort_df):
@@ -123,14 +123,14 @@ class TestBlanketSuppressionChecker:
 
         min_n = 5
         group_by = ["yearGroup", "d_sex"]
-        
+
         is_suppressed = check_blanket_suppression(
             df=unsafe_cohort_df,
             school="Focus School Academy",
             group_by=group_by,
-            min_n=min_n
+            min_n=min_n,
         )
-        
+
         assert is_suppressed is True, "Cohort with small group should be suppressed"
 
     def test_zero_size_groups_are_safe(self):
@@ -150,17 +150,14 @@ S008,Focus School Academy,7,F,4
 S009,Focus School Academy,7,F,2
 S010,Focus School Academy,7,F,3
 """)
-        
+
         min_n = 5
         group_by = ["yearGroup", "d_sex"]
-        
+
         is_suppressed = check_blanket_suppression(
-            df=df,
-            school="Focus School Academy",
-            group_by=group_by,
-            min_n=min_n
+            df=df, school="Focus School Academy", group_by=group_by, min_n=min_n
         )
-        
+
         # Should be safe because only observed groups are checked
         assert is_suppressed is False, "Zero-size groups should not trigger suppression"
 
@@ -170,22 +167,22 @@ S010,Focus School Academy,7,F,3
 
         min_n = 5
         group_by = ["yearGroup", "d_sex"]
-        
+
         # Focus School Academy has safe groups (5 M, 5 F)
         alpha_suppressed = check_blanket_suppression(
             df=multi_school_df,
             school="Focus School Academy",
             group_by=group_by,
-            min_n=min_n
+            min_n=min_n,
         )
         assert alpha_suppressed is False, "Focus School Academy should be safe"
-        
+
         # Neighbouring School has unsafe groups (2 M, 1 F)
         beta_suppressed = check_blanket_suppression(
             df=multi_school_df,
             school="Neighbouring School",
             group_by=group_by,
-            min_n=min_n
+            min_n=min_n,
         )
         assert beta_suppressed is True, "Neighbouring School should be suppressed"
 
@@ -199,17 +196,14 @@ S001,Tiny,7,M,3
 S002,Tiny,7,F,4
 S003,Tiny,7,M,2
 """)
-        
+
         min_n = 5
         group_by = []  # No grouping, overall count
-        
+
         is_suppressed = check_blanket_suppression(
-            df=df,
-            school="Tiny",
-            group_by=group_by,
-            min_n=min_n
+            df=df, school="Tiny", group_by=group_by, min_n=min_n
         )
-        
+
         assert is_suppressed is True, "Small school overall count should be suppressed"
 
 
@@ -232,17 +226,14 @@ S008,Focus School Academy,2,7,4
 S009,Focus School Academy,2,7,2
 S010,Focus School Academy,2,7,3
 """)
-        
+
         min_n = 5
         group_by = ["wave", "yearGroup"]
-        
+
         is_suppressed = check_blanket_suppression(
-            df=df,
-            school="Focus School Academy",
-            group_by=group_by,
-            min_n=min_n
+            df=df, school="Focus School Academy", group_by=group_by, min_n=min_n
         )
-        
+
         assert is_suppressed is False, "All waves safe should not suppress"
 
     def test_wave_aggregation_one_wave_unsafe(self):
@@ -259,17 +250,14 @@ S006,Focus School Academy,2,7,4
 S007,Focus School Academy,2,7,3
 S008,Focus School Academy,2,7,4
 """)
-        
+
         min_n = 5
         group_by = ["wave", "yearGroup"]
-        
+
         is_suppressed = check_blanket_suppression(
-            df=df,
-            school="Focus School Academy",
-            group_by=group_by,
-            min_n=min_n
+            df=df, school="Focus School Academy", group_by=group_by, min_n=min_n
         )
-        
+
         assert is_suppressed is True, "Wave 2 with n=3 should trigger suppression"
 
 
@@ -294,19 +282,16 @@ S010,Focus School Academy,7,A,F,3
 S011,Focus School Academy,7,B,M,1
 S012,Focus School Academy,7,B,M,2
 """)
-        
+
         min_n = 5
         # Filter to class A before checking
         class_a_df = df[df["class"] == "A"]
         group_by = ["yearGroup", "d_sex"]
-        
+
         is_suppressed = check_blanket_suppression(
-            df=class_a_df,
-            school="Focus School Academy",
-            group_by=group_by,
-            min_n=min_n
+            df=class_a_df, school="Focus School Academy", group_by=group_by, min_n=min_n
         )
-        
+
         assert is_suppressed is False, "Class A groups are safe"
 
     def test_class_filter_unsafe(self):
@@ -322,19 +307,16 @@ S005,Focus School Academy,7,A,F,3
 S011,Focus School Academy,7,B,M,1
 S012,Focus School Academy,7,B,M,2
 """)
-        
+
         min_n = 5
         # Filter to class A before checking
         class_a_df = df[df["class"] == "A"]
         group_by = ["yearGroup", "d_sex"]
-        
+
         is_suppressed = check_blanket_suppression(
-            df=class_a_df,
-            school="Focus School Academy",
-            group_by=group_by,
-            min_n=min_n
+            df=class_a_df, school="Focus School Academy", group_by=group_by, min_n=min_n
         )
-        
+
         assert is_suppressed is True, "Class A with small groups should be suppressed"
 
 
@@ -357,13 +339,9 @@ class TestBlanketSuppressionIntegration:
             "group_by": ["yearGroup", "d_sex"],
             "filters": {},
         }
-        
-        result = execute_query(
-            df=safe_cohort_df,
-            query_params=query_params,
-            min_n=5
-        )
-        
+
+        result = execute_query(df=safe_cohort_df, query_params=query_params, min_n=5)
+
         # Result is now wave-indexed
         assert "1" in result, "Result should contain wave '1'"
         wave_result = result["1"]
@@ -382,19 +360,17 @@ class TestBlanketSuppressionIntegration:
             "group_by": ["yearGroup", "d_sex"],
             "filters": {},
         }
-        
-        result = execute_query(
-            df=unsafe_cohort_df,
-            query_params=query_params,
-            min_n=5
-        )
-        
+
+        result = execute_query(df=unsafe_cohort_df, query_params=query_params, min_n=5)
+
         # Result is now wave-indexed
         assert "1" in result, "Result should contain wave '1'"
         wave_result = result["1"]
         assert wave_result["suppressed"] is True, "Unquery should be suppressed"
         assert "message" in wave_result, "Result should contain suppression message"
-        assert "data" not in wave_result or wave_result["data"] == [], "Suppressed query should not return data"
+        assert "data" not in wave_result or wave_result["data"] == [], (
+            "Suppressed query should not return data"
+        )
 
     def test_neighbor_school_suppression_drops_from_chart(self):
         """If a neighbor school is suppressed, it should be dropped from comparison."""
@@ -425,38 +401,56 @@ S021,State Local High,7,F,3
 S022,State Local High,7,F,4
 S023,State Local High,7,F,5
 """)
-        
+
         query_params = {
             "school": "Focus School Academy",
             "variable": "bw_wbeing_1",
             "waves": ["1"],
             "group_by": ["yearGroup", "d_sex"],
             "filters": {},
-            "neighbors": ["Neighbouring School", "State Local High"],  # Neighbouring School is unsafe, State Local High is safe
+            "neighbors": [
+                "Neighbouring School",
+                "State Local High",
+            ],  # Neighbouring School is unsafe, State Local High is safe
         }
-        
-        result = execute_query_with_neighbors(
-            df=df,
-            query_params=query_params,
-            min_n=5
-        )
-        
+
+        result = execute_query_with_neighbors(df=df, query_params=query_params, min_n=5)
+
         # Result is now wave-indexed
         assert "focus" in result
         assert "1" in result["focus"], "Focus result should contain wave '1'"
         focus_wave = result["focus"]["1"]
-        
+
         # Focus School Academy should be safe
         assert focus_wave["suppressed"] is False
         assert len(focus_wave["data"]) > 0
-        
+
         # Check neighbor schools - structure is list of {"school": name, "results": {wave: {...}}}
         neighbor_schools = [n["school"] for n in result["neighbors"]]
-        
-        assert "Neighbouring School" not in neighbor_schools, "Neighbouring School should be dropped due to suppression"
-        
-        # State Local High should be included
-        assert "State Local High" in neighbor_schools, "State Local High should be included"
+
+        # Neighbouring School should be included but suppressed
+        assert "Neighbouring School" in neighbor_schools, (
+            "Neighbouring School should be included"
+        )
+        neighbouring = next(
+            n for n in result["neighbors"] if n["school"] == "Neighbouring School"
+        )
+        assert "1" in neighbouring["results"]
+        assert neighbouring["results"]["1"]["suppressed"] is True, (
+            "Neighbouring School should be suppressed"
+        )
+
+        # State Local High should be included and not suppressed
+        assert "State Local High" in neighbor_schools, (
+            "State Local High should be included"
+        )
+        state_local = next(
+            n for n in result["neighbors"] if n["school"] == "State Local High"
+        )
+        assert "1" in state_local["results"]
+        assert state_local["results"]["1"]["suppressed"] is False, (
+            "State Local High should not be suppressed"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -473,14 +467,14 @@ class TestBlanketSuppressionEdgeCases:
 
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
 """)
-        
+
         is_suppressed = check_blanket_suppression(
             df=df,
             school="Focus School Academy",
             group_by=["yearGroup", "d_sex"],
-            min_n=5
+            min_n=5,
         )
-        
+
         # Empty is safe (nothing to suppress)
         assert is_suppressed is False, "Empty DataFrame should be safe"
 
@@ -492,14 +486,11 @@ class TestBlanketSuppressionEdgeCases:
 S001,Focus School Academy,7,M,3
 S002,Focus School Academy,7,M,4
 """)
-        
+
         is_suppressed = check_blanket_suppression(
-            df=df,
-            school="NonExistent",
-            group_by=["yearGroup", "d_sex"],
-            min_n=5
+            df=df, school="NonExistent", group_by=["yearGroup", "d_sex"], min_n=5
         )
-        
+
         assert is_suppressed is False, "Non-existent school should be safe"
 
     def test_min_n_zero_always_safe(self):
@@ -509,14 +500,14 @@ S002,Focus School Academy,7,M,4
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
 S001,Focus School Academy,7,M,3
 """)
-        
+
         is_suppressed = check_blanket_suppression(
             df=df,
             school="Focus School Academy",
             group_by=["yearGroup", "d_sex"],
-            min_n=0  # No suppression threshold
+            min_n=0,  # No suppression threshold
         )
-        
+
         assert is_suppressed is False, "MIN_N=0 should disable suppression"
 
     def test_min_n_one_only_suppresses_zero(self):
@@ -526,13 +517,13 @@ S001,Focus School Academy,7,M,3
         df = _make_df("""uid,school,yearGroup,d_sex,bw_wbeing_1
 S001,Focus School Academy,7,M,3
 """)
-        
+
         is_suppressed = check_blanket_suppression(
             df=df,
             school="Focus School Academy",
             group_by=["yearGroup", "d_sex"],
-            min_n=1
+            min_n=1,
         )
-        
+
         # n=1 should be safe when MIN_N=1
         assert is_suppressed is False, "Single student safe with MIN_N=1"

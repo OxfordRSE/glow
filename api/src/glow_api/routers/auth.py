@@ -12,8 +12,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/login/", response_model=Token)
 @router.post("/login", response_model=Token, include_in_schema=False)
 def login(
-        form_data: OAuth2PasswordRequestForm = Depends(),
-        db: Session = Depends(get_db),
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
 ) -> Token:
     user = authenticate_user(db, form_data.username, form_data.password)
     if user is None:
@@ -22,5 +22,7 @@ def login(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = create_access_token(data={"sub": user.username, "is_admin": user.is_admin})
+    access_token = create_access_token(
+        data={"sub": user.username, "is_admin": user.is_admin}
+    )
     return Token(access_token=access_token, token_type="bearer")

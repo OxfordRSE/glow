@@ -1,6 +1,9 @@
+import json
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 from typing import Any, List
+
 
 def parse_list(v: Any) -> List[str]:
     if isinstance(v, str):
@@ -23,6 +26,13 @@ class Settings(BaseSettings):
     METADATA_DATABASE_URL: str = "sqlite:///./metadata.db"
     CORS_ORIGINS: List[str] = ["*"]
 
+    # Logging configuration
+    LOG_LEVEL: str = "INFO"  # Log level for glow_api module
+    LOG_UVICORN_ACCESS: str = (
+        "INFO"  # Log level for uvicorn.access (endpoint access logs)
+    )
+    LOG_UVICORN: str = "INFO"  # Log level for uvicorn.error (server logs)
+
     model_config = SettingsConfigDict(
         env_prefix="GLOW_",
         env_file=".env",
@@ -30,7 +40,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    @field_validator("DATA_PREFIXES", "DATA_DEMOGRAPHIC_PREFIXES", "CORS_ORIGINS", mode="before")
+    @field_validator(
+        "DATA_PREFIXES", "DATA_DEMOGRAPHIC_PREFIXES", "CORS_ORIGINS", mode="before"
+    )
     @classmethod
     def parse_list(cls, v) -> List[str]:
         return parse_list(v)

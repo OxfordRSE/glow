@@ -12,11 +12,20 @@ from glow_api.auth import authenticate_user, create_access_token
 from glow_api.data import datastore
 from glow_api.database import run_migrations, get_db
 from glow_api.models import Token
-from glow_api.routers import admin, auth, data, query, schools
+from glow_api.routers import admin, auth, query, schools
 from glow_api.settings import settings
 
 
 def configure_logging() -> None:
+    """Configure logging for the GLOW API.
+
+    Sets up console logging for:
+    - glow_api: Application logs (configurable via GLOW_LOG_LEVEL)
+    - uvicorn.access: HTTP access logs for each endpoint request (configurable via GLOW_LOG_UVICORN_ACCESS)
+    - uvicorn.error: Uvicorn server logs (configurable via GLOW_LOG_UVICORN)
+
+    All logs output to console (stdout) by default.
+    """
     logging.config.dictConfig(
         {
             "version": 1,
@@ -24,21 +33,39 @@ def configure_logging() -> None:
             "formatters": {
                 "default": {
                     "format": "%(asctime)s %(levelname)s [%(name)s] %(message)s",
-                }
+                },
+                "access": {
+                    "format": '%(asctime)s %(levelname)s [%(name)s] %(client_addr)s - "%(request_line)s" %(status_code)s',
+                },
             },
             "handlers": {
                 "console": {
                     "class": "logging.StreamHandler",
                     "formatter": "default",
                     "stream": "ext://sys.stdout",
-                }
+                },
+                "access_console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "access",
+                    "stream": "ext://sys.stdout",
+                },
             },
             "loggers": {
                 "glow_api": {
                     "handlers": ["console"],
-                    "level": "INFO",
+                    "level": settings.LOG_LEVEL,
                     "propagate": False,
-                }
+                },
+                "uvicorn.access": {
+                    "handlers": ["access_console"],
+                    "level": settings.LOG_UVICORN_ACCESS,
+                    "propagate": False,
+                },
+                "uvicorn.error": {
+                    "handlers": ["console"],
+                    "level": settings.LOG_UVICORN,
+                    "propagate": False,
+                },
             },
         }
     )
@@ -78,7 +105,6 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(schools.router)
-app.include_router(data.router)
 app.include_router(query.router)
 
 
@@ -89,26 +115,25 @@ def health() -> dict:
 
 @app.post("/token", response_model=Token, tags=["auth"])
 def token_alias(
-        form_data: OAuth2PasswordRequestForm = Depends(),
-        db: Session = Depends(get_db),
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
 ) -> Token:
     """Alias for /auth/login for backward compatibility."""
     user = authenticate_user(db, form_data.username, form_data.password)
     if user is None:
         from fastapi import HTTPException, status
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = create_access_token(data={"sub": user.username, "is_admin": user.is_admin})
+    access_token = create_access_token(
+        data={"sub": user.username, "is_admin": user.is_admin}
+    )
     return Token(access_token=access_token, token_type="bearer")
 
 
 @app.get("/")
 def root() -> dict:
-    return {
-        "title": app.title,
-        "description": app.description,
-        "version": app.version
-    }
+    return {"title": app.title, "description": app.description, "version": app.version}

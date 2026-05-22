@@ -46,8 +46,8 @@ def _require_admin(current_user: UserRead = Depends(get_current_user)) -> UserRe
 
 @router.get("/users", response_model=list[UserRead])
 def list_all_users(
-        _: UserRead = Depends(_require_admin),
-        db: Session = Depends(get_db),
+    _: UserRead = Depends(_require_admin),
+    db: Session = Depends(get_db),
 ) -> list[UserRead]:
     users = list_users(db)
     result = []
@@ -66,11 +66,16 @@ def list_all_users(
 
 
 @router.post("/users/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-@router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED, include_in_schema=False)
+@router.post(
+    "/users",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
+)
 def create_new_user(
-        payload: UserCreate,
-        _: UserRead = Depends(_require_admin),
-        db: Session = Depends(get_db),
+    payload: UserCreate,
+    _: UserRead = Depends(_require_admin),
+    db: Session = Depends(get_db),
 ) -> UserRead:
     existing = get_user_by_username(db, payload.username)
     if existing is not None:
@@ -98,14 +103,16 @@ def create_new_user(
 
 @router.put("/users/{user_id}", response_model=UserRead)
 def update_existing_user(
-        user_id: int,
-        payload: UserUpdate,
-        _: UserRead = Depends(_require_admin),
-        db: Session = Depends(get_db),
+    user_id: int,
+    payload: UserUpdate,
+    _: UserRead = Depends(_require_admin),
+    db: Session = Depends(get_db),
 ) -> UserRead:
     user = get_user_by_id(db, user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     hashed = get_password_hash(payload.password) if payload.password else None
     updated = update_user(
@@ -128,13 +135,15 @@ def update_existing_user(
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_existing_user(
-        user_id: int,
-        current_admin: UserRead = Depends(_require_admin),
-        db: Session = Depends(get_db),
+    user_id: int,
+    current_admin: UserRead = Depends(_require_admin),
+    db: Session = Depends(get_db),
 ) -> None:
     user = get_user_by_id(db, user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     if user.id == current_admin.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -150,8 +159,8 @@ def delete_existing_user(
 
 @router.get("/schools", response_model=list[SchoolRead])
 def list_all_schools(
-        _: UserRead = Depends(_require_admin),
-        db: Session = Depends(get_db),
+    _: UserRead = Depends(_require_admin),
+    db: Session = Depends(get_db),
 ) -> list[SchoolRead]:
     schools = list_schools(db)
     return [
@@ -167,12 +176,19 @@ def list_all_schools(
     ]
 
 
-@router.post("/schools/", response_model=SchoolRead, status_code=status.HTTP_201_CREATED)
-@router.post("/schools", response_model=SchoolRead, status_code=status.HTTP_201_CREATED, include_in_schema=False)
+@router.post(
+    "/schools/", response_model=SchoolRead, status_code=status.HTTP_201_CREATED
+)
+@router.post(
+    "/schools",
+    response_model=SchoolRead,
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
+)
 def create_new_school(
-        payload: SchoolCreate,
-        _: UserRead = Depends(_require_admin),
-        db: Session = Depends(get_db),
+    payload: SchoolCreate,
+    _: UserRead = Depends(_require_admin),
+    db: Session = Depends(get_db),
 ) -> SchoolRead:
     school = create_school(
         db,
@@ -192,14 +208,16 @@ def create_new_school(
 
 @router.put("/schools/{school_id}", response_model=SchoolRead)
 def update_existing_school(
-        school_id: int,
-        payload: SchoolUpdate,
-        _: UserRead = Depends(_require_admin),
-        db: Session = Depends(get_db),
+    school_id: int,
+    payload: SchoolUpdate,
+    _: UserRead = Depends(_require_admin),
+    db: Session = Depends(get_db),
 ) -> SchoolRead:
     school = get_school_by_id(db, school_id)
     if school is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="School not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="School not found"
+        )
 
     updated = update_school(
         db,
@@ -211,9 +229,13 @@ def update_existing_school(
 
     # Update neighbors if provided
     if payload.geographical_neighbor_ids is not None:
-        updated = set_geographical_neighbors(db, updated, payload.geographical_neighbor_ids)
+        updated = set_geographical_neighbors(
+            db, updated, payload.geographical_neighbor_ids
+        )
     if payload.statistical_neighbor_ids is not None:
-        updated = set_statistical_neighbors(db, updated, payload.statistical_neighbor_ids)
+        updated = set_statistical_neighbors(
+            db, updated, payload.statistical_neighbor_ids
+        )
 
     return SchoolRead(
         id=updated.id,
@@ -227,13 +249,15 @@ def update_existing_school(
 
 @router.delete("/schools/{school_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_existing_school(
-        school_id: int,
-        _: UserRead = Depends(_require_admin),
-        db: Session = Depends(get_db),
+    school_id: int,
+    _: UserRead = Depends(_require_admin),
+    db: Session = Depends(get_db),
 ) -> None:
     school = get_school_by_id(db, school_id)
     if school is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="School not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="School not found"
+        )
     delete_school(db, school)
 
 

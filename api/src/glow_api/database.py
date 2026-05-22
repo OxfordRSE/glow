@@ -10,7 +10,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from glow_api.metadata_models import Base, School, User
+from glow_api.metadata_models import School, User
 from glow_api.settings import settings
 
 # Create engine for metadata database
@@ -176,12 +176,12 @@ def set_geographical_neighbors(
     """Set geographical neighbors for a school (reciprocal relationship)."""
     neighbors = db.query(School).filter(School.id.in_(neighbor_ids)).all()
     school.geographical_neighbors = neighbors
-    
+
     # Make reciprocal
     for neighbor in neighbors:
         if school not in neighbor.geographical_neighbors:
             neighbor.geographical_neighbors.append(school)
-    
+
     db.commit()
     db.refresh(school)
     return school
@@ -193,12 +193,12 @@ def set_statistical_neighbors(
     """Set statistical neighbors for a school (reciprocal relationship)."""
     neighbors = db.query(School).filter(School.id.in_(neighbor_ids)).all()
     school.statistical_neighbors = neighbors
-    
+
     # Make reciprocal
     for neighbor in neighbors:
         if school not in neighbor.statistical_neighbors:
             neighbor.statistical_neighbors.append(school)
-    
+
     db.commit()
     db.refresh(school)
     return school

@@ -79,83 +79,6 @@ export const contractExamplesData = [
     }
   },
   {
-    "id": "data.columns.default",
-    "method": "GET",
-    "path": "/data/columns",
-    "status": 200,
-    "request_model": null,
-    "response_model": "ColumnsResponse",
-    "request": null,
-    "response": [
-      "d_sex",
-      "d_ethnicity",
-      "yearGroup",
-      "class_"
-    ]
-  },
-  {
-    "id": "data.describe.default",
-    "method": "GET",
-    "path": "/data/describe",
-    "status": 200,
-    "request_model": null,
-    "response_model": "DescribeDataResponse",
-    "request": null,
-    "response": {
-      "variables": [
-        {
-          "value": "bw_wbeing_1",
-          "label_key": "api.bw_wbeing_1"
-        },
-        {
-          "value": "bw_wbeing_total",
-          "label_key": "api.bw_wbeing_total"
-        }
-      ],
-      "aggregation_options": [
-        {
-          "value": "d_sex",
-          "label_key": "api.d_sex"
-        },
-        {
-          "value": "yearGroup",
-          "label_key": "api.yearGroup"
-        }
-      ],
-      "filter_options": [
-        {
-          "value": "wave",
-          "label_key": "api.wave",
-          "values": [
-            "1",
-            "2",
-            "3",
-            "4"
-          ]
-        },
-        {
-          "value": "d_sex",
-          "label_key": "api.d_sex",
-          "values": [
-            "M",
-            "F"
-          ]
-        },
-        {
-          "value": "yearGroup",
-          "label_key": "api.yearGroup",
-          "values": [
-            "7",
-            "8",
-            "9",
-            "10",
-            "11"
-          ]
-        }
-      ]
-    }
-  },
-  {
     "id": "query.default",
     "method": "POST",
     "path": "/api/query",
@@ -677,7 +600,72 @@ export const contractExamplesData = [
         "statistical_neighbor_ids": [
           2,
           3
-        ]
+        ],
+        "query_options": {
+          "variables": [
+            "bw_wbeing_1",
+            "bw_wbeing_2",
+            "bw_wbeing_3",
+            "bw_wbeing_total"
+          ],
+          "waves": [
+            "1",
+            "2"
+          ],
+          "aggregations": [
+            {
+              "value": "class",
+              "scope": "focus_only"
+            },
+            {
+              "value": "d_ethnicity",
+              "scope": "shared"
+            },
+            {
+              "value": "d_sex",
+              "scope": "shared"
+            },
+            {
+              "value": "yearGroup",
+              "scope": "shared"
+            }
+          ],
+          "filters": [
+            {
+              "value": "class",
+              "values": [
+                "A",
+                "B",
+                "C"
+              ],
+              "scope": "focus_only"
+            },
+            {
+              "value": "d_ethnicity",
+              "values": [
+                "Asian",
+                "Black",
+                "White"
+              ],
+              "scope": "shared"
+            },
+            {
+              "value": "d_sex",
+              "values": [
+                "F",
+                "M"
+              ],
+              "scope": "shared"
+            },
+            {
+              "value": "yearGroup",
+              "values": [
+                "7"
+              ],
+              "scope": "shared"
+            }
+          ]
+        }
       },
       {
         "id": 2,
@@ -690,7 +678,71 @@ export const contractExamplesData = [
         "statistical_neighbor_ids": [
           1,
           3
-        ]
+        ],
+        "query_options": {
+          "variables": [
+            "bw_wbeing_1",
+            "bw_wbeing_2",
+            "bw_wbeing_3",
+            "bw_wbeing_total"
+          ],
+          "waves": [
+            "1"
+          ],
+          "aggregations": [
+            {
+              "value": "class",
+              "scope": "focus_only"
+            },
+            {
+              "value": "d_ethnicity",
+              "scope": "shared"
+            },
+            {
+              "value": "d_sex",
+              "scope": "shared"
+            },
+            {
+              "value": "yearGroup",
+              "scope": "shared"
+            }
+          ],
+          "filters": [
+            {
+              "value": "class",
+              "values": [
+                "A",
+                "B",
+                "C"
+              ],
+              "scope": "focus_only"
+            },
+            {
+              "value": "d_ethnicity",
+              "values": [
+                "Asian",
+                "Black",
+                "White"
+              ],
+              "scope": "shared"
+            },
+            {
+              "value": "d_sex",
+              "values": [
+                "F",
+                "M"
+              ],
+              "scope": "shared"
+            },
+            {
+              "value": "yearGroup",
+              "values": [
+                "8"
+              ],
+              "scope": "shared"
+            }
+          ]
+        }
       },
       {
         "id": 3,
@@ -701,7 +753,69 @@ export const contractExamplesData = [
         "statistical_neighbor_ids": [
           1,
           2
-        ]
+        ],
+        "query_options": {
+          "variables": [
+            "bw_wbeing_1",
+            "bw_wbeing_2",
+            "bw_wbeing_3",
+            "bw_wbeing_total"
+          ],
+          "waves": [
+            "1"
+          ],
+          "aggregations": [
+            {
+              "value": "class",
+              "scope": "focus_only"
+            },
+            {
+              "value": "d_ethnicity",
+              "scope": "shared"
+            },
+            {
+              "value": "d_sex",
+              "scope": "shared"
+            },
+            {
+              "value": "yearGroup",
+              "scope": "shared"
+            }
+          ],
+          "filters": [
+            {
+              "value": "class",
+              "values": [
+                "A",
+                "B"
+              ],
+              "scope": "focus_only"
+            },
+            {
+              "value": "d_ethnicity",
+              "values": [
+                "Asian",
+                "White"
+              ],
+              "scope": "shared"
+            },
+            {
+              "value": "d_sex",
+              "values": [
+                "F",
+                "M"
+              ],
+              "scope": "shared"
+            },
+            {
+              "value": "yearGroup",
+              "values": [
+                "7"
+              ],
+              "scope": "shared"
+            }
+          ]
+        }
       }
     ]
   },
@@ -735,7 +849,72 @@ export const contractExamplesData = [
         "statistical_neighbor_ids": [
           2,
           3
-        ]
+        ],
+        "query_options": {
+          "variables": [
+            "bw_wbeing_1",
+            "bw_wbeing_2",
+            "bw_wbeing_3",
+            "bw_wbeing_total"
+          ],
+          "waves": [
+            "1",
+            "2"
+          ],
+          "aggregations": [
+            {
+              "value": "class",
+              "scope": "focus_only"
+            },
+            {
+              "value": "d_ethnicity",
+              "scope": "shared"
+            },
+            {
+              "value": "d_sex",
+              "scope": "shared"
+            },
+            {
+              "value": "yearGroup",
+              "scope": "shared"
+            }
+          ],
+          "filters": [
+            {
+              "value": "class",
+              "values": [
+                "A",
+                "B",
+                "C"
+              ],
+              "scope": "focus_only"
+            },
+            {
+              "value": "d_ethnicity",
+              "values": [
+                "Asian",
+                "Black",
+                "White"
+              ],
+              "scope": "shared"
+            },
+            {
+              "value": "d_sex",
+              "values": [
+                "F",
+                "M"
+              ],
+              "scope": "shared"
+            },
+            {
+              "value": "yearGroup",
+              "values": [
+                "7"
+              ],
+              "scope": "shared"
+            }
+          ]
+        }
       },
       {
         "id": 2,
@@ -747,7 +926,71 @@ export const contractExamplesData = [
         ],
         "statistical_neighbor_ids": [
           1
-        ]
+        ],
+        "query_options": {
+          "variables": [
+            "bw_wbeing_1",
+            "bw_wbeing_2",
+            "bw_wbeing_3",
+            "bw_wbeing_total"
+          ],
+          "waves": [
+            "1"
+          ],
+          "aggregations": [
+            {
+              "value": "class",
+              "scope": "focus_only"
+            },
+            {
+              "value": "d_ethnicity",
+              "scope": "shared"
+            },
+            {
+              "value": "d_sex",
+              "scope": "shared"
+            },
+            {
+              "value": "yearGroup",
+              "scope": "shared"
+            }
+          ],
+          "filters": [
+            {
+              "value": "class",
+              "values": [
+                "A",
+                "B",
+                "C"
+              ],
+              "scope": "focus_only"
+            },
+            {
+              "value": "d_ethnicity",
+              "values": [
+                "Asian",
+                "Black",
+                "White"
+              ],
+              "scope": "shared"
+            },
+            {
+              "value": "d_sex",
+              "values": [
+                "F",
+                "M"
+              ],
+              "scope": "shared"
+            },
+            {
+              "value": "yearGroup",
+              "values": [
+                "8"
+              ],
+              "scope": "shared"
+            }
+          ]
+        }
       }
     ]
   }

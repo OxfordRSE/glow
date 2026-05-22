@@ -82,8 +82,12 @@ def db_session(db_engine):
 @pytest.fixture(scope="function")
 def sample_schools(db_session):
     """Create sample schools in the test DB."""
-    alpha = create_school(db_session, name="Focus School Academy", size="medium", category="comprehensive")
-    beta = create_school(db_session, name="Neighbouring School", size="large", category="academy")
+    alpha = create_school(
+        db_session, name="Focus School Academy", size="medium", category="comprehensive"
+    )
+    beta = create_school(
+        db_session, name="Neighbouring School", size="large", category="academy"
+    )
     return {"Focus School Academy": alpha, "Neighbouring School": beta}
 
 
@@ -106,7 +110,10 @@ def admin_user(db_session, sample_schools):
         db_session,
         username="adminuser",
         hashed_password=get_password_hash("adminpass"),
-        school_ids=[sample_schools["Focus School Academy"].id, sample_schools["Neighbouring School"].id],
+        school_ids=[
+            sample_schools["Focus School Academy"].id,
+            sample_schools["Neighbouring School"].id,
+        ],
         is_admin=True,
     )
     return user
@@ -117,6 +124,7 @@ def sample_df():
     df = _make_df(SAMPLE_CSV)
     # Compute derived scores like the real DataStore does
     from glow_api.data import DataStore
+
     ds = DataStore.__new__(DataStore)
     df = ds._process_loaded_data(df)
     return df
@@ -252,13 +260,15 @@ def admin_client(db_session, admin_user, sample_schools, sample_df):
 @pytest.fixture(scope="function")
 def login_as_user(auth_client, db_session):
     """Helper to login as a specific user and return JWT token."""
+
     def _login(username: str) -> str:
         # Get user from DB to check password
         from glow_api.database import get_user_by_username
+
         user = get_user_by_username(db_session, username)
         if not user:
             raise ValueError(f"User {username} not found")
-        
+
         # Login with known password (tests create users with hashed_password)
         # For test users, we need to use the raw password "test_password"
         response = auth_client.post(
@@ -268,7 +278,7 @@ def login_as_user(auth_client, db_session):
         if response.status_code != 200:
             raise ValueError(f"Login failed for {username}: {response.json()}")
         return response.json()["access_token"]
-    
+
     return _login
 
 

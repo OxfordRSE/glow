@@ -164,81 +164,17 @@ export interface QueryFilter {
   value: string | number | (string | number)[];
 }
 
-export interface QueryResultForWave {
-  csv: string;
-  count_csv: string;
-  suppressions: Record<string, Record<number, string>>;
-  provenance: string[];
+export interface QueryOptionItem {
+  value: string;
+  values?: string[];
+  scope?: "shared" | "focus_only";
 }
 
-export interface QueryResult {
-  results: Record<string, QueryResultForWave>;
-}
-
-export interface QueryCatalog {
-  dimensions: string[];
-  measures: string[];
-  scores: string[];
+export interface QueryOptions {
+  variables: string[];
   waves: string[];
-  value_suggestions: Record<string, string[]>;
-  step_types: string[];
-}
-
-export type QueryMetricKind = "count_students" | "mean";
-
-export interface QueryMetric {
-  kind: QueryMetricKind;
-  column?: string;
-  as_column?: string;
-}
-
-export interface QueryFilterStep {
-  type: "filter";
-  column: string;
-  op: QueryFilter["op"];
-  value: QueryFilter["value"];
-}
-
-export interface QueryDeriveScoreStep {
-  type: "derive_score";
-  score: "bw_wbeing_total";
-}
-
-export interface QueryPairWavesStep {
-  type: "pair_waves";
-  from_wave: string;
-  to_wave: string;
-  measures: string[];
-}
-
-export interface QueryBucketBand {
-  label: string;
-  min_students: number;
-  max_students?: number;
-}
-
-export interface QueryBucketSchoolSizeStep {
-  type: "bucket_school_size";
-  output_column: string;
-  bands: QueryBucketBand[];
-}
-
-export interface QueryAggregateStep {
-  type: "aggregate";
-  group_by: string[];
-  metrics: QueryMetric[];
-}
-
-export type QueryStep =
-  | QueryFilterStep
-  | QueryDeriveScoreStep
-  | QueryPairWavesStep
-  | QueryBucketSchoolSizeStep
-  | QueryAggregateStep;
-
-export interface QueryPlan {
-  waves: string[];
-  steps: QueryStep[];
+  aggregations: QueryOptionItem[];
+  filters: QueryOptionItem[];
 }
 
 export interface User {
@@ -289,34 +225,11 @@ export async function getMe(token: string): Promise<User> {
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
-export async function getColumns(token: string): Promise<string[]> {
-  return apiFetch<string[]>("/data/columns", { headers: authHeaders(token) });
-}
-
-export interface FilterOption {
-  value: string;
-  values: string[];
-}
-
-export interface DescribeDataResponse {
-  variables: string[];
-  aggregation_options: string[];
-  filter_options: FilterOption[];
-}
-
-export async function describeData(token: string): Promise<DescribeDataResponse> {
-  return apiFetch<DescribeDataResponse>("/data/describe", {
-    headers: authHeaders(token),
-  });
-}
+// Legacy /data endpoints removed - use query_options from /schools instead
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
-export async function getQueryCatalog(token: string): Promise<QueryCatalog> {
-  return apiFetch<QueryCatalog>("/catalog", {
-    headers: authHeaders(token),
-  });
-}
+// Legacy /query/catalog endpoint removed - use query_options from /schools instead
 
 // ─── Health ───────────────────────────────────────────────────────────────────
 
@@ -387,6 +300,7 @@ export interface School {
   category: string | null;
   geographical_neighbor_ids: number[];
   statistical_neighbor_ids: number[];
+  query_options?: QueryOptions;
 }
 
 export interface QueryRequest {

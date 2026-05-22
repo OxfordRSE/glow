@@ -26,7 +26,6 @@ from glow_api.database import (
     get_school_by_name,
     list_schools,
 )
-from glow_api.metadata_models import User
 
 
 @click.group()
@@ -69,18 +68,20 @@ def users_list() -> None:
         # Eagerly load user data before session closes
         user_data = []
         for user in all_users:
-            user_data.append({
-                "id": user.id,
-                "username": user.username,
-                "is_active": user.is_active,
-                "is_admin": user.is_admin,
-                "school_names": [s.name for s in user.schools],
-            })
-    
+            user_data.append(
+                {
+                    "id": user.id,
+                    "username": user.username,
+                    "is_active": user.is_active,
+                    "is_admin": user.is_admin,
+                    "school_names": [s.name for s in user.schools],
+                }
+            )
+
     if not user_data:
         click.echo("No users found.")
         return
-    
+
     for user in user_data:
         active_flag = "active" if user["is_active"] else "inactive"
         admin_flag = ", admin" if user["is_admin"] else ""
@@ -97,7 +98,9 @@ def users_list() -> None:
     default="",
     help='Comma-separated school names, e.g. "Focus School Academy,Neighbouring School"',
 )
-@click.option("--admin", "is_admin", is_flag=True, default=False, help="Grant admin privileges.")
+@click.option(
+    "--admin", "is_admin", is_flag=True, default=False, help="Grant admin privileges."
+)
 def users_create(username: str, password: str, schools: str, is_admin: bool) -> None:
     """Create a new user."""
     hashed = get_password_hash(password)
@@ -107,7 +110,7 @@ def users_create(username: str, password: str, schools: str, is_admin: bool) -> 
         if existing is not None:
             click.echo(f"User '{username}' already exists.", err=True)
             sys.exit(1)
-        
+
         # Parse school names and get IDs
         school_ids = []
         if schools:
@@ -115,10 +118,13 @@ def users_create(username: str, password: str, schools: str, is_admin: bool) -> 
             for school_name in school_names:
                 school = get_school_by_name(db, school_name)
                 if school is None:
-                    click.echo(f"School '{school_name}' not found. Use 'schools list' to see available schools.", err=True)
+                    click.echo(
+                        f"School '{school_name}' not found. Use 'schools list' to see available schools.",
+                        err=True,
+                    )
                     sys.exit(1)
                 school_ids.append(school.id)
-        
+
         user = create_user(
             db,
             username=username,
@@ -133,12 +139,16 @@ def users_create(username: str, password: str, schools: str, is_admin: bool) -> 
         user_is_admin = user.is_admin
 
     admin_flag = " [ADMIN]" if user_is_admin else ""
-    click.echo(f"User '{user_username}' created (id={user_id}){admin_flag}. Schools: {school_names}")
+    click.echo(
+        f"User '{user_username}' created (id={user_id}){admin_flag}. Schools: {school_names}"
+    )
 
 
 @users.command("update")
 @click.argument("username")
-@click.option("--password", default=None, help="New password (will prompt if not provided).")
+@click.option(
+    "--password", default=None, help="New password (will prompt if not provided)."
+)
 @click.option(
     "--schools",
     default=None,
@@ -157,7 +167,9 @@ def users_update(
 ) -> None:
     """Update a user's password, schools, or active status."""
     if password is None and schools is None and active is None:
-        click.echo("Nothing to update. Provide --password, --schools, or --active/--inactive.")
+        click.echo(
+            "Nothing to update. Provide --password, --schools, or --active/--inactive."
+        )
         return
 
     hashed: str | None = None
@@ -172,7 +184,10 @@ def users_update(
             for school_name in school_names:
                 school = get_school_by_name(db, school_name)
                 if school is None:
-                    click.echo(f"School '{school_name}' not found. Use 'schools list' to see available schools.", err=True)
+                    click.echo(
+                        f"School '{school_name}' not found. Use 'schools list' to see available schools.",
+                        err=True,
+                    )
                     sys.exit(1)
                 school_ids.append(school.id)
 
@@ -181,7 +196,9 @@ def users_update(
         if user is None:
             click.echo(f"User '{username}' not found.", err=True)
             sys.exit(1)
-        update_user(db, user, hashed_password=hashed, school_ids=school_ids, is_active=active)
+        update_user(
+            db, user, hashed_password=hashed, school_ids=school_ids, is_active=active
+        )
 
     click.echo(f"User '{username}' updated.")
 
@@ -228,7 +245,9 @@ def schools_list() -> None:
 @schools.command("create")
 @click.argument("name")
 @click.option("--size", default=None, help="School size (e.g., small, medium, large)")
-@click.option("--category", default=None, help="School category (e.g., comprehensive, academy)")
+@click.option(
+    "--category", default=None, help="School category (e.g., comprehensive, academy)"
+)
 def schools_create(name: str, size: str | None, category: str | None) -> None:
     """Create a new school."""
     with SessionLocal() as db:

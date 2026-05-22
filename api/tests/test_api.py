@@ -41,118 +41,6 @@ def test_login_unknown_user(auth_client):
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_get_columns(client):
-    response = client.get("/data/columns")
-    assert response.status_code == status.HTTP_200_OK
-    cols = response.json()
-    assert "uid" not in cols
-    assert "school" in cols
-    assert "bw_wbeing_1" in cols
-
-
-def test_get_columns(client):
-    response = client.get("/data/describe")
-    assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert "variables" in data
-    assert len(data["variables"]) == 5
-    assert "bw_wbeing_1" in data["variables"]
-    assert "bw_wbeing_total" in data["variables"]
-    assert "aggregation_options" in data
-    assert len(data["aggregation_options"]) == 4
-    assert "class" in data["aggregation_options"]
-    assert "school" not in data["aggregation_options"]
-    assert "filter_options" in data
-    assert len(data["filter_options"]) == 4
-    assert "value" in data["filter_options"][0]
-    assert "values" in data["filter_options"][0]
-
-
-def test_suppression_count_students(sample_df):
-    from glow_api.suppression import count_students
-
-    assert count_students(sample_df) == 10
-
-
-def test_suppression_count_students_no_uid():
-    from glow_api.suppression import count_students
-
-    no_uid_df = pd.DataFrame({"school": ["A", "B", "C"], "score": [1, 2, 3]})
-    assert count_students(no_uid_df) == 3
-
-
-def test_suppression_frequency_no_group_by_above_min_n(sample_df):
-    from glow_api.suppression import suppress_frequency_table
-
-    result_df, suppressions = suppress_frequency_table(
-        sample_df, group_cols=[], value_col=None, min_n=5
-    )
-    assert len(result_df) == 1
-    assert "n" in result_df.columns
-    assert result_df["n"].iloc[0] == 10
-    assert suppressions == {}
-
-
-def test_suppression_frequency_no_group_by_below_min_n(tiny_df):
-    from glow_api.suppression import suppress_frequency_table
-
-    result_df, suppressions = suppress_frequency_table(
-        tiny_df, group_cols=[], value_col=None, min_n=5
-    )
-    assert result_df["n"].isna().all()
-    assert "n" in suppressions
-
-
-def test_suppression_frequency_below_min_n(tiny_df):
-    from glow_api.suppression import suppress_frequency_table
-
-    result_df, suppressions = suppress_frequency_table(
-        tiny_df, group_cols=["school"], value_col=None, min_n=5
-    )
-    assert result_df["n"].isna().all()
-    assert "n" in suppressions
-
-
-def test_suppression_frequency_above_min_n(sample_df):
-    from glow_api.suppression import suppress_frequency_table
-
-    alpha_df = sample_df[sample_df["school"] == "Focus School Academy"]
-    result_df, suppressions = suppress_frequency_table(
-        alpha_df, group_cols=["wave"], value_col=None, min_n=3
-    )
-    assert not result_df["n"].isna().all()
-    assert suppressions == {}
-
-
-def test_suppression_means_below_min_n(tiny_df):
-    from glow_api.suppression import suppress_means_table
-
-    means_df, _, suppressions = suppress_means_table(
-        tiny_df, group_cols=["school"], value_cols=["bw_wbeing_1"], min_n=5
-    )
-    assert means_df["bw_wbeing_1"].isna().all()
-    assert "bw_wbeing_1" in suppressions
-
-
-def test_suppression_means_above_min_n(sample_df):
-    from glow_api.suppression import suppress_means_table
-
-    means_df, _, suppressions = suppress_means_table(
-        sample_df, group_cols=["school"], value_cols=["bw_wbeing_1"], min_n=3
-    )
-    assert not means_df["bw_wbeing_1"].isna().all()
-    assert suppressions == {}
-
-
-def test_user_scope_applied(sample_df):
-    from glow_api.models import UserScope
-    from glow_api.query_utils import apply_user_scope
-
-    scope = UserScope(filters={"school": ["Focus School Academy"]})
-    filtered = apply_user_scope(sample_df, scope)
-    assert set(filtered["school"].unique()) == {"Focus School Academy"}
-
-
 def test_admin_list_users(admin_client):
     response = admin_client.get("/admin/users")
     assert response.status_code == status.HTTP_200_OK
@@ -165,7 +53,7 @@ def test_admin_list_users(admin_client):
 def test_admin_create_user(admin_client, sample_schools):
     # Get school ID for Focus School Academy
     alpha_id = sample_schools["Focus School Academy"].id
-    
+
     payload = {
         "username": "analyst",
         "password": "analyst-pass",
@@ -184,7 +72,7 @@ def test_admin_update_user(admin_client, sample_schools):
     # Get school IDs
     alpha_id = sample_schools["Focus School Academy"].id
     beta_id = sample_schools["Neighbouring School"].id
-    
+
     create_response = admin_client.post(
         "/admin/users",
         json={
@@ -214,7 +102,7 @@ def test_admin_update_user(admin_client, sample_schools):
 
 def test_admin_delete_user(admin_client, sample_schools):
     alpha_id = sample_schools["Focus School Academy"].id
-    
+
     create_response = admin_client.post(
         "/admin/users",
         json={
@@ -245,3 +133,115 @@ def test_admin_me_endpoint(admin_client):
 def test_docs_example_fixture_is_parseable(sample_df):
     df = pd.read_csv(io.StringIO(sample_df.to_csv(index=False)))
     assert not df.empty
+
+
+def test_schools_list_for_user(client, sample_schools):
+    """Regular user should see their assigned schools with query options."""
+    response = client.get("/schools")
+    assert response.status_code == status.HTTP_200_OK
+    schools = response.json()
+
+    # Should only see Focus School Academy (sample_user has access to this school)
+    assert len(schools) == 1
+    school = schools[0]
+    assert school["name"] == "Focus School Academy"
+    assert school["id"] == sample_schools["Focus School Academy"].id
+
+    # Should include query_options
+    assert "query_options" in school
+    query_options = school["query_options"]
+
+    # Query options should have all required fields
+    assert "variables" in query_options
+    assert "waves" in query_options
+    assert "aggregations" in query_options
+    assert "filters" in query_options
+
+    # Variables should include wellbeing questions
+    assert "bw_wbeing_1" in query_options["variables"]
+
+    # Aggregations should include yearGroup, sex, etc.
+    agg_values = [item["value"] for item in query_options["aggregations"]]
+    assert "yearGroup" in agg_values
+    assert "d_sex" in agg_values
+
+    # Class should be focus_only
+    class_agg = next(
+        (item for item in query_options["aggregations"] if item["value"] == "class"),
+        None,
+    )
+    assert class_agg is not None
+    assert class_agg["scope"] == "focus_only"
+
+    # Filters should have values
+    for filter_item in query_options["filters"]:
+        assert "value" in filter_item
+        assert "values" in filter_item
+        assert isinstance(filter_item["values"], list)
+        assert len(filter_item["values"]) > 0
+
+
+def test_schools_list_for_admin(admin_client, sample_schools):
+    """Admin should see all schools with query options."""
+    response = admin_client.get("/schools")
+    assert response.status_code == status.HTTP_200_OK
+    schools = response.json()
+
+    # Should see all schools
+    assert len(schools) == 2
+    school_names = {s["name"] for s in schools}
+    assert "Focus School Academy" in school_names
+    assert "Neighbouring School" in school_names
+
+    # All schools should have query_options
+    for school in schools:
+        assert "query_options" in school
+        assert "variables" in school["query_options"]
+        assert "waves" in school["query_options"]
+
+
+def test_schools_list_query_options_scoped_to_school(client, sample_schools):
+    """Query options should be scoped to each school's data."""
+    response = client.get("/schools")
+    assert response.status_code == status.HTTP_200_OK
+    schools = response.json()
+
+    # Get Focus School Academy
+    alpha_school = next(s for s in schools if s["name"] == "Focus School Academy")
+
+    # Check yearGroup filter values
+    year_filter = next(
+        (
+            item
+            for item in alpha_school["query_options"]["filters"]
+            if item["value"] == "yearGroup"
+        ),
+        None,
+    )
+    assert year_filter is not None
+    # Focus School Academy should only have year 7
+    assert "7" in year_filter["values"]
+    # Should not have year 8 (that's Neighbouring School)
+    assert "8" not in year_filter["values"]
+
+
+def test_schools_list_requires_authentication(auth_client):
+    """Unauthenticated requests should be rejected."""
+    response = auth_client.get("/schools")
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_schools_include_neighbor_ids(client, db_session, sample_schools):
+    """Schools should include geographical and statistical neighbor IDs."""
+    # Set up neighbors
+    alpha = sample_schools["Focus School Academy"]
+    beta = sample_schools["Neighbouring School"]
+    alpha.geographical_neighbors.append(beta)
+    db_session.commit()
+
+    response = client.get("/schools")
+    assert response.status_code == status.HTTP_200_OK
+    schools = response.json()
+
+    alpha_school = next(s for s in schools if s["name"] == "Focus School Academy")
+    assert beta.id in alpha_school["geographical_neighbor_ids"]

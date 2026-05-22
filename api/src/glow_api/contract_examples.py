@@ -14,13 +14,13 @@ EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples" / "contracts"
 
 def iter_contract_examples() -> Iterator[tuple[str, dict[str, Any]]]:
     """Iterate over all contract example files.
-    
+
     Yields:
         Tuples of (example_id, example_dict) for each JSON file.
     """
     if not EXAMPLES_DIR.exists():
         return
-    
+
     for json_file in sorted(EXAMPLES_DIR.glob("*.json")):
         with open(json_file) as f:
             example = json.load(f)
@@ -29,10 +29,10 @@ def iter_contract_examples() -> Iterator[tuple[str, dict[str, Any]]]:
 
 def examples_for_model(model_name: str) -> list[dict[str, Any]]:
     """Get all response examples for a given Pydantic model.
-    
+
     Args:
         model_name: The name of the Pydantic model (e.g., "QueryResponse")
-        
+
     Returns:
         List of example response bodies that match the given model.
     """
@@ -45,10 +45,10 @@ def examples_for_model(model_name: str) -> list[dict[str, Any]]:
 
 def get_example(example_id: str) -> dict[str, Any] | None:
     """Get a specific contract example by ID.
-    
+
     Args:
         example_id: The example identifier (e.g., "query.default")
-        
+
     Returns:
         The full example dict or None if not found.
     """
@@ -60,17 +60,17 @@ def get_example(example_id: str) -> dict[str, Any] | None:
 
 def get_openapi_examples(model_name: str) -> dict[str, Any] | None:
     """Get OpenAPI examples configuration for a model.
-    
+
     Args:
         model_name: The name of the Pydantic model
-        
+
     Returns:
         OpenAPI examples dict or None if no examples found.
     """
     examples = examples_for_model(model_name)
     if not examples:
         return None
-    
+
     # For schema-level examples, just use the first example
     # (Route-level named examples would go in the router decorator)
     return {"examples": examples}

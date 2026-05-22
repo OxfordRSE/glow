@@ -36,8 +36,6 @@ export const Default: Story = {
       'GET /admin/me': 'admin.me.user',
       'GET /schools': 'schools.user-default',
       'POST /api/query': 'query.default',
-      'GET /data/columns': 'data.columns.default',
-      'GET /data/describe': 'data.describe.default',
     }),
   },
   decorators: [

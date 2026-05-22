@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { authStore } from '$lib/stores';
-  import { listSchools, query, describeData, type School, type QueryResponse, type DescribeDataResponse, type FilterOption } from '$lib/api';
+  import { listSchools, query, type School, type QueryResponse, type QueryOptions } from '$lib/api';
   import ChartCard from '$lib/components/ChartCard.svelte';
   import type { ChartJsData } from '$lib/chartUtils';
   import { createI18n, locale } from '$lib/i18n';
@@ -14,37 +14,42 @@
   let selectedSchoolId = $state<number | null>(null);
   let neighborType = $state<'geographical' | 'statistical'>('geographical');  // Always include neighbors, just choose type
   
-  // Data description from API
-  let dataDescription = $state<DescribeDataResponse | null>(null);
+  // Query options from selected school
+  const selectedSchool = $derived(
+    schools.find(s => s.id === selectedSchoolId)
+  );
   
-  // Query parameters - now loaded from API
+  const queryOptions = $derived(selectedSchool?.query_options);
+  
+  // Query parameters - now loaded from school's query_options
   const variables = $derived(
-    dataDescription?.variables.map(v => ({
+    queryOptions?.variables.map(v => ({
       value: v,
       label: i18n.t(`api.${v}`)
     })) ?? []
   );
   
   const aggregationOptions = $derived(
-    dataDescription?.aggregation_options.map(a => ({
-      value: a,
-      label: i18n.t(`api.${a}`)
-    })) ?? []
+    queryOptions?.aggregations
+      .filter(a => a.scope === 'shared')  // Filter out focus_only aggregations
+      .map(a => ({
+        value: a.value,
+        label: i18n.t(`api.${a.value}`)
+      })) ?? []
   );
   
   const filterOptions = $derived(
-    dataDescription?.filter_options
-      .filter(f => f.value !== 'wave')  // Wave is now first-class, not a filter
+    queryOptions?.filters
+      .filter(f => f.value !== 'wave' && f.scope === 'shared')  // Wave is first-class, filter out focus_only
       .map(f => ({
         value: f.value,
         label: i18n.t(`api.${f.value}`),
-        values: f.values
+        values: f.values ?? []
       })) ?? []
   );
   
   const waveOptions = $derived(
-    dataDescription?.filter_options
-      .find(f => f.value === 'wave')?.values ?? []
+    queryOptions?.waves ?? []
   );
   
   let selectedVariable = $state('bw_wbeing_1');
@@ -61,31 +66,28 @@
     if (!token) return;
 
     try {
-      // Fetch both schools and data description
-      const [schoolsData, dataDesc] = await Promise.all([
-        listSchools(token),
-        describeData(token)
-      ]);
-      
-      schools = schoolsData;
-      dataDescription = dataDesc;
-      
-      // Set default variable if available
-      if (dataDescription.variables.length > 0) {
-        selectedVariable = dataDescription.variables[0].value;
-      }
-      
-      // Set default waves to all available waves
-      const waveFilter = dataDescription.filter_options.find(f => f.value === 'wave');
-      if (waveFilter && waveFilter.values.length > 0) {
-        selectedWaves = [...waveFilter.values];
-      }
+      // Fetch schools with query_options
+      schools = await listSchools(token);
       
       // Pre-select user's first school if available
       if ($authStore.user?.school_ids && $authStore.user.school_ids.length > 0) {
         selectedSchoolId = $authStore.user.school_ids[0];
       } else if (schools.length > 0) {
         selectedSchoolId = schools[0].id;
+      }
+      
+      // Set defaults based on selected school's query options
+      const opts = selectedSchool?.query_options;
+      if (opts) {
+        // Set default variable if available
+        if (opts.variables.length > 0) {
+          selectedVariable = opts.variables[0];
+        }
+        
+        // Set default waves to all available waves
+        if (opts.waves.length > 0) {
+          selectedWaves = [...opts.waves];
+        }
       }
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : i18n.t('dashboard.loadErrorHelp');
@@ -128,7 +130,18 @@
 
   async function executeQuery() {
     const token = $authStore.token;
-    if (!token || selectedSchoolId === null || selectedWaves.length === 0) return;
+    if (!token) {
+      queryError = i18n.t("dashboard.tokenErrorHelp");
+      return;
+    }
+    if (selectedSchoolId === null) {
+      queryError = i18n.t("dashboard.noSchoolErrorHelp");
+      return;
+    }
+    if(selectedWaves.length === 0) {
+      queryError = i18n.t("dashboard.noWavesErrorHelp");
+      return;
+    }
 
     queryLoading = true;
     queryError = null;

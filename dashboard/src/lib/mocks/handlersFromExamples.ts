@@ -19,8 +19,6 @@ export interface ApiResponseConfig {
   'GET /admin/me'?: string
   'GET /schools'?: string
   'POST /api/query'?: string
-  'GET /data/columns'?: string
-  'GET /data/describe'?: string
 }
 
 /**
@@ -84,30 +82,6 @@ export function createHandlersFromExamples(
       return HttpResponse.json(fallback?.response || {}, { status: fallback?.status || 200 })
     })
   )
-  
-  // Columns handler
-  const columnsExampleId = config['GET /data/columns'] || 'data.columns.default'
-  const columnsExample = getExample(columnsExampleId)
-  if (columnsExample) {
-    handlers.push(
-      http.get(`${API_BASE}/data/columns`, async () => {
-        await delay(100)
-        return HttpResponse.json(columnsExample.response, { status: columnsExample.status })
-      })
-    )
-  }
-  
-  // Describe data handler
-  const describeExampleId = config['GET /data/describe'] || 'data.describe.default'
-  const describeExample = getExample(describeExampleId)
-  if (describeExample) {
-    handlers.push(
-      http.get(`${API_BASE}/data/describe`, async () => {
-        await delay(100)
-        return HttpResponse.json(describeExample.response, { status: describeExample.status })
-      })
-    )
-  }
   
   return handlers
 }
