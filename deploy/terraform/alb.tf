@@ -177,7 +177,7 @@ resource "aws_lb_listener_rule" "odk" {
 
   condition {
     host_header {
-      values = [var.odk_domain != "" ? var.odk_domain : "odk.${var.domain_name}"]
+      values = ["odk.${var.domain_name}"]
     }
   }
 }
@@ -232,25 +232,25 @@ resource "aws_security_group" "alb" {
 
 # ─── Route 53 + ACM (only when domain_name is set) ───────────────────────────
 
-# Look up the Route 53 hosted zone for the domain.
+# Look up the Route 53 hosted zone for the domain (only if manage_dns=true).
 # Zone lookup: strips the leftmost label to find the parent zone.
-#   e.g. "dashboard.example.ac.uk" → looks for zone "example.ac.uk"
+#   e.g. "eu.glow-project.org" → looks for zone "glow-project.org"
 # The hosted zone must already exist in Route 53 (or be delegated to AWS).
 data "aws_route53_zone" "main" {
-  count        = var.domain_name != "" ? 1 : 0
+  count        = var.domain_name != "" && var.manage_dns ? 1 : 0
   name         = join(".", slice(split(".", var.domain_name), 1, length(split(".", var.domain_name))))
   private_zone = false
 }
 
-# Request an ACM certificate for the domain and subdomains (DNS validation via Route 53)
+# Request an ACM certificate for the domain and subdomains (DNS validation)
 resource "aws_acm_certificate" "main" {
   count             = var.domain_name != "" ? 1 : 0
   domain_name       = var.domain_name
   validation_method = "DNS"
 
   subject_alternative_names = [
-    "*.${var.domain_name}",
-    var.odk_domain != "" && !endswith(var.odk_domain, var.domain_name) ? var.odk_domain : null
+    "api.${var.domain_name}",
+    "odk.${var.domain_name}"
   ]
 
   lifecycle {
@@ -260,9 +260,9 @@ resource "aws_acm_certificate" "main" {
   tags = local.tags
 }
 
-# Create the DNS validation records in Route 53
+# Create the DNS validation records in Route 53 (only if manage_dns=true)
 resource "aws_route53_record" "cert_validation" {
-  for_each = var.domain_name != "" ? {
+  for_each = var.domain_name != "" && var.manage_dns ? {
     for dvo in aws_acm_certificate.main[0].domain_validation_options : dvo.resource_record_name => {
       name   = dvo.resource_record_name
       record = dvo.resource_record_value
@@ -278,16 +278,16 @@ resource "aws_route53_record" "cert_validation" {
   zone_id         = data.aws_route53_zone.main[0].zone_id
 }
 
-# Wait for ACM certificate validation to complete
+# Wait for ACM certificate validation to complete (only if manage_dns=true)
 resource "aws_acm_certificate_validation" "main" {
-  count                   = var.domain_name != "" ? 1 : 0
+  count                   = var.domain_name != "" && var.manage_dns ? 1 : 0
   certificate_arn         = aws_acm_certificate.main[0].arn
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 }
 
-# DNS alias record pointing the root domain to the ALB
+# DNS alias record pointing the root domain to the ALB (only if manage_dns=true)
 resource "aws_route53_record" "main" {
-  count   = var.domain_name != "" ? 1 : 0
+  count   = var.domain_name != "" && var.manage_dns ? 1 : 0
   zone_id = data.aws_route53_zone.main[0].zone_id
   name    = var.domain_name
   type    = "A"
@@ -299,9 +299,9 @@ resource "aws_route53_record" "main" {
   }
 }
 
-# DNS alias record for api subdomain
+# DNS alias record for api subdomain (only if manage_dns=true)
 resource "aws_route53_record" "api" {
-  count   = var.domain_name != "" ? 1 : 0
+  count   = var.domain_name != "" && var.manage_dns ? 1 : 0
   zone_id = data.aws_route53_zone.main[0].zone_id
   name    = "api.${var.domain_name}"
   type    = "A"
@@ -313,11 +313,11 @@ resource "aws_route53_record" "api" {
   }
 }
 
-# DNS alias record for odk subdomain
+# DNS alias record for odk subdomain (only if manage_dns=true)
 resource "aws_route53_record" "odk" {
-  count   = var.domain_name != "" ? 1 : 0
+  count   = var.domain_name != "" && var.manage_dns ? 1 : 0
   zone_id = data.aws_route53_zone.main[0].zone_id
-  name    = var.odk_domain != "" ? var.odk_domain : "odk.${var.domain_name}"
+  name    = "odk.${var.domain_name}"
   type    = "A"
 
   alias {

@@ -31,18 +31,36 @@ That's it! This single command deploys the entire Glow infrastructure to AWS.
    - Download the `.pem` file to `~/.ssh/`
    - Set permissions: `chmod 400 ~/.ssh/your-key.pem`
 
-4. **Route 53 Hosted Zone** - for your domain
+4. **Domain Setup** - choose ONE of:
+
+   **Option A: You own the domain's Route 53 hosted zone**
    ```bash
    aws route53 create-hosted-zone --name example.ac.uk --caller-reference $(date +%s)
    ```
    Then update your domain's nameservers at your registrar.
+   
+   **Option B: Delegated subdomain (managed by another organization)**
+   
+   You're deploying to a subdomain like `eu.glow-project.org` where the parent organization owns `glow-project.org`.
+   
+   No Route 53 setup needed! The deployment will generate DNS instructions to send to the domain owner.
 
 ## Configuration (2 minutes)
 
 Create `deploy/terraform/terraform.tfvars`:
 
+**Option A: You own the domain (manage DNS automatically)**
 ```hcl
 domain_name             = "glow.example.ac.uk"
+manage_dns              = true  # Default - creates Route 53 records
+ssh_key_name            = "my-key-pair"
+ssh_allowed_cidr_blocks = ["0.0.0.0/0"]  # Restrict to your IP in production
+```
+
+**Option B: Delegated subdomain (DNS managed externally)**
+```hcl
+domain_name             = "eu.glow-project.org"
+manage_dns              = false  # Don't create Route 53 records
 ssh_key_name            = "my-key-pair"
 ssh_allowed_cidr_blocks = ["0.0.0.0/0"]  # Restrict to your IP in production
 ```
@@ -58,19 +76,52 @@ See `deploy/terraform/terraform.tfvars.example` for all options.
 The script will:
 1. Create S3 bucket for Terraform state
 2. Run Terraform to create AWS infrastructure
-3. Upload compose files to EC2 via SSH
-4. Install Docker on EC2
-5. Generate runtime secrets
-6. Start all services (Glow + ODK Central)
-7. Configure ODK integration
+3. Request ACM certificate (DNS validation)
+4. Upload compose files to EC2 via SSH
+5. Install Docker on EC2
+6. Generate runtime secrets
+7. Start all services (Glow + ODK Central)
+8. Configure ODK integration
+
+**If using delegated subdomain (manage_dns=false):**
+
+The deployment will display DNS setup instructions at the end. Copy these and send them to your domain administrator. Example output:
+
+```
+═══════════════════════════════════════════════════════════════════════════
+DNS SETUP INSTRUCTIONS
+═══════════════════════════════════════════════════════════════════════════
+
+Your domain is NOT managed by Route 53 (manage_dns=false).
+Share these DNS records with your domain administrator:
+
+For ACM certificate validation (temporary):
+_abc123.eu.glow-project.org  →  CNAME  →  _def456.acm-validations.aws.
+_abc123.api.eu.glow-project.org  →  CNAME  →  _def456.acm-validations.aws.
+_abc123.odk.eu.glow-project.org  →  CNAME  →  _def456.acm-validations.aws.
+
+For application access (permanent):
+eu.glow-project.org      →  CNAME  →  glow-core-alb-123456789.eu-west-2.elb.amazonaws.com
+api.eu.glow-project.org  →  CNAME  →  glow-core-alb-123456789.eu-west-2.elb.amazonaws.com
+odk.eu.glow-project.org  →  CNAME  →  glow-core-alb-123456789.eu-west-2.elb.amazonaws.com
+```
+
+**Services will NOT be accessible until:**
+1. Domain administrator creates the DNS records
+2. ACM certificate validates (10-30 minutes after DNS propagation)
+
+Check certificate status:
+```bash
+aws acm describe-certificate --certificate-arn arn:aws:acm:... --query 'Certificate.Status'
+```
 
 ## Access Your Services
 
-After deployment:
+After deployment (and DNS setup if manage_dns=false):
 
-- **Dashboard**: `https://glow.example.ac.uk`
-- **API**: `https://api.glow.example.ac.uk`  
-- **ODK Central**: `https://odk.glow.example.ac.uk`
+- **Dashboard**: `https://<your-domain>`
+- **API**: `https://api.<your-domain>`  
+- **ODK Central**: `https://odk.<your-domain>`
 
 ## Get Credentials
 

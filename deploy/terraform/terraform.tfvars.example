@@ -11,12 +11,19 @@ availability_zone = "eu-west-2a"
 
 # ─── Domain Configuration ─────────────────────────────────────────────────────
 
-# Root domain name (Route 53 hosted zone must exist for parent domain)
+# Root domain name
 # This configures:
-#   - glow.example.ac.uk     → Dashboard
-#   - api.glow.example.ac.uk → API
-#   - odk.glow.example.ac.uk → ODK Central
+#   - <domain>     → Dashboard
+#   - api.<domain> → API
+#   - odk.<domain> → ODK Central
+
+# Example 1: You own the Route 53 hosted zone
 domain_name = "glow.example.ac.uk"
+manage_dns  = true  # Auto-create DNS records in Route 53 (default)
+
+# Example 2: Delegated subdomain (parent organization owns glow-project.org)
+# domain_name = "eu.glow-project.org"
+# manage_dns  = false  # Don't create Route 53 records; deployment will output DNS instructions
 
 # ─── EC2 Configuration ────────────────────────────────────────────────────────
 

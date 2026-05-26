@@ -47,7 +47,8 @@ check_aws_auth() {
   info "Checking AWS credentials..."
   if ! aws sts get-caller-identity --region "${AWS_REGION}" &>/dev/null; then
     error "AWS credentials not configured or expired."
-    error "Run: aws configure  (or aws sso login)"
+    error "Set profile with export AWS_PROFILE=<profile_name>"
+    error "Then run: aws configure  (or aws sso login)"
     exit 1
   fi
   local account_id
@@ -212,6 +213,33 @@ main() {
   echo ""
   info "SSH access:  ssh -i ${ssh_key} ec2-user@${ec2_ip}"
   echo ""
+  
+  # Show DNS setup instructions if DNS is not managed by Route 53
+  local dns_managed
+  dns_managed="$(terraform -chdir="${TERRAFORM_DIR}" output -raw dns_managed 2>/dev/null || echo "true")"
+  
+  if [[ "${dns_managed}" == "false" ]]; then
+    warn "DNS is NOT managed by Route 53 (manage_dns=false)"
+    echo ""
+    terraform -chdir="${TERRAFORM_DIR}" output -raw dns_setup_instructions
+    echo ""
+    warn "IMPORTANT: Your services will NOT be accessible until DNS records are created!"
+    warn "Copy the instructions above and send them to your domain administrator."
+    echo ""
+    
+    # Show certificate validation command
+    local cert_status_cmd
+    cert_status_cmd="$(terraform -chdir="${TERRAFORM_DIR}" output -raw acm_validation_status_command 2>/dev/null || echo "")"
+    if [[ -n "${cert_status_cmd}" ]]; then
+      info "Check certificate validation status with:"
+      echo "  ${cert_status_cmd}"
+      echo ""
+    fi
+  else
+    info "DNS records created in Route 53"
+    info "Certificate validation may take 10-30 minutes"
+    echo ""
+  fi
   warn "ODK Central admin credentials are in /opt/glow/.env.runtime on the EC2 instance"
   warn "Retrieve with: ssh -i ${ssh_key} ec2-user@${ec2_ip} 'cat /opt/glow/.env.runtime'"
 }

@@ -45,19 +45,40 @@ variable "ssh_allowed_cidr_blocks" {
 
 variable "domain_name" {
   description = <<-EOT
-    Root domain name for the application (e.g. "glow.example.ac.uk").
+    Root domain name for the application (e.g. "eu.glow-project.org" or "glow.example.ac.uk").
     When set, the following subdomains will be configured:
-      - glow.example.ac.uk (dashboard)
-      - api.glow.example.ac.uk (API)
-      - odk.glow.example.ac.uk (ODK Central)
+      - <domain> (dashboard)
+      - api.<domain> (API)
+      - odk.<domain> (ODK Central)
     
     Terraform will:
-      - Request an ACM certificate via DNS validation (Route 53)
-      - Create Route 53 ALIAS records pointing to the ALB
+      - Request an ACM certificate via DNS validation
       - Configure HTTPS listener (port 443) with host-based routing
       - Redirect HTTP (port 80) to HTTPS
     
-    A Route 53 hosted zone for the parent domain must already exist.
+    If you control the Route 53 hosted zone for the domain (or parent domain), 
+    set manage_dns=true to auto-create DNS records.
+    
+    If the domain is managed externally (delegated subdomain), set manage_dns=false
+    and follow the DNS setup instructions in terraform outputs.
   EOT
   type        = string
+}
+
+variable "manage_dns" {
+  description = <<-EOT
+    Whether to manage DNS records in Route 53.
+    
+    Set to true if:
+      - You own the domain's Route 53 hosted zone, OR
+      - You own the parent domain's zone (e.g. you own "example.ac.uk" and deploying to "glow.example.ac.uk")
+    
+    Set to false if:
+      - The domain is managed by another organization
+      - You're deploying to a delegated subdomain (e.g. "eu.glow-project.org" where parent owns "glow-project.org")
+    
+    When false, terraform outputs will provide DNS records to share with the domain owner.
+  EOT
+  type        = bool
+  default     = true
 }
