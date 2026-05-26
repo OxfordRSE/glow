@@ -62,7 +62,7 @@ output "dns_managed" {
 
 output "dns_setup_instructions" {
   description = "DNS records to configure (if manage_dns=false, share these with your domain administrator)"
-  value = var.domain_name != "" ? (var.manage_dns ? 
+  value = var.domain_name != "" ? (var.manage_dns ?
     "DNS records automatically created in Route 53" :
     <<-EOT
     
@@ -76,8 +76,8 @@ output "dns_setup_instructions" {
     ───────────────────────────────────────────────────────────────────────────
     1. ACM Certificate Validation (CNAME records)
     ───────────────────────────────────────────────────────────────────────────
-    ${join("\n    ", [for dvo in aws_acm_certificate.main[0].domain_validation_options : 
-      format("%-60s  CNAME  %s", dvo.resource_record_name, dvo.resource_record_value)
+    ${join("\n    ", [for dvo in aws_acm_certificate.main[0].domain_validation_options :
+    format("%-60s  CNAME  %s", dvo.resource_record_name, dvo.resource_record_value)
     ])}
     
     IMPORTANT: The certificate will not validate until these CNAME records are created.
@@ -98,9 +98,9 @@ output "dns_setup_instructions" {
     "Please create the following DNS records for our Glow deployment:
     
     For ACM certificate validation (temporary, can be removed after cert validates):
-    ${join("\n    ", [for dvo in aws_acm_certificate.main[0].domain_validation_options : 
-      format("%s  →  CNAME  →  %s", dvo.resource_record_name, dvo.resource_record_value)
-    ])}
+    ${join("\n    ", [for dvo in aws_acm_certificate.main[0].domain_validation_options :
+    format("%s  →  CNAME  →  %s", dvo.resource_record_name, dvo.resource_record_value)
+])}
     
     For application access (permanent):
     ${var.domain_name}       →  CNAME  →  ${aws_lb.main.dns_name}
@@ -113,7 +113,7 @@ output "dns_setup_instructions" {
     ═══════════════════════════════════════════════════════════════════════════
     
     EOT
-  ) : "No domain configured"
+) : "No domain configured"
 }
 
 output "acm_certificate_arn" {

@@ -1,9 +1,6 @@
 locals {
-  project_name = "glow"
-
   tags = {
-    Project      = var.app_name
-    project-name = local.project_name
+    project-name = var.app_name
     ManagedBy    = "terraform"
     Environment  = "production"
   }

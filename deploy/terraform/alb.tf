@@ -106,7 +106,7 @@ resource "aws_lb_listener" "http" {
 
   default_action {
     type = var.domain_name != "" ? "redirect" : "fixed-response"
-    
+
     dynamic "redirect" {
       for_each = var.domain_name != "" ? [1] : []
       content {
@@ -125,6 +125,8 @@ resource "aws_lb_listener" "http" {
       }
     }
   }
+
+  tags = local.tags
 }
 
 # HTTPS listener with host-based routing (only created when domain_name is set)
@@ -145,6 +147,8 @@ resource "aws_lb_listener" "https" {
       status_code  = "404"
     }
   }
+
+  tags = local.tags
 }
 
 # Listener rules for subdomain routing
@@ -163,6 +167,8 @@ resource "aws_lb_listener_rule" "api" {
       values = ["api.${var.domain_name}"]
     }
   }
+
+  tags = local.tags
 }
 
 resource "aws_lb_listener_rule" "odk" {
@@ -180,6 +186,8 @@ resource "aws_lb_listener_rule" "odk" {
       values = ["odk.${var.domain_name}"]
     }
   }
+
+  tags = local.tags
 }
 
 resource "aws_lb_listener_rule" "dashboard" {
@@ -197,6 +205,8 @@ resource "aws_lb_listener_rule" "dashboard" {
       values = [var.domain_name]
     }
   }
+
+  tags = local.tags
 }
 
 # ─── Security groups ─────────────────────────────────────────────────────────
