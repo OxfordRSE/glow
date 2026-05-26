@@ -273,7 +273,7 @@ resource "aws_acm_certificate" "main" {
 # Create the DNS validation records in Route 53 (only if manage_dns=true)
 resource "aws_route53_record" "cert_validation" {
   for_each = var.domain_name != "" && var.manage_dns ? {
-    for dvo in aws_acm_certificate.main[0].domain_validation_options : dvo.resource_record_name => {
+    for dvo in aws_acm_certificate.main[0].domain_validation_options : dvo.domain_name => {
       name   = dvo.resource_record_name
       record = dvo.resource_record_value
       type   = dvo.resource_record_type
