@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# activate-stack.sh — EC2 runtime activation script
+# activate-stack.sh — Runtime activation script
 # 
-# This script runs on the EC2 instance to:
+# This script runs on EC2 or self-hosted VM to:
 #   1. Install Docker and Docker Compose
-#   2. Start the docker-compose stack (Glow + ODK Central)
-#   3. Configure ODK Central admin user
-#   4. Create ODK API integration user with read-only access
-#   5. Store credentials for API container to consume
+#   2. Mount data volume (EC2 only)
+#   3. Set up data directory structure
+#   4. Start the docker-compose stack (Glow + ODK Central)
+#   5. Configure ODK Central admin user
+#   6. Create ODK API integration user with read-only access
+#   7. Store credentials for API container to consume
 #
 # Environment variables expected:
 #   DOMAIN_NAME - root domain (e.g., glow.example.com)
@@ -23,9 +25,10 @@ step()  { echo -e "\n${BLUE}▶${RESET} $*\n"; }
 DOMAIN_NAME="${DOMAIN_NAME:?DOMAIN_NAME environment variable required}"
 WORK_DIR="/opt/glow"
 DEPLOY_DIR="${WORK_DIR}/deploy"
-ADMIN_ENV="${DEPLOY_DIR}/.deploy/.env.admin"
-RUNTIME_ENV="${DEPLOY_DIR}/.deploy/share/.env.runtime"
-FORMS_STATE="${DEPLOY_DIR}/.deploy/share/odk-forms-state.json"
+DATA_DIR="${WORK_DIR}/docker-mount-data"
+ADMIN_ENV="${DATA_DIR}/.deploy/.env.admin"
+RUNTIME_ENV="${DATA_DIR}/.deploy/share/.env.runtime"
+FORMS_STATE="${DATA_DIR}/.deploy/share/odk-forms-state.json"
 SCRIPTS_DIR="${DEPLOY_DIR}/scripts"
 FORMS_DIR="${DEPLOY_DIR}/odk-forms"
 
@@ -34,7 +37,16 @@ cd "${WORK_DIR}"
 # Source ODK API helper functions
 source "${SCRIPTS_DIR}/odk-api-helper.sh"
 
-# ─── Install Docker ──────────────────────────────────────────────────────────
+# ─── Environment Detection ───────────────────────────────────────────────────
+detect_environment() {
+  if curl -s -f -m 1 http://169.254.169.254/latest/meta-data/instance-id &>/dev/null 2>&1; then
+    echo "ec2"
+  else
+    echo "vm"
+  fi
+}
+
+# ─── OS-Aware Docker Installation ────────────────────────────────────────────
 install_docker() {
   if command -v docker &>/dev/null; then
     info "Docker already installed: $(docker --version)"
@@ -42,15 +54,192 @@ install_docker() {
   fi
   
   step "Installing Docker"
-  sudo yum update -y
-  sudo yum install -y docker
-  sudo systemctl enable docker
-  sudo systemctl start docker
-  sudo usermod -aG docker ec2-user
   
-  # Need to use sudo for docker until re-login
+  if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    case "$ID" in
+      amzn|amazonlinux)
+        sudo yum update -y
+        sudo yum install -y docker
+        sudo systemctl enable docker
+        sudo systemctl start docker
+        sudo usermod -aG docker "${USER}"
+        ;;
+      ubuntu|debian)
+        sudo apt-get update
+        sudo apt-get install -y docker.io docker-compose-plugin
+        sudo systemctl enable docker
+        sudo systemctl start docker
+        sudo usermod -aG docker "${USER}"
+        ;;
+      *)
+        error "Unsupported OS: $ID"
+        error "Please install Docker manually: https://docs.docker.com/engine/install/"
+        exit 1
+        ;;
+    esac
+  else
+    error "Cannot detect OS (/etc/os-release not found)"
+    exit 1
+  fi
+  
   info "Docker installed"
 }
+
+# ─── EBS Volume Mounting (EC2 only) ──────────────────────────────────────────
+mount_data_volume() {
+  local env_type
+  env_type=$(detect_environment)
+  
+  if [[ "$env_type" != "ec2" ]]; then
+    info "Not on EC2, skipping EBS volume mount"
+    return
+  fi
+  
+  step "Mounting EBS data volume"
+  
+  # Check if /data is already mounted
+  if mountpoint -q /data 2>/dev/null; then
+    info "/data already mounted"
+    return
+  fi
+  
+  # Wait for device to be available (can take a few seconds)
+  local retries=10
+  while [ ! -e /dev/xvdf ] && [ $retries -gt 0 ]; do
+    info "Waiting for /dev/xvdf to be available..."
+    sleep 2
+    retries=$((retries - 1))
+  done
+  
+  if [ ! -e /dev/xvdf ]; then
+    error "/dev/xvdf not found - EBS volume not attached"
+    exit 1
+  fi
+  
+  # Check if /dev/xvdf has a filesystem
+  if ! sudo file -s /dev/xvdf | grep -q filesystem; then
+    info "Formatting /dev/xvdf as ext4"
+    sudo mkfs.ext4 -F /dev/xvdf
+  else
+    info "Existing filesystem found on /dev/xvdf"
+  fi
+  
+  # Create mount point and mount
+  sudo mkdir -p /data
+  sudo mount /dev/xvdf /data
+  
+  # Add to fstab if not present (for reboots)
+  if ! grep -q "/dev/xvdf" /etc/fstab 2>/dev/null; then
+    echo "/dev/xvdf /data ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
+  fi
+  
+  # Set ownership
+  sudo chown -R "${USER}:${USER}" /data
+  
+  info "EBS volume mounted at /data"
+}
+
+# ─── Data Directory Setup ────────────────────────────────────────────────────
+setup_data_directory() {
+  local env_type
+  env_type=$(detect_environment)
+  
+  step "Setting up data directory"
+  
+  cd "${WORK_DIR}"
+  
+  if [[ "$env_type" == "ec2" ]]; then
+    # On EC2: symlink ./docker-mount-data → /data
+    if [[ -L "docker-mount-data" ]]; then
+      info "docker-mount-data symlink already exists"
+    elif [[ -d "docker-mount-data" ]]; then
+      warn "docker-mount-data is a directory, converting to symlink"
+      sudo rm -rf docker-mount-data
+      ln -s /data docker-mount-data
+    else
+      info "Creating symlink: docker-mount-data → /data"
+      ln -s /data docker-mount-data
+    fi
+  else
+    # On VM: create local directory
+    if [[ ! -d "docker-mount-data" ]]; then
+      info "Creating local data directory: docker-mount-data"
+      mkdir -p docker-mount-data
+    fi
+  fi
+  
+  # Create subdirectories for all services
+  mkdir -p docker-mount-data/{glow-postgres,odk-postgres,odk-transfer,odk-secrets,odk-enketo-redis-main,odk-enketo-redis-cache}
+  
+  # Also create .deploy directories in the data dir
+  mkdir -p docker-mount-data/.deploy/share
+  
+  info "Data directory ready: ${WORK_DIR}/docker-mount-data"
+}
+
+# ─── Version Validation ──────────────────────────────────────────────────────
+validate_deployment_version() {
+  local version_file="${WORK_DIR}/docker-mount-data/.glow-deployment-version"
+  local current_version
+  
+  # Get current version from git
+  cd "${WORK_DIR}"
+  current_version=$(git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)")
+  
+  info "Current deployment version: ${current_version}"
+  
+  if [[ ! -f "$version_file" ]]; then
+    info "No previous deployment found (initial deployment)"
+    echo "[PROGRESS] Initial deployment of ${current_version}"
+    return 0
+  fi
+  
+  local previous_version
+  previous_version=$(cat "$version_file")
+  
+  info "Previous deployment version: ${previous_version}"
+  echo "[PROGRESS] Upgrading from ${previous_version} to ${current_version}"
+  
+  # Extract major versions (handle v1.2.3 or 1.2.3 format)
+  local prev_major
+  local curr_major
+  prev_major=$(echo "$previous_version" | sed -E 's/^v?([0-9]+)\..*/\1/' | grep -E '^[0-9]+$' || echo "0")
+  curr_major=$(echo "$current_version" | sed -E 's/^v?([0-9]+)\..*/\1/' | grep -E '^[0-9]+$' || echo "0")
+  
+  if [[ "$curr_major" -gt "$prev_major" ]] && [[ "$prev_major" != "0" ]]; then
+    echo "[ERROR] Major version upgrade detected: ${previous_version} → ${current_version}"
+    error "Major version upgrades require manual migration steps."
+    error "Please consult the upgrade guide before proceeding."
+    error ""
+    error "Upgrade guide: https://github.com/oxrse/glow/blob/main/UPGRADING.md"
+    error ""
+    error "To force upgrade (NOT RECOMMENDED), remove: ${version_file}"
+    exit 1
+  fi
+  
+  if [[ "$curr_major" -lt "$prev_major" ]] && [[ "$curr_major" != "0" ]]; then
+    warn "Downgrading major version: ${previous_version} → ${current_version}"
+    warn "This may cause data compatibility issues!"
+  fi
+  
+  info "Version upgrade path validated"
+}
+
+# ─── Write Deployment Version ────────────────────────────────────────────────
+write_deployment_version() {
+  local version_file="${WORK_DIR}/docker-mount-data/.glow-deployment-version"
+  local current_version
+  
+  cd "${WORK_DIR}"
+  current_version=$(git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)")
+  
+  echo "$current_version" > "$version_file"
+  info "Deployment version written: ${current_version}"
+}
+
+# ─── Install Docker ──────────────────────────────────────────────────────────
+# (Function defined above in OS-Aware Docker Installation section)
 
 # ─── Install Docker Compose ──────────────────────────────────────────────────
 install_compose() {
@@ -448,7 +637,12 @@ verify_stack() {
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 main() {
-  info "Starting EC2 stack activation for domain: ${DOMAIN_NAME}"
+  info "Starting stack activation for domain: ${DOMAIN_NAME}"
+  
+  # Environment setup
+  mount_data_volume         # EC2 only: mount /dev/xvdf to /data
+  setup_data_directory      # Create docker-mount-data (symlink or dir)
+  validate_deployment_version  # Check for major version upgrades
   
   install_docker
   install_compose
@@ -467,7 +661,10 @@ main() {
   restart_api
   verify_stack
   
-  step "Stack activation complete!"
+  # Write version marker on success
+  write_deployment_version
+  
+  echo "[SUCCESS] Stack activation complete!"
   echo ""
   info "Services are running with docker-compose"
   info "View logs: cd ${WORK_DIR} && sudo docker compose logs -f"

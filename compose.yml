@@ -49,7 +49,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-glow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
     volumes:
-      - glow_postgres_data:/var/lib/postgresql/data
+      - ./docker-mount-data/glow-postgres:/var/lib/postgresql/data
     networks:
       - api_db
     restart: unless-stopped
@@ -98,7 +98,7 @@ services:
       POSTGRES_USER: ${ODK_POSTGRES_USER:-odk}
       POSTGRES_PASSWORD: ${ODK_POSTGRES_PASSWORD:-odk}
     volumes:
-      - odk_postgres_data:/var/lib/postgresql/data
+      - ./docker-mount-data/odk-postgres:/var/lib/postgresql/data
     networks:
       - odk_internal
     restart: unless-stopped
@@ -138,7 +138,7 @@ services:
         fi
         exec tail -f /dev/null
     volumes:
-      - odk_secrets:/etc/secrets
+      - ./docker-mount-data/odk-secrets:/etc/secrets
     healthcheck:
       test:
         - CMD
@@ -177,7 +177,7 @@ services:
       HTTPS_PORT: ${ODK_HTTPS_PORT:-8443}
       SUPPORT_EMAIL: ${ODK_SYSADMIN_EMAIL:-admin@example.com}
     volumes:
-      - odk_secrets:/etc/secrets
+      - ./docker-mount-data/odk-secrets:/etc/secrets
     networks:
       - odk_internal
     restart: unless-stopped
@@ -188,7 +188,7 @@ services:
       - odk
     volumes:
       - ./odk-central/redis/redis-enketo-main.conf:/usr/local/etc/redis/redis.conf:ro
-      - odk_enketo_redis_main:/data
+      - ./docker-mount-data/odk-enketo-redis-main:/data
     command:
       - redis-server
       - /usr/local/etc/redis/redis.conf
@@ -202,7 +202,7 @@ services:
       - odk
     volumes:
       - ./odk-central/redis/redis-enketo-cache.conf:/usr/local/etc/redis/redis.conf:ro
-      - odk_enketo_redis_cache:/data
+      - ./docker-mount-data/odk-enketo-redis-cache:/data
     command:
       - redis-server
       - /usr/local/etc/redis/redis.conf
@@ -256,8 +256,8 @@ services:
       S3_BUCKET_NAME: ${ODK_S3_BUCKET_NAME:-}
       SESSION_LIFETIME: ${ODK_SESSION_LIFETIME:-86400}
     volumes:
-      - odk_secrets:/etc/secrets
-      - odk_transfer:/data/transfer
+      - ./docker-mount-data/odk-secrets:/etc/secrets
+      - ./docker-mount-data/odk-transfer:/data/transfer
     networks:
       - odk_internal
       - odk_api
@@ -309,11 +309,3 @@ networks:
     internal: true
   odk_internal:
     internal: true
-
-volumes:
-  glow_postgres_data:
-  odk_postgres_data:
-  odk_transfer:
-  odk_secrets:
-  odk_enketo_redis_main:
-  odk_enketo_redis_cache:

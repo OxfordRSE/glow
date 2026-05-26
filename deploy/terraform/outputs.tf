@@ -3,7 +3,7 @@ output "alb_dns_name" {
   value       = aws_lb.main.dns_name
 }
 
-output "ec2_instance_id" {
+output "instance_id" {
   description = "EC2 instance ID"
   value       = aws_instance.main.id
 }
@@ -13,9 +13,9 @@ output "ec2_public_ip" {
   value       = aws_instance.main.public_ip
 }
 
-output "ssh_key_name" {
-  description = "SSH key pair name"
-  value       = var.ssh_key_name
+output "git_ref" {
+  description = "Git reference being deployed"
+  value       = var.git_ref
 }
 
 output "domain_name" {
@@ -43,14 +43,35 @@ output "odk_url" {
   value       = "https://odk.${var.domain_name}"
 }
 
-output "ssh_command" {
-  description = "SSH command to connect to EC2 instance"
-  value       = "ssh -i ~/.ssh/${var.ssh_key_name}.pem ec2-user@${aws_instance.main.public_ip}"
+output "ssm_session_command" {
+  description = "Command to start SSM session for debugging"
+  value       = "aws ssm start-session --target ${aws_instance.main.id} --region ${var.aws_region}"
+}
+
+output "instance_connect_command" {
+  description = "Command to connect via EC2 Instance Connect"
+  value       = "aws ec2-instance-connect ssh --instance-id ${aws_instance.main.id} --region ${var.aws_region}"
+}
+
+output "cloudwatch_logs_command" {
+  description = "Command to view activation logs"
+  value       = "aws logs tail /aws/ec2/cloud-init --follow --region ${var.aws_region}"
+}
+
+output "deployment_version_command" {
+  description = "Command to check deployed version"
+  value       = <<-EOT
+    aws ssm send-command \
+      --instance-ids ${aws_instance.main.id} \
+      --document-name "AWS-RunShellScript" \
+      --parameters 'commands=["cat /opt/glow/docker-mount-data/.glow-deployment-version 2>/dev/null || echo none"]' \
+      --region ${var.aws_region}
+  EOT
 }
 
 output "credentials_location" {
   description = "Location of runtime credentials on EC2 instance"
-  value       = "/opt/glow/deploy/.deploy/share/.env.runtime"
+  value       = "/opt/glow/docker-mount-data/.deploy/.env.admin"
 }
 
 # ─── DNS Setup Instructions ──────────────────────────────────────────────────

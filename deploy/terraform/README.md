@@ -16,8 +16,7 @@ Single-command deployment of Glow (API + Dashboard + ODK Central) on AWS.
 
 1. **AWS CLI** installed and configured (`aws configure`)
 2. **Terraform** >= 1.5.0
-3. **SSH key pair** created in AWS EC2
-4. **Route 53 hosted zone** for your domain
+3. **Route 53 hosted zone** for your domain (if using manage_dns=true)
 
 ## Quick Start
 
@@ -36,28 +35,28 @@ domain_name = "glow.example.ac.uk"
 instance_type       = "t3.medium"
 data_volume_size_gb = 100
 
-# SSH access (key must exist in AWS)
-ssh_key_name            = "my-key-pair"
-ssh_allowed_cidr_blocks = ["0.0.0.0/0"]  # Restrict to your IP in production
+# Deployment configuration
+# git_ref = "v1.2.3"  # Specific version (leave empty for latest release)
 ```
 
 ### 2. Deploy
 
 ```bash
-./terraform/deploy.sh
+./deploy/deploy.sh
 ```
 
 This will:
 1. Create S3 bucket for Terraform state (if needed)
 2. Run `terraform init` and `terraform apply`
-3. Upload compose files to EC2 via SSH
-4. Run activation script that:
+3. EC2 user data automatically:
+   - Clones the repository from GitHub
    - Installs Docker and Docker Compose
+   - Mounts persistent EBS volume
    - Generates runtime secrets
    - Starts the full stack (Glow + ODK Central)
-   - Creates ODK admin user (`noreply@<domain>`)
+   - Creates ODK admin user
    - Creates ODK API integration user
-   - Stores all credentials in `/opt/glow/.env.runtime`
+4. Monitor progress via CloudWatch logs
 
 ### 3. Access Your Services
 
@@ -69,42 +68,50 @@ After deployment completes:
 
 ### 4. Retrieve Credentials
 
-ODK Central admin credentials are stored on the EC2 instance:
+ODK Central admin credentials are stored on the EC2 instance.
 
+**Via SSM Session Manager (recommended):**
 ```bash
-ssh -i ~/.ssh/my-key-pair.pem ec2-user@<instance-ip> 'cat /opt/glow/.env.runtime'
+aws ssm start-session --target <instance-id>
+cat /opt/glow/docker-mount-data/.deploy/.env.admin
 ```
 
-Or use the SSH command from terraform outputs:
-
+**Or get from terraform output:**
 ```bash
-terraform -chdir=terraform output -raw ssh_command | bash -c "$(cat) 'cat /opt/glow/.env.runtime'"
+terraform -chdir=deploy/terraform output -raw ssm_session_command
 ```
 
 ## File Structure
 
 ```
-terraform/
-├── deploy.sh          # Main deployment script
-├── main.tf            # Terraform backend config
-├── variables.tf       # Input variables
-├── outputs.tf         # Output values
-├── ec2.tf             # EC2 instance, IAM, EBS
-├── alb.tf             # Load balancer, listeners, routing
-└── terraform.tfvars   # Your configuration (create this)
-
-scripts/
-└── activate-stack.sh  # EC2 runtime activation
+deploy/
+├── deploy.sh                    # Main deployment script
+├── terraform/
+│   ├── main.tf                  # Terraform backend config
+│   ├── variables.tf             # Input variables
+│   ├── outputs.tf               # Output values
+│   ├── ec2.tf                   # EC2 instance, IAM, EBS
+│   ├── alb.tf                   # Load balancer, listeners, routing
+│   ├── cloudwatch.tf            # CloudWatch log groups
+│   ├── user-data.sh             # EC2 bootstrap script
+│   └── terraform.tfvars         # Your configuration (create this)
+└── scripts/
+    ├── activate-stack.sh        # Runtime activation
+    └── update-stack.sh          # Update existing deployment
 ```
 
 ## Management
 
 ### View Logs
 
-SSH to instance and use docker compose:
-
+**CloudWatch logs (activation/updates):**
 ```bash
-ssh -i ~/.ssh/my-key-pair.pem ec2-user@<instance-ip>
+aws logs tail /aws/ec2/cloud-init --follow
+```
+
+**Application logs via SSM:**
+```bash
+aws ssm start-session --target <instance-id>
 cd /opt/glow
 sudo docker compose logs -f
 ```
@@ -112,21 +119,25 @@ sudo docker compose logs -f
 ### Restart Services
 
 ```bash
-sudo docker compose --env-file .env.runtime restart
+aws ssm start-session --target <instance-id>
+cd /opt/glow
+sudo docker compose --profile odk restart
 ```
 
-### Update Infrastructure
+### Update Deployment
 
-Edit `terraform.tfvars` and re-run:
+Edit `terraform.tfvars` (e.g., change `git_ref` to new version) and re-run:
 
 ```bash
-./terraform/deploy.sh
+./deploy/deploy.sh
 ```
+
+The script will detect the existing deployment and trigger an update.
 
 ### Destroy Everything
 
 ```bash
-cd terraform
+cd deploy/terraform
 terraform destroy
 ```
 
@@ -134,19 +145,30 @@ terraform destroy
 
 ## Troubleshooting
 
-### SSH connection fails
+### Cannot access instance
 
-- Check security group allows your IP
-- Verify key name matches in terraform.tfvars
-- Ensure `.pem` file has correct permissions: `chmod 400 ~/.ssh/key.pem`
+**SSM Session Manager not working:**
+- Ensure instance has SSM agent running (pre-installed on Amazon Linux 2023)
+- Check IAM role has SSM permissions (should be automatic)
+- Install session manager plugin: `aws ssm start-session` will show instructions
+
+**EC2 Instance Connect:**
+```bash
+aws ec2-instance-connect ssh --instance-id <instance-id>
+```
 
 ### Services not starting
 
-SSH to instance and check:
-
+Check activation logs:
 ```bash
-sudo docker compose --env-file /opt/glow/.env.runtime ps
-sudo docker compose --env-file /opt/glow/.env.runtime logs
+aws logs tail /aws/ec2/cloud-init --follow
+```
+
+Or connect to instance and check:
+```bash
+aws ssm start-session --target <instance-id>
+sudo docker compose ps
+sudo docker compose logs
 ```
 
 ### Certificate validation slow
@@ -156,6 +178,15 @@ ACM DNS validation can take 10-30 minutes. This is normal.
 ### ALB health checks failing
 
 Check target groups in AWS console. Services must be healthy on EC2 first.
+
+### Deployment version conflicts
+
+If you see a major version upgrade error, check:
+```bash
+cat /opt/glow/docker-mount-data/.glow-deployment-version
+```
+
+Consult the upgrade guide: `UPGRADING.md`
 
 ## Cost Estimate
 
@@ -172,7 +203,7 @@ Approximate monthly costs (eu-west-2):
 - All secrets are generated at runtime and stored on EC2 only
 - TLS certificates auto-renew via ACM
 - EBS volumes are encrypted at rest
-- Restrict SSH access via `ssh_allowed_cidr_blocks`
+- Instance access via SSM Session Manager (no SSH port exposed)
 - Review security groups before production use
 
 ## Support

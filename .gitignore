@@ -231,6 +231,9 @@ deploy/.deploy/share/*
 # Docker
 .docker/
 
+# Docker persistent data (bind mounts)
+docker-mount-data/
+
 # Deploy lockfile (generated at deploy time)
 .deploy-lock.json
 

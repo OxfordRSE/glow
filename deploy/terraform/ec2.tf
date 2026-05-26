@@ -40,7 +40,7 @@ resource "aws_iam_instance_profile" "ec2_instance" {
   role = aws_iam_role.ec2_instance.name
 }
 
-# Basic CloudWatch logs permission
+# IAM permissions for CloudWatch Logs and SSM
 resource "aws_iam_role_policy" "ec2_instance" {
   name = "${var.app_name}-ec2-policy"
   role = aws_iam_role.ec2_instance.id
@@ -55,6 +55,29 @@ resource "aws_iam_role_policy" "ec2_instance" {
           "logs:CreateLogStream",
           "logs:PutLogEvents",
           "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:UpdateInstanceInformation",
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2messages:AcknowledgeMessage",
+          "ec2messages:DeleteMessage",
+          "ec2messages:FailMessage",
+          "ec2messages:GetEndpoint",
+          "ec2messages:GetMessages",
+          "ec2messages:SendReply"
         ]
         Resource = "*"
       }
@@ -95,15 +118,6 @@ resource "aws_security_group" "ec2" {
     security_groups = [aws_security_group.alb.id]
   }
 
-  # SSH access (always enabled for deployment)
-  ingress {
-    description = "SSH access"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = var.ssh_allowed_cidr_blocks
-  }
-
   # Allow all outbound traffic
   egress {
     from_port   = 0
@@ -134,7 +148,18 @@ resource "aws_instance" "main" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_instance.name
   vpc_security_group_ids = [aws_security_group.ec2.id]
   availability_zone      = var.availability_zone
-  key_name               = var.ssh_key_name
+
+  user_data = templatefile("${path.module}/user-data.sh", {
+    domain_name  = var.domain_name
+    git_repo_url = var.git_repo_url
+    git_ref      = var.git_ref
+  })
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required" # Enforce IMDSv2
+    http_put_response_hop_limit = 1
+  }
 
   root_block_device {
     volume_type = "gp3"

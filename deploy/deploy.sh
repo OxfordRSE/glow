@@ -5,13 +5,12 @@
 # Prerequisites:
 #   - aws CLI configured
 #   - terraform installed
-#   - SSH key pair created in AWS (specified in terraform.tfvars)
 #
 # This script:
-#   1. Creates S3 bucket for Terraform state (if needed)
-#   2. Runs terraform init + apply
-#   3. Uploads compose files and activation script to EC2
-#   4. Runs remote activation to start stack + configure ODK integration
+#   1. Runs terraform init + apply
+#   2. Detects deployment state (initial vs update)
+#   3. Monitors activation via CloudWatch logs
+#   4. Handles failures with destroy/recreate option
 
 set -euo pipefail
 
@@ -31,7 +30,7 @@ step()  { echo -e "\n${BLUE}▶${RESET} $*\n"; }
 # ─── Check tools ─────────────────────────────────────────────────────────────
 check_tools() {
   local missing=()
-  for tool in aws terraform ssh scp; do
+  for tool in aws terraform; do
     if ! command -v "$tool" &>/dev/null; then
       missing+=("$tool")
     fi
@@ -115,54 +114,216 @@ run_terraform() {
   terraform -chdir="${TERRAFORM_DIR}" apply -auto-approve
 }
 
-# ─── Upload and activate on EC2 ──────────────────────────────────────────────
-activate_ec2_stack() {
-  local ssh_key="$1"
-  local ec2_ip="$2"
-  local domain="$3"
+# ─── Detect deployment state ─────────────────────────────────────────────────
+get_deployment_state() {
+  local instance_id="$1"
   
-  step "Uploading compose files and activation script to EC2"
+  info "Detecting deployment state..."
   
-  # Wait for EC2 SSH to be ready
-  info "Waiting for SSH to be ready on ${ec2_ip}..."
-  local retries=30
-  while ! ssh -i "${ssh_key}" -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
-    ec2-user@"${ec2_ip}" "echo ok" &>/dev/null; do
+  # Check if instance is newly created (< 5 minutes old)
+  local launch_time
+  launch_time=$(aws ec2 describe-instances \
+    --instance-ids "${instance_id}" \
+    --query 'Reservations[0].Instances[0].LaunchTime' \
+    --output text \
+    --region "${AWS_REGION}")
+  
+  local now
+  now=$(date -u +%s)
+  local launch_epoch
+  # Handle both GNU date and macOS date
+  launch_epoch=$(date -d "${launch_time}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$(echo ${launch_time} | cut -d. -f1)" +%s 2>/dev/null || echo "0")
+  local age_seconds=$((now - launch_epoch))
+  
+  if [[ $age_seconds -lt 300 ]]; then
+    info "Instance is new (${age_seconds}s old) - initial deployment"
+    echo "initial"
+    return
+  fi
+  
+  # Check version marker file via SSM
+  info "Checking for existing deployment version..."
+  local cmd_id
+  cmd_id=$(aws ssm send-command \
+    --instance-ids "${instance_id}" \
+    --document-name "AWS-RunShellScript" \
+    --parameters 'commands=["cat /opt/glow/docker-mount-data/.glow-deployment-version 2>/dev/null || echo NONE"]' \
+    --query 'Command.CommandId' \
+    --output text \
+    --region "${AWS_REGION}" 2>/dev/null || echo "")
+  
+  if [[ -z "$cmd_id" ]]; then
+    warn "Could not query instance (SSM not ready yet?)"
+    echo "initial"
+    return
+  fi
+  
+  # Wait for command to complete
+  sleep 5
+  
+  local version
+  version=$(aws ssm get-command-invocation \
+    --command-id "${cmd_id}" \
+    --instance-id "${instance_id}" \
+    --query 'StandardOutputContent' \
+    --output text \
+    --region "${AWS_REGION}" 2>/dev/null | tr -d '\n' || echo "NONE")
+  
+  if [[ "$version" == "NONE" ]] || [[ -z "$version" ]]; then
+    warn "No deployment version found - treating as initial deployment"
+    echo "initial"
+  else
+    info "Existing deployment found: ${version}"
+    echo "update"
+  fi
+}
+
+# ─── Stream CloudWatch logs ──────────────────────────────────────────────────
+stream_activation_logs() {
+  local log_group="/aws/ec2/cloud-init"
+  
+  step "Monitoring activation via CloudWatch logs"
+  info "Log group: ${log_group}"
+  
+  # Wait for log stream to appear (up to 2 minutes)
+  local retries=24
+  info "Waiting for logs to appear..."
+  while ! aws logs describe-log-streams \
+    --log-group-name "${log_group}" \
+    --max-items 1 \
+    --region "${AWS_REGION}" &>/dev/null; do
     retries=$((retries - 1))
     if [[ $retries -eq 0 ]]; then
-      error "SSH connection timed out"
-      exit 1
+      warn "CloudWatch logs not available yet"
+      warn "User data may still be running in background"
+      return 1
     fi
-    sleep 10
+    sleep 5
   done
-  info "SSH ready"
   
-  # Create remote directories
-  ssh -i "${ssh_key}" -o StrictHostKeyChecking=no ec2-user@"${ec2_ip}" \
-    "sudo mkdir -p /opt/glow/deploy/scripts && sudo chown -R ec2-user:ec2-user /opt/glow"
+  info "Streaming logs (press Ctrl+C to stop monitoring, deployment continues in background)..."
+  echo ""
   
-  # Upload compose files
-  scp -i "${ssh_key}" -o StrictHostKeyChecking=no \
-    "${REPO_ROOT}/compose.yml" \
-    "${REPO_ROOT}/compose.override.yml" \
-    "${REPO_ROOT}/.env.example" \
-    ec2-user@"${ec2_ip}":/opt/glow/
+  # Tail logs and look for markers
+  # Note: This will run until timeout or user interrupts
+  timeout 600 aws logs tail "${log_group}" \
+    --follow \
+    --format short \
+    --region "${AWS_REGION}" 2>/dev/null | while read -r line; do
+    echo "$line"
+    
+    if echo "$line" | grep -q "\[SUCCESS\]"; then
+      info "Deployment successful!"
+      return 0
+    fi
+    
+    if echo "$line" | grep -q "\[ERROR\]"; then
+      error "Deployment failed!"
+      return 1
+    fi
+  done
   
-  # Upload ODK Central configs
-  scp -i "${ssh_key}" -o StrictHostKeyChecking=no -r \
-    "${REPO_ROOT}/odk-central" \
-    ec2-user@"${ec2_ip}":/opt/glow/
+  local tail_exit=$?
   
-  # Upload activation script
-  scp -i "${ssh_key}" -o StrictHostKeyChecking=no \
-    "${SCRIPT_DIR}/scripts/activate-stack.sh" \
-    ec2-user@"${ec2_ip}":/opt/glow/deploy/scripts/
+  if [[ $tail_exit -eq 124 ]]; then
+    error "Deployment timed out after 10 minutes"
+    return 1
+  fi
   
-  step "Running activation script on EC2"
-  ssh -i "${ssh_key}" -o StrictHostKeyChecking=no ec2-user@"${ec2_ip}" \
-    "cd /opt/glow && DOMAIN_NAME=${domain} bash deploy/scripts/activate-stack.sh"
+  return 0
+}
+
+# ─── Trigger update via SSM ──────────────────────────────────────────────────
+trigger_update() {
+  local instance_id="$1"
+  local git_ref="${2:-}"
   
-  info "Stack activation complete"
+  step "Triggering stack update via SSM"
+  
+  local commands="cd /opt/glow && "
+  if [[ -n "$git_ref" ]]; then
+    commands+="GIT_REF='${git_ref}' "
+  fi
+  commands+="bash deploy/scripts/update-stack.sh"
+  
+  info "Running: ${commands}"
+  
+  local cmd_id
+  cmd_id=$(aws ssm send-command \
+    --instance-ids "${instance_id}" \
+    --document-name "AWS-RunShellScript" \
+    --parameters "commands=[\"${commands}\"]" \
+    --query 'Command.CommandId' \
+    --output text \
+    --region "${AWS_REGION}")
+  
+  info "SSM Command ID: ${cmd_id}"
+  info "Monitoring output..."
+  
+  # Poll for command completion
+  local status="InProgress"
+  while [[ "$status" == "InProgress" ]] || [[ "$status" == "Pending" ]]; do
+    sleep 5
+    status=$(aws ssm get-command-invocation \
+      --command-id "${cmd_id}" \
+      --instance-id "${instance_id}" \
+      --query 'Status' \
+      --output text \
+      --region "${AWS_REGION}" 2>/dev/null || echo "Pending")
+    echo -n "."
+  done
+  echo ""
+  
+  # Show output
+  aws ssm get-command-invocation \
+    --command-id "${cmd_id}" \
+    --instance-id "${instance_id}" \
+    --query 'StandardOutputContent' \
+    --output text \
+    --region "${AWS_REGION}"
+  
+  if [[ "$status" == "Success" ]]; then
+    info "Update completed successfully"
+    return 0
+  else
+    error "Update failed with status: ${status}"
+    aws ssm get-command-invocation \
+      --command-id "${cmd_id}" \
+      --instance-id "${instance_id}" \
+      --query 'StandardErrorContent' \
+      --output text \
+      --region "${AWS_REGION}"
+    return 1
+  fi
+}
+
+# ─── Handle deployment failure ───────────────────────────────────────────────
+handle_failure() {
+  local instance_id="$1"
+  
+  error "Deployment failed or timed out"
+  echo ""
+  warn "You can:"
+  warn "  1. Check logs: aws logs tail /aws/ec2/cloud-init --follow --region ${AWS_REGION}"
+  warn "  2. Debug via SSM: aws ssm start-session --target ${instance_id} --region ${AWS_REGION}"
+  warn "  3. Destroy and retry"
+  echo ""
+  
+  read -p "Destroy infrastructure and start over? [y/N] " -r
+  echo ""
+  
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    step "Destroying infrastructure"
+    terraform -chdir="${TERRAFORM_DIR}" destroy -auto-approve
+    echo ""
+    info "Infrastructure destroyed"
+    info "Run ./deploy/deploy.sh again to retry deployment"
+    exit 1
+  else
+    info "Leaving resources in place for debugging"
+    info "SSM access: aws ssm start-session --target ${instance_id} --region ${AWS_REGION}"
+    exit 1
+  fi
 }
 
 # ─── Main ────────────────────────────────────────────────────────────────────
@@ -181,29 +342,34 @@ main() {
   # Run Terraform
   run_terraform "${tfstate_bucket}"
   
-  # Extract outputs
-  local ec2_ip
-  ec2_ip="$(terraform -chdir="${TERRAFORM_DIR}" output -raw ec2_public_ip)"
-  
-  local ssh_key_name
-  ssh_key_name="$(terraform -chdir="${TERRAFORM_DIR}" output -raw ssh_key_name)"
+  # Get outputs
+  local instance_id
+  instance_id="$(terraform -chdir="${TERRAFORM_DIR}" output -raw instance_id)"
   
   local domain_name
   domain_name="$(terraform -chdir="${TERRAFORM_DIR}" output -raw domain_name)"
   
-  # Construct SSH key path (assumes default location)
-  local ssh_key="${HOME}/.ssh/${ssh_key_name}.pem"
-  if [[ ! -f "${ssh_key}" ]]; then
-    ssh_key="${HOME}/.ssh/${ssh_key_name}"
-    if [[ ! -f "${ssh_key}" ]]; then
-      error "SSH key not found: ${ssh_key_name}"
-      error "Expected at: ${HOME}/.ssh/${ssh_key_name}.pem or ${HOME}/.ssh/${ssh_key_name}"
-      exit 1
-    fi
-  fi
+  local git_ref
+  git_ref="$(terraform -chdir="${TERRAFORM_DIR}" output -raw git_ref 2>/dev/null || echo "")"
   
-  # Upload and activate
-  activate_ec2_stack "${ssh_key}" "${ec2_ip}" "${domain_name}"
+  # Detect deployment state
+  local state
+  state=$(get_deployment_state "${instance_id}")
+  
+  case "$state" in
+    initial)
+      info "Initial deployment - user_data will run automatically"
+      stream_activation_logs || handle_failure "${instance_id}"
+      ;;
+    update)
+      info "Existing deployment detected - triggering update"
+      trigger_update "${instance_id}" "${git_ref}" || handle_failure "${instance_id}"
+      ;;
+    *)
+      error "Unknown deployment state: ${state}"
+      exit 1
+      ;;
+  esac
   
   step "Deployment complete!"
   echo ""
@@ -211,10 +377,11 @@ main() {
   info "API:         https://api.${domain_name}"
   info "ODK Central: https://odk.${domain_name}"
   echo ""
-  info "SSH access:  ssh -i ${ssh_key} ec2-user@${ec2_ip}"
+  info "SSM access:  aws ssm start-session --target ${instance_id} --region ${AWS_REGION}"
+  info "View logs:   aws logs tail /aws/ec2/cloud-init --follow --region ${AWS_REGION}"
   echo ""
   
-  # Show DNS setup instructions if DNS is not managed by Route 53
+  # Show DNS setup instructions if needed
   local dns_managed
   dns_managed="$(terraform -chdir="${TERRAFORM_DIR}" output -raw dns_managed 2>/dev/null || echo "true")"
   
@@ -226,22 +393,12 @@ main() {
     warn "IMPORTANT: Your services will NOT be accessible until DNS records are created!"
     warn "Copy the instructions above and send them to your domain administrator."
     echo ""
-    
-    # Show certificate validation command
-    local cert_status_cmd
-    cert_status_cmd="$(terraform -chdir="${TERRAFORM_DIR}" output -raw acm_validation_status_command 2>/dev/null || echo "")"
-    if [[ -n "${cert_status_cmd}" ]]; then
-      info "Check certificate validation status with:"
-      echo "  ${cert_status_cmd}"
-      echo ""
-    fi
-  else
-    info "DNS records created in Route 53"
-    info "Certificate validation may take 10-30 minutes"
-    echo ""
   fi
-  warn "ODK Central admin credentials are in /opt/glow/.env.runtime on the EC2 instance"
-  warn "Retrieve with: ssh -i ${ssh_key} ec2-user@${ec2_ip} 'cat /opt/glow/.env.runtime'"
+  
+  warn "ODK Central admin credentials are stored on the instance at:"
+  warn "  /opt/glow/docker-mount-data/.deploy/.env.admin"
+  echo ""
+  info "Retrieve with: aws ssm start-session --target ${instance_id} --region ${AWS_REGION}"
 }
 
 main "$@"

@@ -113,3 +113,189 @@ Always ensure that the development environment exposes the backend and frontend 
 
 Front/backend containers are restarted frequently during development.
 Restarting either should not restart the other.
+
+## Deployment
+
+### AWS Deployment (Recommended)
+
+For production deployments on AWS, see `deploy/terraform/README.md`.
+
+The AWS deployment provides:
+- Automated infrastructure provisioning
+- Automatic HTTPS certificates via AWS Certificate Manager
+- Load balancing and health checks
+- Persistent data storage on EBS volumes
+- Automated backups and monitoring
+
+Quick start:
+```bash
+cd deploy
+./deploy.sh
+```
+
+### Self-Hosted Deployment (Manual)
+
+For deploying to your own VM/server (not AWS):
+
+#### Prerequisites
+- Ubuntu 22.04+ or Debian 11+ server
+- Root or sudo access
+- Domain name pointing to your server
+- Ports 80/443 open for web traffic
+
+#### Deployment Steps
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/oxrse/glow.git
+cd glow
+git checkout v1.2.3  # Use latest release tag
+```
+
+2. **Run activation script:**
+```bash
+DOMAIN_NAME=glow.example.com bash deploy/scripts/activate-stack.sh
+```
+
+The script will:
+- Detect your OS and install Docker
+- Create `./docker-mount-data/` directory for persistent data
+- Generate secure secrets
+- Start all services (API, Dashboard, ODK Central)
+- Configure ODK Central with admin user
+
+3. **Access services:**
+- Dashboard: `http://glow.example.com` 
+- API: `http://glow.example.com:8000`
+- ODK Central: `http://glow.example.com:8080`
+
+4. **Set up reverse proxy for HTTPS:**
+
+You'll need to configure a reverse proxy (nginx, Apache, Caddy, etc.) to:
+- Terminate HTTPS with your SSL certificate
+- Forward requests to the appropriate ports
+
+Example nginx configuration:
+```nginx
+server {
+    listen 80;
+    server_name glow.example.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name glow.example.com;
+    
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+    
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name api.glow.example.com;
+    
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+    
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name odk.glow.example.com;
+    
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+    
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+#### Data Persistence
+
+All persistent data is stored in `./docker-mount-data/`:
+- `glow-postgres/` - Glow API database
+- `odk-postgres/` - ODK Central database
+- `odk-secrets/` - ODK encryption keys
+- `.deploy/.env.admin` - Admin credentials
+- Other service data
+
+**Backup this directory regularly!**
+
+Recommended backup strategy:
+```bash
+# Stop services
+cd /path/to/glow
+sudo docker compose --profile odk stop
+
+# Backup data
+sudo tar czf glow-backup-$(date +%Y%m%d).tar.gz docker-mount-data/
+
+# Restart services
+sudo docker compose --profile odk start
+```
+
+#### Updates
+
+To update to a new version:
+
+```bash
+cd /path/to/glow
+git fetch --tags
+git checkout v1.3.0  # New version
+bash deploy/scripts/update-stack.sh
+```
+
+The update script will:
+- Validate the version upgrade path (blocks major version jumps)
+- Rebuild containers with new code
+- Restart services
+- Preserve all data in `docker-mount-data/`
+
+#### Retrieving Credentials
+
+Admin credentials are stored in:
+```bash
+cat ./docker-mount-data/.deploy/.env.admin
+```
+
+This file contains:
+- ODK Central admin email
+- ODK Central admin password
+
+#### Troubleshooting
+
+**Services not starting:**
+```bash
+sudo docker compose ps
+sudo docker compose logs
+```
+
+**Check versions:**
+```bash
+cat docker-mount-data/.glow-deployment-version
+```
+
+**Major version upgrade blocked:**
+If you see an error about major version upgrades, consult `UPGRADING.md` for migration instructions.
+
+**Data location:**
+If you want data on a separate partition, you can:
+1. Mount your partition at `/data`
+2. Create symlink: `ln -s /data ./docker-mount-data`
+3. Run activation script as normal

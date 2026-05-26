@@ -30,15 +30,27 @@ variable "data_volume_size_gb" {
   default     = 100
 }
 
-variable "ssh_key_name" {
-  description = "Name of the SSH key pair for EC2 access (must already exist in AWS)"
+variable "git_repo_url" {
+  description = "Git repository URL to clone for deployment"
   type        = string
+  default     = "https://github.com/oxrse/glow.git"
 }
 
-variable "ssh_allowed_cidr_blocks" {
-  description = "CIDR blocks allowed to SSH to the EC2 instance"
-  type        = list(string)
-  default     = ["0.0.0.0/0"]
+variable "git_ref" {
+  description = <<-EOT
+    Git reference to deploy (tag, branch, or commit SHA).
+    
+    Examples:
+      - "v1.2.3"         # Specific release tag (recommended)
+      - "main"           # Main branch (for testing only)
+      - "feature/new-ui" # Feature branch (for testing only)
+      - ""               # Empty = latest release tag (default)
+    
+    WARNING: Deploying from branches bypasses release processes.
+    Production deployments should always use release tags.
+  EOT
+  type        = string
+  default     = ""
 }
 
 # ─── Domain Configuration ─────────────────────────────────────────────────────

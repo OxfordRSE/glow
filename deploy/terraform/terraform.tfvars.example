@@ -22,7 +22,7 @@ domain_name = "glow.example.ac.uk"
 manage_dns  = true  # Auto-create DNS records in Route 53 (default)
 
 # Example 2: Delegated subdomain (parent organization owns glow-project.org)
-# domain_name = "eu.glow-project.org"
+# domain_name = "eg.glow-project.org"
 # manage_dns  = false  # Don't create Route 53 records; deployment will output DNS instructions
 
 # ─── EC2 Configuration ────────────────────────────────────────────────────────
