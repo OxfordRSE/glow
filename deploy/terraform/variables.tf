@@ -10,6 +10,24 @@ variable "app_name" {
   default     = "glow-core"
 }
 
+variable "tfstate_bucket_name" {
+  description = <<-EOT
+    S3 bucket name for Terraform state storage.
+    
+    If not specified, the bucket name is auto-generated from domain_name:
+      - Example: "glow.example.ac.uk" -> "glow-example-ac-uk-tfstate"
+    
+    Override this when:
+      - Migrating from an old deployment with a different domain
+      - Auto-generated name conflicts with an existing bucket
+      - You need a specific bucket name for organizational policies
+    
+    The bucket will be created if it doesn't exist.
+  EOT
+  type        = string
+  default     = ""
+}
+
 # ─── EC2 Configuration ────────────────────────────────────────────────────────
 
 variable "instance_type" {

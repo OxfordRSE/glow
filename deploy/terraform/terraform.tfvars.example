@@ -9,6 +9,11 @@ app_name   = "glow-core"
 # Availability zone (must be in the same region)
 availability_zone = "eu-west-2a"
 
+# Optional: Override auto-generated Terraform state bucket name
+# If not set, bucket name is auto-generated from domain_name
+# Example: "glow.example.ac.uk" -> "glow-example-ac-uk-tfstate"
+# tfstate_bucket_name = "my-custom-glow-tfstate-bucket"
+
 # ─── Domain Configuration ─────────────────────────────────────────────────────
 
 # Root domain name
@@ -33,11 +38,12 @@ instance_type = "t3.medium"
 # Persistent data volume size in GB
 data_volume_size_gb = 100
 
-# ─── SSH Access ───────────────────────────────────────────────────────────────
+# ─── Deployment Configuration ─────────────────────────────────────────────────
 
-# SSH key pair name (must already exist in AWS EC2)
-ssh_key_name = "my-key-pair"
+# Git repository (defaults to official GLOW repo)
+# git_repo_url = "https://github.com/oxrse/glow.git"
 
-# CIDR blocks allowed to SSH (restrict to your IP in production)
-# Example: ["1.2.3.4/32"] for single IP
-ssh_allowed_cidr_blocks = ["0.0.0.0/0"]
+# Git reference to deploy (leave empty for latest release)
+# git_ref = "v1.2.3"  # Specific version
+# git_ref = "main"    # Latest main branch (testing only)
+git_ref = "" # Latest release (recommended)

@@ -56,6 +56,75 @@ check_aws_auth() {
   echo "${account_id}"
 }
 
+# ─── Get domain name from terraform.tfvars ───────────────────────────────────
+get_domain_from_tfvars() {
+  local tfvars="${TERRAFORM_DIR}/terraform.tfvars"
+  
+  if [[ ! -f "$tfvars" ]]; then
+    error "terraform.tfvars not found at: ${tfvars}"
+    error "Please create terraform.tfvars from terraform.tfvars.example"
+    exit 1
+  fi
+  
+  # Extract domain_name value from tfvars (handle quotes and comments)
+  local domain
+  domain=$(grep -E '^\s*domain_name\s*=' "$tfvars" | \
+    sed 's/.*=\s*"\([^"]*\)".*/\1/' | \
+    head -1)
+  
+  if [[ -z "$domain" ]]; then
+    error "domain_name not found in terraform.tfvars"
+    error "Please set domain_name in terraform.tfvars"
+    exit 1
+  fi
+  
+  echo "$domain"
+}
+
+# ─── Get override bucket name from terraform.tfvars ──────────────────────────
+get_override_bucket_from_tfvars() {
+  local tfvars="${TERRAFORM_DIR}/terraform.tfvars"
+  
+  if [[ ! -f "$tfvars" ]]; then
+    echo ""
+    return
+  fi
+  
+  # Extract tfstate_bucket_name value from tfvars (handle quotes and comments)
+  local bucket
+  bucket=$(grep -E '^\s*tfstate_bucket_name\s*=' "$tfvars" | \
+    sed 's/.*=\s*"\([^"]*\)".*/\1/' | \
+    head -1)
+  
+  echo "$bucket"
+}
+
+# ─── Generate S3 bucket name from domain ─────────────────────────────────────
+generate_bucket_name() {
+  local domain="$1"
+  
+  # Sanitize domain for S3 bucket name:
+  # - Convert to lowercase
+  # - Replace dots with hyphens
+  # - Remove any invalid characters
+  local sanitized
+  sanitized=$(echo "$domain" | tr '[:upper:]' '[:lower:]' | tr '.' '-' | sed 's/[^a-z0-9-]//g')
+  
+  # S3 bucket names must be 3-63 characters
+  # Format: <sanitized-domain>-tfstate
+  local bucket="${sanitized}-tfstate"
+  
+  # Ensure not too long (S3 limit is 63 chars)
+  if [[ ${#bucket} -gt 63 ]]; then
+    # Truncate domain part but keep -tfstate suffix
+    local max_domain_len=$((63 - 8))  # 8 chars for "-tfstate"
+    sanitized="${sanitized:0:$max_domain_len}"
+    bucket="${sanitized}-tfstate"
+  fi
+  
+  echo "$bucket"
+}
+
 # ─── Ensure S3 backend bucket ────────────────────────────────────────────────
 ensure_backend_bucket() {
   local bucket="$1"
@@ -335,8 +404,25 @@ main() {
   local account_id
   account_id="$(check_aws_auth)"
   
-  # S3 bucket for Terraform state (account-unique)
-  local tfstate_bucket="${APP_NAME}-tfstate-${account_id}"
+  # Get domain name from terraform.tfvars
+  local domain_name
+  domain_name="$(get_domain_from_tfvars)"
+  info "Domain: ${domain_name}"
+  
+  # Check for explicit bucket override
+  local override_bucket
+  override_bucket="$(get_override_bucket_from_tfvars)"
+  
+  # Generate S3 bucket name (use override if provided)
+  local tfstate_bucket
+  if [[ -n "$override_bucket" ]]; then
+    tfstate_bucket="$override_bucket"
+    info "Using override Terraform state bucket: ${tfstate_bucket}"
+  else
+    tfstate_bucket="$(generate_bucket_name "${domain_name}")"
+    info "Auto-generated Terraform state bucket: ${tfstate_bucket}"
+  fi
+  
   ensure_backend_bucket "${tfstate_bucket}"
   
   # Run Terraform

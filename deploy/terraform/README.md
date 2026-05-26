@@ -31,6 +31,10 @@ availability_zone = "eu-west-2a"
 # Domain configuration (Route 53 hosted zone must exist)
 domain_name = "glow.example.ac.uk"
 
+# Optional: Override S3 bucket name for Terraform state
+# If not set, auto-generated from domain_name
+# tfstate_bucket_name = "my-custom-glow-tfstate"
+
 # EC2 configuration
 instance_type       = "t3.medium"
 data_volume_size_gb = 100
@@ -46,9 +50,11 @@ data_volume_size_gb = 100
 ```
 
 This will:
-1. Create S3 bucket for Terraform state (if needed)
-2. Run `terraform init` and `terraform apply`
-3. EC2 user data automatically:
+1. Read domain_name from terraform.tfvars
+2. Create S3 bucket for Terraform state: `<domain-with-dots-as-hyphens>-tfstate`
+   - Example: `glow.example.ac.uk` → `glow-example-ac-uk-tfstate`
+3. Run `terraform init` and `terraform apply`
+4. EC2 user data automatically:
    - Clones the repository from GitHub
    - Installs Docker and Docker Compose
    - Mounts persistent EBS volume
@@ -80,6 +86,19 @@ cat /opt/glow/docker-mount-data/.deploy/.env.admin
 ```bash
 terraform -chdir=deploy/terraform output -raw ssm_session_command
 ```
+
+## Important Notes
+
+### Terraform State Storage
+
+- Terraform state is stored in an S3 bucket
+- **Default**: Auto-generated from `domain_name`
+  - Example: `glow.example.ac.uk` → `glow-example-ac-uk-tfstate`
+- **Override**: Set `tfstate_bucket_name` in terraform.tfvars to use a custom name
+- The bucket is created automatically on first deployment
+- **Changing domain_name creates a new bucket** unless you override (see "Changing Domain Name" below)
+- The bucket has versioning enabled for state recovery
+- All public access is blocked for security
 
 ## File Structure
 
@@ -142,6 +161,63 @@ terraform destroy
 ```
 
 ⚠️ **Warning**: This deletes all resources including data. Backup first!
+
+### Changing Domain Name
+
+If you need to change the domain name, you have two options:
+
+#### Option 1: Fresh Deployment (Recommended)
+
+1. **Important**: The S3 backend bucket name is auto-generated from domain_name
+2. Changing domain_name will create a NEW Terraform state bucket
+3. The old deployment will become "orphaned" (Terraform loses track of it)
+
+```bash
+# Destroy old deployment first
+cd deploy/terraform
+terraform destroy
+
+# Update domain_name in terraform.tfvars
+# Then deploy fresh
+cd ../..
+./deploy/deploy.sh
+```
+
+#### Option 2: Keep Existing State
+
+Use the `tfstate_bucket_name` override to keep using the same state bucket:
+
+```hcl
+# terraform.tfvars
+
+# Old domain
+# domain_name = "old.example.com"
+
+# New domain  
+domain_name = "new.example.com"
+
+# Keep using the old state bucket
+tfstate_bucket_name = "old-example-com-tfstate"
+```
+
+Then deploy:
+```bash
+./deploy/deploy.sh
+```
+
+This updates the domain without losing track of existing infrastructure.
+
+### Bucket Name Already Taken
+
+If the auto-generated bucket name conflicts with an existing bucket:
+
+```hcl
+# terraform.tfvars
+domain_name = "glow.example.ac.uk"
+
+# Use a different bucket name
+tfstate_bucket_name = "glow-example-ac-uk-tfstate-v2"
+```
 
 ## Troubleshooting
 
