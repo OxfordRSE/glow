@@ -28,7 +28,7 @@ jobs:
       - name: Run dashboard browser smoke tests
         working-directory: dashboard
         env:
-          PLAYWRIGHT_BASE_URL: http://127.0.0.1:5173
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
           PLAYWRIGHT_ADMIN_USER: admin
           PLAYWRIGHT_ADMIN_PASSWORD: admin
           PLAYWRIGHT_SCOPED_USER: alpha-user

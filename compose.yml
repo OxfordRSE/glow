@@ -1,66 +1,314 @@
-# Canonical service specification for glow-core
-# Used by: local dev, CI smoke tests
-# Production uses same images with different env/infra
+# Production-like core stack.
+# Glow services always run. ODK Central is available behind the `odk` profile so
+# local development and CI can opt in without paying its startup cost by default.
 
 services:
   api:
     build:
       context: ./api
       dockerfile: Dockerfile
-    command: uvicorn glow_api.main:app --host 0.0.0.0 --port 8000 --reload
-    working_dir: /app
     environment:
       GLOW_DATA_PATH: /data/data.csv
       GLOW_MIN_N: ${GLOW_MIN_N:-5}
       GLOW_SECRET_KEY: ${GLOW_SECRET_KEY:-change-me-in-production}
-      GLOW_DATABASE_URL: sqlite:////data/auth.db
-      GLOW_CORS_ORIGINS: '["http://localhost:5173"]'
+      GLOW_METADATA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-glow}:${POSTGRES_PASSWORD:-change-me-in-production}@api-db:5432/${POSTGRES_DB:-glow}
+      GLOW_CORS_ORIGINS: ${GLOW_CORS_ORIGINS:-["http://localhost:3000","http://127.0.0.1:3000"]}
     volumes:
-      - ./data:/data
-      - ./api:/app
+      - ./data:/data:ro
+    depends_on:
+      api-db:
+        condition: service_healthy
     networks:
-      - app
+      - public
+      - api_db
+      - dashboard_api
+      - odk_api
+    ports:
+      - "8000:8000"
     restart: unless-stopped
     healthcheck:
       test:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+
+  api-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-glow}
+      POSTGRES_USER: ${POSTGRES_USER:-glow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
+    volumes:
+      - glow_postgres_data:/var/lib/postgresql/data
+    networks:
+      - api_db
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-glow} -d ${POSTGRES_DB:-glow}
+      interval: 10s
+      timeout: 5s
+      retries: 5
       start_period: 10s
 
   dashboard:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-      target: dev
-    command: npm run dev -- --host 0.0.0.0 --port 3000
-    working_dir: /app
-    volumes:
-      - ./dashboard:/app
-      - dashboard_node_modules:/app/node_modules
     environment:
-      NODE_ENV: development
-      CHOKIDAR_USEPOLLING: "true"
+      NODE_ENV: production
+      PUBLIC_API_BASE: ${PUBLIC_API_BASE:-http://127.0.0.1:8000}
+    depends_on:
+      api:
+        condition: service_healthy
     networks:
-      - app
+      - public
+      - dashboard_api
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/en/login').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  postgres14:
+    image: postgres:14-alpine
+    profiles:
+      - odk
+    environment:
+      POSTGRES_DB: ${ODK_POSTGRES_DB:-odk}
+      POSTGRES_USER: ${ODK_POSTGRES_USER:-odk}
+      POSTGRES_PASSWORD: ${ODK_POSTGRES_PASSWORD:-odk}
+    volumes:
+      - odk_postgres_data:/var/lib/postgresql/data
+    networks:
+      - odk_internal
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${ODK_POSTGRES_USER:-odk} -d ${ODK_POSTGRES_DB:-odk}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  mail:
+    image: axllent/mailpit:v1.27
+    profiles:
+      - odk
+    networks:
+      - odk_internal
     restart: unless-stopped
 
-  proxy:
-    image: nginx:alpine
-    ports:
-      - "5173:5173"
+  secrets:
+    image: busybox:1.36
+    profiles:
+      - odk
+    command:
+      - /bin/sh
+      - -ceu
+      - |
+        if [ ! -f /etc/secrets/enketo-secret ]; then
+          head -c1024 /dev/urandom | tr -dc '[:alnum:]' | head -c64 > /etc/secrets/enketo-secret
+        fi
+        if [ ! -f /etc/secrets/enketo-less-secret ]; then
+          head -c512 /dev/urandom | tr -dc '[:alnum:]' | head -c32 > /etc/secrets/enketo-less-secret
+        fi
+        if [ ! -f /etc/secrets/enketo-api-key ]; then
+          head -c2048 /dev/urandom | tr -dc '[:alnum:]' | head -c128 > /etc/secrets/enketo-api-key
+        fi
+        exec tail -f /dev/null
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - odk_secrets:/etc/secrets
+    healthcheck:
+      test:
+        - CMD
+        - /bin/sh
+        - -c
+        - test -s /etc/secrets/enketo-secret && test -s /etc/secrets/enketo-less-secret && test -s /etc/secrets/enketo-api-key
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 1s
+    restart: unless-stopped
+
+  pyxform:
+    image: ghcr.io/getodk/pyxform-http:v4.4.1
+    profiles:
+      - odk
     networks:
-      - app
+      - odk_internal
+    restart: unless-stopped
+
+  enketo:
+    build:
+      context: ./odk-central/enketo
+      dockerfile: Dockerfile
+    profiles:
+      - odk
+    depends_on:
+      secrets:
+        condition: service_healthy
+      enketo_redis_main:
+        condition: service_started
+      enketo_redis_cache:
+        condition: service_started
+    environment:
+      DOMAIN: ${ODK_DOMAIN:-odk.local}
+      HTTPS_PORT: ${ODK_HTTPS_PORT:-8443}
+      SUPPORT_EMAIL: ${ODK_SYSADMIN_EMAIL:-admin@example.com}
+    volumes:
+      - odk_secrets:/etc/secrets
+    networks:
+      - odk_internal
+    restart: unless-stopped
+
+  enketo_redis_main:
+    image: redis:8.6.2
+    profiles:
+      - odk
+    volumes:
+      - ./odk-central/redis/redis-enketo-main.conf:/usr/local/etc/redis/redis.conf:ro
+      - odk_enketo_redis_main:/data
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+    networks:
+      - odk_internal
+    restart: unless-stopped
+
+  enketo_redis_cache:
+    image: redis:8.6.2
+    profiles:
+      - odk
+    volumes:
+      - ./odk-central/redis/redis-enketo-cache.conf:/usr/local/etc/redis/redis.conf:ro
+      - odk_enketo_redis_cache:/data
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+    networks:
+      - odk_internal
+    restart: unless-stopped
+
+  service:
+    image: ghcr.io/getodk/central-service:${ODK_CENTRAL_TAG:-v2026.1.2}
+    profiles:
+      - odk
+    depends_on:
+      postgres14:
+        condition: service_healthy
+      secrets:
+        condition: service_healthy
+      pyxform:
+        condition: service_started
+      enketo:
+        condition: service_started
+      mail:
+        condition: service_started
+    environment:
+      DOMAIN: ${ODK_DOMAIN:-odk.local}
+      SYSADMIN_EMAIL: ${ODK_SYSADMIN_EMAIL:-admin@example.com}
+      HTTPS_PORT: ${ODK_HTTPS_PORT:-8443}
+      PGHOST: postgres14
+      PGDATABASE: ${ODK_POSTGRES_DB:-odk}
+      PGUSER: ${ODK_POSTGRES_USER:-odk}
+      PGPASSWORD: ${ODK_POSTGRES_PASSWORD:-odk}
+      PGAPPNAME: odkcentral
+      DB_POOL_SIZE: ${ODK_DB_POOL_SIZE:-10}
+      EMAIL_FROM: ${ODK_EMAIL_FROM:-no-reply@odk.local}
+      EMAIL_HOST: mail
+      EMAIL_PORT: ${ODK_EMAIL_PORT:-1025}
+      EMAIL_SECURE: ${ODK_EMAIL_SECURE:-false}
+      EMAIL_IGNORE_TLS: ${ODK_EMAIL_IGNORE_TLS:-true}
+      EMAIL_USER: ${ODK_EMAIL_USER:-}
+      EMAIL_PASSWORD: ${ODK_EMAIL_PASSWORD:-}
+      OIDC_ENABLED: ${ODK_OIDC_ENABLED:-false}
+      OIDC_ISSUER_URL: ${ODK_OIDC_ISSUER_URL:-}
+      OIDC_CLIENT_ID: ${ODK_OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${ODK_OIDC_CLIENT_SECRET:-}
+      SENTRY_ORG_SUBDOMAIN: ${ODK_SENTRY_ORG_SUBDOMAIN:-o130137}
+      SENTRY_KEY: ${ODK_SENTRY_KEY:-3cf75f54983e473da6bd07daddf0d2ee}
+      SENTRY_PROJECT: ${ODK_SENTRY_PROJECT:-1298632}
+      SENTRY_TRACE_RATE: ${ODK_SENTRY_TRACE_RATE:-0.1}
+      S3_SERVER: ${ODK_S3_SERVER:-}
+      S3_ACCESS_KEY: ${ODK_S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${ODK_S3_SECRET_KEY:-}
+      S3_BUCKET_NAME: ${ODK_S3_BUCKET_NAME:-}
+      SESSION_LIFETIME: ${ODK_SESSION_LIFETIME:-86400}
+    volumes:
+      - odk_secrets:/etc/secrets
+      - odk_transfer:/data/transfer
+    networks:
+      - odk_internal
+      - odk_api
+    restart: unless-stopped
+
+  nginx:
+    image: ghcr.io/getodk/central-nginx:${ODK_CENTRAL_TAG:-v2026.1.2}
+    profiles:
+      - odk
+    depends_on:
+      service:
+        condition: service_started
+      enketo:
+        condition: service_started
+    environment:
+      DOMAIN: ${ODK_DOMAIN:-odk.local}
+      CERTBOT_EMAIL: ${ODK_SYSADMIN_EMAIL:-admin@example.com}
+      SSL_TYPE: ${ODK_SSL_TYPE:-selfsign}
+      OIDC_ENABLED: ${ODK_OIDC_ENABLED:-false}
+      SENTRY_ORG_SUBDOMAIN: ${ODK_SENTRY_ORG_SUBDOMAIN:-o130137}
+      SENTRY_KEY: ${ODK_SENTRY_KEY:-3cf75f54983e473da6bd07daddf0d2ee}
+      SENTRY_PROJECT: ${ODK_SENTRY_PROJECT:-1298632}
+    volumes:
+      - ./odk-central/nginx/odk.conf.template:/usr/share/odk/nginx/odk.conf.template:ro
+      - ./odk-central/nginx/client-config.json.template:/usr/share/odk/nginx/client-config.json.template:ro
+    networks:
+      - public
+      - odk_internal
+    ports:
+      - "${ODK_HTTP_PORT:-8080}:80"
+      - "${ODK_HTTPS_PORT:-8443}:443"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - nc -z localhost 80 || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
 networks:
-  app:
+  public:
+  api_db:
+    internal: true
+  dashboard_api:
+    internal: true
+  odk_api:
+    internal: true
+  odk_internal:
+    internal: true
 
 volumes:
-  dashboard_node_modules:
+  glow_postgres_data:
+  odk_postgres_data:
+  odk_transfer:
+  odk_secrets:
+  odk_enketo_redis_main:
+  odk_enketo_redis_cache:

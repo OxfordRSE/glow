@@ -1,23 +1,22 @@
-# Test-specific overrides for compose.yml
+# Test-specific overrides for compose.yml.
 # Usage: docker compose -f compose.yml -f compose.test.yml up
-# Used by: CI smoke tests
 
 services:
   api:
     environment:
-      # Use deterministic secret for tests
       GLOW_SECRET_KEY: smoke-test-secret
-      # Stricter healthcheck for CI
+      GLOW_CORS_ORIGINS: '["http://127.0.0.1:3000"]'
     healthcheck:
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 5s
-    # Remove restart policy in test mode
+    restart: "no"
+
+  api-db:
     restart: "no"
 
   dashboard:
-    restart: "no"
-
-  proxy:
+    environment:
+      PUBLIC_API_BASE: http://127.0.0.1:8000
     restart: "no"

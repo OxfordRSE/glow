@@ -9,9 +9,12 @@ This project has two components:
 - **API** (`/api`) — a read-only FastAPI service that provides suppression-safe access to student questionnaire data
 - **Dashboard** (`/dashboard`) — a SvelteKit app for authenticated users to view and query data via interactive charts
 
-In development, both are served through an nginx proxy:
-- Dashboard → `http://localhost:5173`
-- API → `http://localhost:5173/api`
+In local compose, the Glow services are exposed directly:
+- Dashboard → `http://localhost:3000`
+- API → `http://localhost:8000`
+
+The self-hosted ODK Central stack is available behind the optional `odk` compose profile.
+Its public entrypoint defaults to `http://localhost:8080` and `https://localhost:8443`.
 
 ## Quick Start
 
@@ -29,21 +32,24 @@ For the most consistent development experience:
    docker compose exec api glow-api users create --admin admin
    ```
 
-The dashboard will be available at <http://localhost:5173> and the API at <http://localhost:5173/api>.
+The dashboard will be available at <http://localhost:3000> and the API at <http://localhost:8000>.
 
 The devcontainer provides:
 - Python 3.12 + Node 22 pre-installed
 - `uv` for fast Python package management
 - Playwright with browser dependencies
-- All app services (API, dashboard, proxy) running via the canonical `compose.yml`
+- All app services running through the production-like compose base plus dev overrides
 
 ### Option 2: Docker Compose (Host-Based)
 
-`compose.yml` is the canonical service specification used by local dev, CI, and devcontainer. The API runs with reload enabled, the dashboard runs the Vite dev server, and both bind-mount the local workspace.
+`compose.yml` now defines the production-like core stack: Glow dashboard, Glow API, Glow Postgres, and an optional ODK Central profile. Local development layers on `compose.override.yml`, which switches the API and dashboard into reload/watch mode and bind-mounts the workspace.
 
 ```bash
 # Set a strong JWT secret
 export GLOW_SECRET_KEY="your-strong-secret-here"
+
+# Set a Postgres password for the local stack
+export POSTGRES_PASSWORD="your-local-postgres-password"
 
 # Place your data file (CSV or Parquet) at data/data.csv
 # The API defaults to /data/data.csv inside the container
@@ -51,11 +57,27 @@ export GLOW_SECRET_KEY="your-strong-secret-here"
 # Start the local development stack
 docker compose up --build
 
+# Start the full stack including ODK Central
+docker compose --profile odk up --build
+
 # Create the first admin user (in a separate terminal)
 docker compose exec api glow-api users create --admin admin
 ```
 
-The dashboard will be available at <http://localhost:5173>.
+The dashboard will be available at <http://localhost:3000>.
+
+### ODK Central
+
+The optional `odk` profile adds a self-hosted ODK Central stack using the official Central service/nginx images plus the supporting Postgres, Redis, Enketo, SMTP, and secrets services they require.
+
+Network boundaries in the compose setup are:
+
+- ODK Central internal services talk only on the `odk_internal` network.
+- Glow Dashboard can only reach Glow API on `dashboard_api`.
+- Glow API can only reach its own Postgres on `api_db`.
+- The only shared route between ODK Central and Glow is `service` ↔ `api` on `odk_api`.
+
+This keeps ODK Central isolated from the dashboard while still allowing API-mediated data flow.
 
 ## API
 
@@ -69,7 +91,7 @@ The dashboard will be available at <http://localhost:5173>.
 | `GLOW_SECRET_KEY` | *(insecure default)* | JWT signing secret — **must be set in production** |
 | `GLOW_ALGORITHM` | `HS256` | JWT algorithm |
 | `GLOW_ACCESS_TOKEN_EXPIRE_MINUTES` | `480` | Token lifetime (8 hours) |
-| `GLOW_DATABASE_URL` | `sqlite:///./auth.db` | SQLAlchemy database URL |
+| `GLOW_METADATA_DATABASE_URL` | `sqlite:///./metadata.db` | SQLAlchemy metadata database URL |
 | `GLOW_CORS_ORIGINS` | `["*"]` | JSON list of allowed CORS origins |
 
 ### Endpoints
@@ -160,11 +182,15 @@ The SvelteKit dashboard provides:
 
 This repo uses a centralized approach to minimize drift between dev/test/prod:
 
-- **`compose.yml`** — canonical service specification (API, dashboard, proxy)
-  - Used by: local dev, CI smoke tests, devcontainer
-  - Single source of truth for service topology
-- **`compose.test.yml`** — minimal test-specific overrides
-  - Stricter healthchecks, deterministic secrets, no restart policies
+- **`compose.yml`** — production-like core stack (dashboard, API, Postgres)
+  - Used by: CI smoke tests and as the base for local development
+  - Defines runtime topology and network boundaries
+  - Includes the optional `odk` profile for self-hosted ODK Central
+- **`compose.override.yml`** — local development overrides
+  - Enables source bind mounts, Vite/Uvicorn reload, and dev-friendly defaults
+  - Applied automatically by `docker compose up`
+- **`compose.test.yml`** — test-specific overrides
+  - Deterministic secrets, tighter healthchecks, no restart policies
   - Usage: `docker compose -f compose.yml -f compose.test.yml up`
 - **`.devcontainer/`** — VS Code devcontainer configuration
   - Provides tooling shell (Python 3.12, Node 22, uv, Playwright)

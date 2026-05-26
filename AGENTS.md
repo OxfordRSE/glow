@@ -109,9 +109,7 @@ Not yet of concern.
 ## Development
 
 We use docker compose to keep stuff working in development environments.
-Always ensure that the development environment is set up such that the proxy can forward requests to
-the backend appropriately and make the frontend available.
+Always ensure that the development environment exposes the backend and frontend appropriately.
 
 Front/backend containers are restarted frequently during development.
-Restarting either should restart the proxy if required, but should never restart the other:
-e.g. restarting the frontend container should not restart the backend.
+Restarting either should not restart the other.

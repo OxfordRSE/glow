@@ -8,16 +8,24 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from glow_api.metadata_models import School, User
 from glow_api.settings import settings
 
+
+def create_metadata_engine(database_url: str):
+    engine_kwargs = {}
+
+    if make_url(database_url).get_backend_name() == "sqlite":
+        engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+    return create_engine(database_url, **engine_kwargs)
+
+
 # Create engine for metadata database
-engine = create_engine(
-    settings.METADATA_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-)
+engine = create_metadata_engine(settings.METADATA_DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
