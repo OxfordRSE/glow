@@ -210,3 +210,43 @@ def set_statistical_neighbors(
     db.commit()
     db.refresh(school)
     return school
+
+
+def extract_schools_from_dataframe(db: Session, df) -> list[School]:
+    """Extract unique school names from a DataFrame and create School records.
+
+    Returns list of created/existing schools.
+    """
+    if "school" not in df.columns:
+        raise ValueError("DataFrame does not contain 'school' column")
+
+    unique_schools = df["school"].dropna().unique()
+    created_schools = []
+
+    for school_name in sorted(unique_schools):
+        existing = get_school_by_name(db, school_name)
+        if existing is None:
+            school = create_school(db, name=school_name)
+            created_schools.append(school)
+        else:
+            created_schools.append(existing)
+
+    return created_schools
+
+
+def grant_admins_all_schools(db: Session) -> int:
+    """Grant all admin users access to all schools.
+
+    Returns the number of admin users updated.
+    """
+    admins = db.query(User).filter(User.is_admin).all()
+    all_schools = list_schools(db)
+
+    updated_count = 0
+    for admin in admins:
+        # Set all schools for this admin
+        admin.schools = all_schools
+        updated_count += 1
+
+    db.commit()
+    return updated_count

@@ -138,35 +138,6 @@ N is counted as **distinct students (uid)**, not rows.
 Any materialized result cell where the contributing student count is less than `GLOW_MIN_N` is suppressed
 (set to empty in the CSV output) and recorded in the `suppressions` field of the response.
 
-### Whitelisted columns
-
-Query columns are restricted to a whitelist to prevent data leakage:
-
-- **Dimensions**: `school`, `yearGroup`, `class`, `sex`, `ethnicity`, `wave`, `d_city`, `d_country`
-- **Measures**: `bw_wbeing_1`–`bw_wbeing_7`, `d_age`
-- **Derived scores**: currently `bw_wbeing_total`
-
-### Query Builder
-
-The query system exposes a safe plan DSL for analytical work over the scoped student-wave table.
-
-Supported plan steps:
-
-- `filter`
-- `derive_score`
-- `pair_waves`
-- `bucket_school_size`
-- `aggregate`
-
-Safety properties:
-
-- `uid` is kept internally for suppression counts but is never a legal public grouping field
-- unsupported columns fail even when they appear late in an otherwise valid plan
-- aggregation is terminal
-- every output metric carries an exact distinct-student count and is suppressed when `N < GLOW_MIN_N`
-
-Developer documentation and examples live in [docs/query-builder.md](docs/query-builder.md).
-
 ## Dashboard
 
 The SvelteKit dashboard provides:
