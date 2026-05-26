@@ -13,8 +13,13 @@ services:
       GLOW_SECRET_KEY: ${GLOW_SECRET_KEY:-change-me-in-production}
       GLOW_METADATA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-glow}:${POSTGRES_PASSWORD:-change-me-in-production}@api-db:5432/${POSTGRES_DB:-glow}
       GLOW_CORS_ORIGINS: ${GLOW_CORS_ORIGINS:-["http://localhost:3000","http://127.0.0.1:3000"]}
+      # ODK API integration (values provided via env_file in deployment)
+      ODK_API_URL: ${ODK_API_URL:-}
+      ODK_API_EMAIL: ${ODK_API_EMAIL:-}
+      ODK_API_PASSWORD: ${ODK_API_PASSWORD:-}
     volumes:
       - ./data:/data:ro
+      - ./deploy/.deploy/share:/deploy:ro
     depends_on:
       api-db:
         condition: service_healthy

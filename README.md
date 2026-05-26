@@ -245,37 +245,20 @@ npm run check
 
 ## Deployment (AWS)
 
-See `terraform/` for infrastructure definitions (ECS Fargate + ALB + ECR + EFS).
+See `deploy/terraform/` for infrastructure definitions (EC2 + ALB + Route53).
 
-```bash
-# Deploy version 0.1.0 (base semver must match API version in pyproject.toml)
-export GLOW_SECRET_KEY="your-production-secret"
-./deploy.sh 0.1.0
+See `DEPLOYMENT.md` for the quick start guide using `./deploy/deploy.sh`.
 
-# Or with a pre-release suffix
-./deploy.sh 0.1.0-beta1
-```
-
-The `deploy.sh` script:
-1. Checks required tools (`aws`, `terraform`, `docker`, `curl`, `jq`, `python3`)
-2. Validates the deploy version against the API version
-3. Authenticates with AWS SSO
-4. Creates an S3 bucket for Terraform state + deploy lockfile
-5. Resolves lockfile conflicts interactively
-6. Builds and pushes Docker images to ECR (immutable tags — no `latest`)
-7. Runs `terraform apply` interactively
-8. Updates the remote lockfile
-
-### Required environment variables for deploy
-
-| Variable | Description |
-|---|---|
-| `GLOW_SECRET_KEY` | JWT secret for production |
-| `AWS_REGION` | AWS region (default: `eu-west-2`) |
+The deployment uses:
+- EC2 instance running Docker Compose
+- Application Load Balancer with subdomain routing
+- Route 53 for DNS management
+- ACM for TLS certificates
+- Auto-configured ODK Central integration
 
 ### Terraform variables
 
-See `terraform/variables.tf` for all available variables. Key ones:
+See `deploy/terraform/variables.tf` for all available variables. Key ones:
 
 | Variable | Description |
 |---|---|
