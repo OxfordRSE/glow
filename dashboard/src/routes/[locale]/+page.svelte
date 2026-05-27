@@ -673,6 +673,46 @@
             <p class="text-sm text-gray-400">{i18n.t('explore.privacyProtection')}</p>
           </div>
         {/if}
+
+        <!-- Partner Logos -->
+        <div class="flex justify-center items-center gap-8 mt-8 flex-wrap">
+          <a
+            href="https://www.ox.ac.uk/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="University of Oxford"
+          >
+            <img
+              src="/img/university_of_oxford.svg"
+              alt="University of Oxford"
+              class="logo"
+            />
+          </a>
+          <a
+            href="https://wellbeing.hmc.ox.ac.uk/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Wellbeing Research Centre"
+          >
+            <img
+              src="/img/wellbeing_research_centre.svg"
+              alt="Wellbeing Research Centre"
+              class="logo"
+            />
+          </a>
+          <a
+            href="https://www.rse.ox.ac.uk/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Oxford RSE"
+          >
+            <img
+              src="/img/oxford_rse.svg"
+              alt="Oxford RSE"
+              class="logo"
+            />
+          </a>
+        </div>
       </div>
     </div>
   {/if}
@@ -693,5 +733,15 @@
 
   h2 {
     @apply text-xl font-semibold text-gray-900;
+  }
+
+  .logo {
+    height: 100px;
+    width: auto;
+    transition: opacity 0.2s;
+  }
+
+  .logo:hover {
+    opacity: 0.8;
   }
 </style>
