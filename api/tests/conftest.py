@@ -2,6 +2,8 @@
 
 import io
 import json
+import os
+import threading
 
 import pandas as pd
 import pytest
@@ -16,6 +18,10 @@ from glow_api.database import create_user, create_school, get_db
 from glow_api.metadata_models import Base, User, School
 from glow_api.main import app
 from glow_api.settings import settings
+from tests.mock_odk import MockODKClient
+
+# Set testing flag to skip datastore initialization in lifespan
+os.environ["GLOW_TESTING"] = "1"
 
 # ---------------------------------------------------------------------------
 # Sample DataFrame used across tests
@@ -123,9 +129,8 @@ def admin_user(db_session, sample_schools):
 def sample_df():
     df = _make_df(SAMPLE_CSV)
     # Compute derived scores like the real DataStore does
-    from glow_api.data import DataStore
-
-    ds = DataStore.__new__(DataStore)
+    mock_client = MockODKClient()
+    ds = DataStore(odk_client=mock_client, refresh_hours=0)
     df = ds._process_loaded_data(df)
     return df
 
@@ -133,6 +138,29 @@ def sample_df():
 @pytest.fixture(scope="function")
 def tiny_df():
     return _make_df(TINY_CSV)
+
+
+def _make_mock_datastore(df: pd.DataFrame, metadata: dict = None) -> DataStore:
+    """Helper to create a mock DataStore with pre-loaded data.
+    
+    Args:
+        df: DataFrame to inject into the DataStore
+        metadata: Optional metadata dict
+        
+    Returns:
+        DataStore instance with data already loaded
+    """
+    if metadata is None:
+        metadata = {}
+    
+    mock_client = MockODKClient(submissions_df=df, metadata=metadata)
+    ds = DataStore(odk_client=mock_client, refresh_hours=0)
+    ds._df = ds._process_loaded_data(df)
+    ds._metadata = metadata
+    ds._lock = threading.Lock()
+    ds.startup = lambda: None
+    ds.shutdown = lambda: None
+    return ds
 
 
 # ---------------------------------------------------------------------------
@@ -150,13 +178,7 @@ def client(db_session, sample_user, sample_schools, sample_df):
         yield db_session
 
     # Override data store with sample data
-    import threading
-
-    fake_store = DataStore.__new__(DataStore)
-    fake_store._df = fake_store._process_loaded_data(sample_df)
-    fake_store._lock = threading.Lock()
-    fake_store.startup = lambda: None
-    fake_store.shutdown = lambda: None
+    fake_store = _make_mock_datastore(sample_df)
 
     def override_get_datastore():
         return fake_store
@@ -187,15 +209,9 @@ def client(db_session, sample_user, sample_schools, sample_df):
 @pytest.fixture(scope="function")
 def auth_client(db_session, sample_user, sample_schools, sample_df):
     """TestClient WITHOUT auth override — uses real JWT flow."""
-    import threading
-
     from glow_api.data import get_datastore
 
-    fake_store = DataStore.__new__(DataStore)
-    fake_store._df = fake_store._process_loaded_data(sample_df)
-    fake_store._lock = threading.Lock()
-    fake_store.startup = lambda: None
-    fake_store.shutdown = lambda: None
+    fake_store = _make_mock_datastore(sample_df)
 
     def override_get_datastore():
         return fake_store
@@ -216,17 +232,12 @@ def auth_client(db_session, sample_user, sample_schools, sample_df):
 def admin_client(db_session, admin_user, sample_schools, sample_df):
     """TestClient with an authenticated admin user."""
     from glow_api.models import UserRead
+    import glow_api.data as data_module
 
     def override_get_db():
         yield db_session
 
-    import threading
-
-    fake_store = DataStore.__new__(DataStore)
-    fake_store._df = fake_store._process_loaded_data(sample_df)
-    fake_store._lock = threading.Lock()
-    fake_store.startup = lambda: None
-    fake_store.shutdown = lambda: None
+    fake_store = _make_mock_datastore(sample_df)
 
     def override_get_current_user():
         return UserRead(
@@ -238,13 +249,10 @@ def admin_client(db_session, admin_user, sample_schools, sample_df):
             is_admin=True,
         )
 
-    import glow_api.data as data_module
-    import glow_api.main as main_module
-
-    original_data_ds = data_module.datastore
-    original_main_ds = main_module.datastore
+    # Store original datastore
+    original_datastore = data_module.datastore
+    # Override module-level datastore
     data_module.datastore = fake_store
-    main_module.datastore = fake_store
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
@@ -253,8 +261,8 @@ def admin_client(db_session, admin_user, sample_schools, sample_df):
         yield c
 
     app.dependency_overrides.clear()
-    data_module.datastore = original_data_ds
-    main_module.datastore = original_main_ds
+    # Restore original datastore
+    data_module.datastore = original_datastore
 
 
 @pytest.fixture(scope="function")

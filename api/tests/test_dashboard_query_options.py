@@ -10,13 +10,25 @@ from glow_api.models import QueryOptions
 @pytest.fixture
 def dfwl(sample_df):
     """Create DataFrameWithWhitelists from sample data."""
-    # Use DataStore to process the data and extract whitelists
-    ds = DataStore.__new__(DataStore)
+    # Use MockODKClient with sample metadata
+    from tests.mock_odk import MockODKClient
+    
+    metadata = {
+        "bw_wbeing_1": {"min": 0, "max": 5},
+        "bw_wbeing_2": {"min": 0, "max": 5},
+        "bw_wbeing_3": {"min": 0, "max": 5},
+    }
+    
+    mock_client = MockODKClient(submissions_df=sample_df, metadata=metadata)
+    ds = DataStore(odk_client=mock_client, refresh_hours=0)
     df = ds._process_loaded_data(sample_df)
+    ds._metadata = metadata
+    
     return DataFrameWithWhitelists(
         df=df,
         categorical_whitelist=ds._categorical_whitelist,
         numerical_whitelist=ds._numerical_whitelist,
+        metadata=metadata,
     )
 
 
@@ -135,6 +147,7 @@ class TestBuildQueryOptions:
             df=df,
             categorical_whitelist=ds._categorical_whitelist,
             numerical_whitelist=ds._numerical_whitelist,
+            metadata={},
         )
 
         options = build_query_options(dfwl)

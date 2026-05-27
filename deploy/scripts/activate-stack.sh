@@ -30,7 +30,7 @@ ADMIN_ENV="${DATA_DIR}/.deploy/.env.admin"
 RUNTIME_ENV="${DATA_DIR}/.deploy/share/.env.runtime"
 FORMS_STATE="${DATA_DIR}/.deploy/share/odk-forms-state.json"
 SCRIPTS_DIR="${DEPLOY_DIR}/scripts"
-FORMS_DIR="${DEPLOY_DIR}/odk-forms"
+FORMS_DIR="${WORK_DIR}/odk-forms"
 
 cd "${WORK_DIR}"
 
@@ -303,7 +303,13 @@ EOF
 # Glow API
 GLOW_SECRET_KEY=${glow_secret}
 GLOW_MIN_N=5
-GLOW_DATA_PATH=/data/data.csv
+GLOW_ODK_API_URL=http://odk-service:8383
+GLOW_ODK_API_EMAIL=${api_user_email}
+GLOW_ODK_API_PASSWORD=${odk_api_password}
+GLOW_ODK_PROJECT_ID=1
+GLOW_ODK_FORM_ID=bewell_questionnaire
+GLOW_DATA_CACHE_PATH=/data/cache.parquet
+GLOW_DATA_REFRESH_HOURS=1
 GLOW_METADATA_DATABASE_URL=postgresql+psycopg://glow:${postgres_password}@api-db:5432/glow
 GLOW_CORS_ORIGINS=["https://${DOMAIN_NAME}","https://api.${DOMAIN_NAME}"]
 

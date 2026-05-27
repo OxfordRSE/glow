@@ -10,6 +10,7 @@ import pytest
 
 from glow_api.data import DataStore
 from glow_api.settings import settings
+from tests.mock_odk import MockODKClient
 
 
 class TestComputeDerivedScores:
@@ -251,45 +252,21 @@ class TestDataStore:
 
     def test_init(self):
         """Test DataStore initialization."""
-        ds = DataStore(data_path="test.csv", refresh_hours=24)
+        mock_client = MockODKClient()
+        ds = DataStore(odk_client=mock_client, refresh_hours=24)
 
-        assert ds._data_path == Path("test.csv")
+        assert ds._odk_client == mock_client
         assert ds._refresh_hours == 24
         assert isinstance(ds._df, pd.DataFrame)
         assert ds._df.empty
         assert isinstance(ds._lock, type(threading.Lock()))
+        assert ds._metadata == {}
+        assert ds._etag is None
 
-    def test_load_csv(self):
-        """Test loading data from a CSV file."""
-        # Create a temporary CSV file
-        csv_data = """uid,wave,bw_wbeing_1,bw_wbeing_2
-S001,1,3,4
-S002,1,4,3
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-            f.write(csv_data)
-            temp_path = f.name
-
-        try:
-            ds = DataStore(data_path=temp_path, refresh_hours=0)
-            df = ds._load()
-
-            # Verify data was loaded
-            assert len(df) == 2
-            assert "uid" in df.columns
-            assert "bw_wbeing_1" in df.columns
-
-            # Verify derived scores were computed
-            assert "bw_wbeing_total" in df.columns
-            assert df.loc[0, "bw_wbeing_total"] == 7  # 3 + 4
-            assert df.loc[1, "bw_wbeing_total"] == 7  # 4 + 3
-        finally:
-            Path(temp_path).unlink()
-
-    def test_load_parquet(self):
-        """Test loading data from a Parquet file."""
-        # Create a temporary Parquet file
-        df_original = pd.DataFrame(
+    def test_load_from_odk(self):
+        """Test loading data from ODK Central (mocked)."""
+        # Create test data
+        df = pd.DataFrame(
             {
                 "uid": ["S001", "S002"],
                 "wave": [1, 1],
@@ -297,186 +274,261 @@ S002,1,4,3
                 "bw_wbeing_2": [4, 3],
             }
         )
+        metadata = {
+            "bw_wbeing_1": {"min": 0, "max": 5},
+            "bw_wbeing_2": {"min": 0, "max": 5},
+        }
+        
+        mock_client = MockODKClient(submissions_df=df, metadata=metadata)
+        ds = DataStore(odk_client=mock_client, refresh_hours=0)
+        
+        loaded_df = ds._load()
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            temp_path = f.name
+        # Verify data was loaded
+        assert len(loaded_df) == 2
+        assert "uid" in loaded_df.columns
+        assert "bw_wbeing_1" in loaded_df.columns
 
-        try:
-            df_original.to_parquet(temp_path)
+        # Verify derived scores were computed
+        assert "bw_wbeing_total" in loaded_df.columns
+        assert loaded_df.loc[0, "bw_wbeing_total"] == 7  # 3 + 4
+        assert loaded_df.loc[1, "bw_wbeing_total"] == 7  # 4 + 3
+        
+        # Verify metadata was fetched
+        assert ds._metadata == metadata
+        assert mock_client.fetch_count == 1
+        assert mock_client.metadata_fetch_count == 1
 
-            ds = DataStore(data_path=temp_path, refresh_hours=0)
-            df = ds._load()
-
-            # Verify data was loaded
-            assert len(df) == 2
-            assert "uid" in df.columns
-            assert "bw_wbeing_1" in df.columns
-
-            # Verify derived scores were computed
-            assert "bw_wbeing_total" in df.columns
-            assert df.loc[0, "bw_wbeing_total"] == 7  # 3 + 4
-            assert df.loc[1, "bw_wbeing_total"] == 7  # 4 + 3
-        finally:
-            Path(temp_path).unlink()
+    def test_load_with_etag_match(self):
+        """Test that ETAG matching returns cached data."""
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S002"],
+                "wave": [1, 1],
+                "bw_wbeing_1": [3, 4],
+                "bw_wbeing_2": [4, 3],
+            }
+        )
+        
+        mock_client = MockODKClient(submissions_df=df, etag="test-etag-123")
+        ds = DataStore(odk_client=mock_client, refresh_hours=0)
+        
+        # First load
+        df1 = ds._load()
+        assert len(df1) == 2
+        assert ds._etag == "test-etag-123"
+        
+        # Simulate what refresh() does - store the loaded data
+        ds._df = df1
+        
+        # Second load with same ETAG - should return existing data from self._df
+        df2 = ds._load()
+        assert len(df2) == 2
+        # ETAG matched, so ODK returned empty DataFrame, but we kept existing data
+        assert mock_client.fetch_count == 2
 
     def test_refresh(self):
-        """Test refreshing data from disk."""
-        # Create initial CSV
-        csv_data = """uid,wave,bw_wbeing_1,bw_wbeing_2
-S001,1,3,4
-S002,1,4,3
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-            f.write(csv_data)
-            temp_path = f.name
+        """Test refreshing data from ODK Central."""
+        # Initial data
+        df1 = pd.DataFrame(
+            {
+                "uid": ["S001", "S002"],
+                "wave": [1, 1],
+                "bw_wbeing_1": [3, 4],
+                "bw_wbeing_2": [4, 3],
+            }
+        )
+        
+        mock_client = MockODKClient(submissions_df=df1, metadata={})
+        ds = DataStore(odk_client=mock_client, refresh_hours=0)
+        ds.refresh()
 
-        try:
-            ds = DataStore(data_path=temp_path, refresh_hours=0)
-            ds.refresh()
+        # Verify initial data
+        frozen = ds.to_frozen()
+        assert len(frozen.df) == 2
+        assert frozen.df.loc[0, "bw_wbeing_total"] == 7
 
-            # Verify initial data
-            df = ds.to_frozen().df
-            assert len(df) == 2
-            assert df.loc[0, "bw_wbeing_total"] == 7
+        # Update mock to return new data
+        df2 = pd.DataFrame(
+            {
+                "uid": ["S001", "S002", "S003"],
+                "wave": [1, 1, 1],
+                "bw_wbeing_1": [5, 6, 7],
+                "bw_wbeing_2": [5, 6, 7],
+            }
+        )
+        mock_client.submissions_df = df2
 
-            # Update the CSV file
-            new_csv_data = """uid,wave,bw_wbeing_1,bw_wbeing_2
-S001,1,5,5
-S002,1,6,6
-S003,1,7,7
-"""
-            with open(temp_path, "w") as f:
-                f.write(new_csv_data)
+        # Refresh and verify new data
+        ds.refresh()
+        frozen = ds.to_frozen()
+        assert len(frozen.df) == 3
+        assert frozen.df.loc[0, "bw_wbeing_total"] == 10  # 5 + 5
+        assert frozen.df.loc[1, "bw_wbeing_total"] == 12  # 6 + 6
+        assert frozen.df.loc[2, "bw_wbeing_total"] == 14  # 7 + 7
 
-            # Refresh and verify new data
-            ds.refresh()
-            df = ds.to_frozen().df
-            assert len(df) == 3
-            assert df.loc[0, "bw_wbeing_total"] == 10  # 5 + 5
-            assert df.loc[1, "bw_wbeing_total"] == 12  # 6 + 6
-            assert df.loc[2, "bw_wbeing_total"] == 14  # 7 + 7
-        finally:
-            Path(temp_path).unlink()
-
-    def test_refresh_file_not_found(self):
-        """Test that refresh handles missing file gracefully."""
-        ds = DataStore(data_path="nonexistent.csv", refresh_hours=0)
+    def test_refresh_odk_error(self):
+        """Test that refresh handles ODK errors gracefully."""
+        # Create a mock that raises an error
+        class ErrorODKClient(MockODKClient):
+            def fetch_submissions(self, etag=None):
+                raise RuntimeError("ODK Central connection failed")
+        
+        mock_client = ErrorODKClient()
+        ds = DataStore(odk_client=mock_client, refresh_hours=0)
+        
         # Set initial data
         ds._df = pd.DataFrame({"uid": ["S001"]})
 
         # Refresh should not crash and should keep existing data
         ds.refresh()
-        df = ds.to_frozen().df
-        assert len(df) == 1
-        assert "uid" in df.columns
+        frozen = ds.to_frozen()
+        assert len(frozen.df) == 1
+        assert "uid" in frozen.df.columns
 
     def test_get_dataframe_returns_copy(self):
-        """Test that get_dataframe returns a copy, not the original."""
-        ds = DataStore(data_path="test.csv", refresh_hours=0)
+        """Test that to_frozen returns a copy, not the original."""
+        mock_client = MockODKClient()
+        ds = DataStore(odk_client=mock_client, refresh_hours=0)
         ds._df = pd.DataFrame(
             {
                 "uid": ["S001", "S002"],
                 "bw_wbeing_1": [3, 4],
             }
         )
+        ds._metadata = {"bw_wbeing_1": {"min": 0, "max": 5}}
 
         # Get dataframe and modify it
-        df1 = ds.to_frozen().df
-        df1.loc[0, "bw_wbeing_1"] = 999
+        frozen1 = ds.to_frozen()
+        frozen1.df.loc[0, "bw_wbeing_1"] = 999
+        frozen1.metadata["bw_wbeing_1"]["min"] = 999
 
         # Get dataframe again and verify original is unchanged
-        df2 = ds.to_frozen().df
-        assert df2.loc[0, "bw_wbeing_1"] == 3
+        frozen2 = ds.to_frozen()
+        assert frozen2.df.loc[0, "bw_wbeing_1"] == 3
+        assert frozen2.metadata["bw_wbeing_1"]["min"] == 0
 
     def test_thread_safety(self):
         """Test that DataStore is thread-safe."""
         import time
 
-        csv_data = """uid,wave,bw_wbeing_1,bw_wbeing_2
-S001,1,3,4
-S002,1,4,3
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-            f.write(csv_data)
-            temp_path = f.name
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S002"],
+                "wave": [1, 1],
+                "bw_wbeing_1": [3, 4],
+                "bw_wbeing_2": [4, 3],
+            }
+        )
+        
+        mock_client = MockODKClient(submissions_df=df, metadata={})
+        ds = DataStore(odk_client=mock_client, refresh_hours=0)
+        ds.startup()
 
-        try:
-            ds = DataStore(data_path=temp_path, refresh_hours=0)
-            ds.startup()
+        results = []
+        errors = []
 
-            results = []
-            errors = []
+        def read_data():
+            try:
+                for _ in range(10):
+                    frozen = ds.to_frozen()
+                    results.append(len(frozen.df))
+                    time.sleep(0.001)
+            except Exception as e:
+                errors.append(e)
 
-            def read_data():
-                try:
-                    for _ in range(10):
-                        df = ds.to_frozen().df
-                        results.append(len(df))
-                        time.sleep(0.001)
-                except Exception as e:
-                    errors.append(e)
+        # Start multiple threads reading simultaneously
+        threads = [threading.Thread(target=read_data) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
 
-            # Start multiple threads reading simultaneously
-            threads = [threading.Thread(target=read_data) for _ in range(5)]
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join()
-
-            # Verify no errors occurred
-            assert len(errors) == 0
-            # Verify all reads returned consistent data
-            assert all(r == 2 for r in results)
-        finally:
-            ds.shutdown()
-            Path(temp_path).unlink()
+        # Verify no errors occurred
+        assert len(errors) == 0
+        # Verify all reads returned consistent data
+        assert all(r == 2 for r in results)
+        
+        ds.shutdown()
 
     def test_startup_and_shutdown(self):
         """Test startup and shutdown methods."""
-        csv_data = """uid,wave,bw_wbeing_1
-S001,1,3
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-            f.write(csv_data)
-            temp_path = f.name
+        df = pd.DataFrame(
+            {
+                "uid": ["S001"],
+                "wave": [1],
+                "bw_wbeing_1": [3],
+            }
+        )
+        
+        mock_client = MockODKClient(submissions_df=df, metadata={})
+        ds = DataStore(odk_client=mock_client, refresh_hours=1)
 
-        try:
-            ds = DataStore(data_path=temp_path, refresh_hours=1)
+        # Verify data is not loaded yet
+        assert ds._df.empty
 
-            # Verify data is not loaded yet
-            assert ds._df.empty
+        # Startup should load data
+        ds.startup()
+        assert not ds._df.empty
+        assert len(ds._df) == 1
 
-            # Startup should load data
-            ds.startup()
-            assert not ds._df.empty
-            assert len(ds._df) == 1
-
-            # Shutdown should stop scheduler
-            ds.shutdown()
-            assert not ds._scheduler.running
-        finally:
-            Path(temp_path).unlink()
+        # Shutdown should stop scheduler
+        ds.shutdown()
+        assert not ds._scheduler.running
 
     def test_startup_with_zero_refresh_hours(self):
         """Test that scheduler is not started when refresh_hours is 0."""
-        csv_data = """uid,wave,bw_wbeing_1
-S001,1,3
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-            f.write(csv_data)
-            temp_path = f.name
+        df = pd.DataFrame(
+            {
+                "uid": ["S001"],
+                "wave": [1],
+                "bw_wbeing_1": [3],
+            }
+        )
+        
+        mock_client = MockODKClient(submissions_df=df, metadata={})
+        ds = DataStore(odk_client=mock_client, refresh_hours=0)
+        ds.startup()
 
-        try:
-            ds = DataStore(data_path=temp_path, refresh_hours=0)
-            ds.startup()
+        # Verify data is loaded
+        assert not ds._df.empty
 
-            # Verify data is loaded
-            assert not ds._df.empty
-
-            # Verify scheduler is not running
-            assert not ds._scheduler.running
-        finally:
-            Path(temp_path).unlink()
+        # Verify scheduler is not running
+        assert not ds._scheduler.running
+    
+    def test_cache_save_and_load(self):
+        """Test that cache is saved and loaded correctly."""
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S002"],
+                "wave": [1, 1],
+                "bw_wbeing_1": [3, 4],
+                "bw_wbeing_2": [4, 3],
+            }
+        )
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "cache.parquet"
+            
+            mock_client = MockODKClient(submissions_df=df, metadata={}, etag="test-etag")
+            ds = DataStore(odk_client=mock_client, refresh_hours=0, cache_path=cache_path)
+            
+            # Load data (should save to cache)
+            ds._load()
+            
+            # Verify cache files exist
+            assert cache_path.exists()
+            assert cache_path.with_suffix(".etag").exists()
+            
+            # Create new DataStore and verify cache is loaded
+            mock_client2 = MockODKClient(submissions_df=df, metadata={}, etag="test-etag")
+            ds2 = DataStore(odk_client=mock_client2, refresh_hours=0, cache_path=cache_path)
+            
+            cached = ds2._load_cache()
+            assert cached is not None
+            cached_df, cached_etag = cached
+            assert len(cached_df) == 2
+            assert cached_etag == "test-etag"
 
 
 class TestDataStoreIntegration:

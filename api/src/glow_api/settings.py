@@ -1,8 +1,8 @@
 import json
+from typing import Any, List, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
-from typing import Any, List
 
 
 def parse_list(v: Any) -> List[str]:
@@ -15,14 +15,26 @@ def parse_list(v: Any) -> List[str]:
 
 
 class Settings(BaseSettings):
-    DATA_PATH: str = "data/data.csv"
-    DATA_REFRESH_HOURS: int = 24
+    # ODK Central configuration
+    ODK_API_URL: str = "http://localhost:8383"  # Default for testing
+    ODK_API_EMAIL: str = "test@example.com"  # Default for testing
+    ODK_API_PASSWORD: str = "test-password"  # Default for testing
+    ODK_PROJECT_ID: int = 1  # Default for testing
+    ODK_FORM_ID: str = "bewell_questionnaire"
+    
+    # Data refresh configuration
+    DATA_CACHE_PATH: Optional[str] = None  # If set, cache DataFrame and ETAG
+    DATA_REFRESH_HOURS: int = 1  # Poll ODK Central every hour
     DATA_PREFIXES: List[str] = ["bw"]
     DATA_DEMOGRAPHIC_PREFIXES: List[str] = ["d"]
+    
+    # Security
     MIN_N: int = 5
     SECRET_KEY: str = "change-me-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8  # 8 hours
+    
+    # Database
     METADATA_DATABASE_URL: str = "sqlite:///./metadata.db"
     CORS_ORIGINS: List[str] = ["*"]
 

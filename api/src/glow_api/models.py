@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Literal, Optional
+from typing import Dict, Literal, Optional
 
 from pydantic import BaseModel, Field, RootModel, model_validator
 
@@ -75,6 +75,13 @@ class SchoolUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 # Query Options Models (canonical metadata for dashboard)
 # ---------------------------------------------------------------------------
+class VariableMetadata(BaseModel):
+    """Metadata for a single variable (min/max values for axis scaling)."""
+    
+    min: Optional[int] = None
+    max: Optional[int] = None
+
+
 class QueryOptionItem(BaseModel):
     """A single query option (aggregation or filter) with scope information."""
 
@@ -96,6 +103,7 @@ class QueryOptions(BaseModel):
     waves: list[str]  # Available wave values
     aggregations: list[QueryOptionItem]  # Grouping dimensions with scope
     filters: list[QueryOptionItem]  # Filter dimensions with scope and possible values
+    metadata: Dict[str, VariableMetadata] = Field(default_factory=dict)  # Min/max values for variables
 
 
 class ColumnsResponse(RootModel[list[str]]):

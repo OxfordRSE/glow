@@ -6,11 +6,11 @@ are available, used for both metadata delivery and request validation.
 """
 
 import logging
-from typing import Optional
+from typing import Dict, Optional
 
 
 from glow_api.data import DataFrameWithWhitelists
-from glow_api.models import QueryOptions, QueryOptionItem
+from glow_api.models import QueryOptions, QueryOptionItem, VariableMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -70,12 +70,48 @@ def build_query_options(
                     scope=scope,
                 )
             )
+    
+    # Build metadata dict from dfwl.metadata
+    # Convert to VariableMetadata objects
+    metadata_dict: Dict[str, VariableMetadata] = {}
+    for var_name, var_meta in dfwl.metadata.items():
+        # Only include metadata for variables that are in our variables list
+        if var_name in variables:
+            metadata_dict[var_name] = VariableMetadata(
+                min=var_meta.get("min"),
+                max=var_meta.get("max"),
+            )
+    
+    # Also compute metadata for derived totals (sum of constituent items)
+    for var in variables:
+        if var.endswith("_total") and var not in metadata_dict:
+            # Extract constituent items (e.g., bw_wbeing_total -> bw_wbeing_1, bw_wbeing_2, etc.)
+            # Parse the variable name to get the prefix (e.g., bw_wbeing)
+            parts = var.split("_")
+            if len(parts) >= 3 and parts[-1] == "total":
+                prefix = "_".join(parts[:-1])  # e.g., "bw_wbeing"
+                
+                # Find all constituent items
+                constituent_items = [v for v in dfwl.metadata.keys() if v.startswith(prefix + "_") and not v.endswith("_total")]
+                
+                # Sum min/max values
+                if constituent_items:
+                    total_min = sum(dfwl.metadata.get(item, {}).get("min", 0) or 0 for item in constituent_items)
+                    total_max = sum(dfwl.metadata.get(item, {}).get("max", 0) or 0 for item in constituent_items)
+                    
+                    # Only set if we have at least one min or max
+                    if total_min > 0 or total_max > 0:
+                        metadata_dict[var] = VariableMetadata(
+                            min=total_min if total_min > 0 else None,
+                            max=total_max if total_max > 0 else None,
+                        )
 
     return QueryOptions(
         variables=variables,
         waves=waves,
         aggregations=aggregation_items,
         filters=filter_items,
+        metadata=metadata_dict,
     )
 
 

@@ -92,6 +92,7 @@ def test_schools_sync_extracts_creates_and_grants_access(
     # Create a fake datastore with sample data
     fake_store = DataStore.__new__(DataStore)
     fake_store._df = fake_store._process_loaded_data(sample_df)
+    fake_store._metadata = {}
     fake_store._lock = threading.Lock()
     fake_store.startup = lambda: None
     fake_store.shutdown = lambda: None
@@ -162,6 +163,7 @@ def test_schools_sync_is_idempotent(monkeypatch, db_engine, sample_df):
     # Create a fake datastore with sample data
     fake_store = DataStore.__new__(DataStore)
     fake_store._df = fake_store._process_loaded_data(sample_df)
+    fake_store._metadata = {}
     fake_store._lock = threading.Lock()
     fake_store.startup = lambda: None
     fake_store.shutdown = lambda: None

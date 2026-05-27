@@ -142,13 +142,12 @@ glow/
 │   │   ├── rotate-api-password.sh    # NEW: Password rotation tool (~100 lines)
 │   │   └── smoke_compose.sh          # MOVED: Unchanged
 │   │
-│   ├── odk-forms/                    # NEW: Form definitions directory
-│   │   ├── README.md                 # NEW: Form management documentation
-│   │   └── .gitkeep                  # NEW: Ensure tracked in git
-│   │
 │   ├── deploy.sh                     # MOVED from terraform/deploy.sh + MODIFY
 │   └── ODK_INTEGRATION_PLAN.md       # MOVED from terraform/ (this document)
 │
+├── odk-forms/                        # NEW: Form definitions directory
+│   ├── README.md                     # NEW: Form management documentation
+│   └── .gitkeep                      # NEW: Ensure tracked in git
 ├── api/                              # Unchanged
 ├── dashboard/                        # Unchanged
 ├── odk-central/                      # Unchanged (README.md kept for reference)
@@ -165,8 +164,8 @@ glow/
 |------|-------------|-------|
 | `deploy/.deploy/share/.gitkeep` | Ensure directory tracked | 0 |
 | `deploy/.deploy/share/odk-forms-state.json` | Form version tracking | ~10 |
-| `deploy/odk-forms/README.md` | Form management docs | ~80 |
-| `deploy/odk-forms/.gitkeep` | Ensure directory tracked | 0 |
+| `odk-forms/README.md` | Form management docs | ~80 |
+| `odk-forms/.gitkeep` | Ensure directory tracked | 0 |
 | `deploy/scripts/odk-api-helper.sh` | HTTP API wrapper functions | ~300 |
 | `deploy/scripts/rotate-api-password.sh` | Password rotation tool | ~100 |
 | `deploy/ODK_INTEGRATION_PLAN.md` | This document (moved) | 1200+ |
@@ -286,7 +285,7 @@ glow/
   mkdir -p deploy/.deploy/share
   mkdir -p deploy/terraform
   mkdir -p deploy/scripts
-  mkdir -p deploy/odk-forms
+  mkdir -p odk-forms
   ```
 
 - [ ] Move existing files:
@@ -1282,9 +1281,9 @@ glow/
 │   │       └── odk-forms-state.json
 │   ├── terraform/                    # Terraform infrastructure code
 │   ├── scripts/                      # Deployment scripts
-│   ├── odk-forms/                    # Form definitions
 │   ├── deploy.sh                     # Main deployment entry point
 │   └── ODK_INTEGRATION_PLAN.md       # This document
+│── odk-forms/                        # Form definitions
 ```
 
 **Rationale**: 
@@ -1362,7 +1361,7 @@ api:
 
 | Category | Changes |
 |----------|---------|
-| **New directories** | `deploy/`, `deploy/.deploy/`, `deploy/.deploy/share/`, `deploy/odk-forms/` |
+| **New directories** | `deploy/`, `deploy/.deploy/`, `deploy/.deploy/share/`, `odk-forms/` |
 | **Moved files** | terraform/* → deploy/terraform/, scripts/* → deploy/scripts/ |
 | **New scripts** | odk-api-helper.sh (~300 lines), rotate-api-password.sh (~100 lines) |
 | **Modified scripts** | activate-stack.sh (+300 lines ODK logic), deploy.sh (paths + flags) |

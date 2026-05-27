@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from glow_api import __version__
 from glow_api.auth import authenticate_user, create_access_token
-from glow_api.data import datastore
+from glow_api.data import get_datastore
 from glow_api.database import run_migrations, get_db
 from glow_api.models import Token
 from glow_api.routers import admin, auth, query, schools
@@ -76,11 +76,30 @@ configure_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import os
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info("Starting application lifespan...")
     settings.warn_insecure_defaults()
+    
+    logger.info("Running migrations...")
     run_migrations()
-    datastore.startup()
-    yield
-    datastore.shutdown()
+    logger.info("Migrations complete")
+    
+    # Skip datastore initialization in test mode
+    if not os.getenv("GLOW_TESTING"):
+        logger.info("Initializing datastore...")
+        ds = get_datastore()
+        logger.info("Datastore created, starting up...")
+        ds.startup()
+        logger.info("Datastore startup complete")
+        yield
+        logger.info("Shutting down datastore...")
+        ds.shutdown()
+    else:
+        logger.info("Test mode - skipping datastore initialization")
+        yield
 
 
 app = FastAPI(

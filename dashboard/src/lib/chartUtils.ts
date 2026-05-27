@@ -41,6 +41,8 @@ export interface ChartLabelOptions {
   columnLabel?: (column: string) => string;
   countLabel?: string;
   meanLabel?: string;
+  min?: number;
+  max?: number;
 }
 
 /**
@@ -59,7 +61,20 @@ function resolveChartLabels(options: ChartLabelOptions = {}) {
   };
 }
 
-function baseOptions(yLabel = "Count", horizontal = false): Record<string, unknown> {
+function baseOptions(yLabel = "Count", horizontal = false, min?: number, max?: number): Record<string, unknown> {
+  const scaleConfig: Record<string, unknown> = {
+    beginAtZero: true,
+    title: { display: true, text: yLabel },
+  };
+  
+  // Add min/max if provided
+  if (min !== undefined) {
+    scaleConfig.min = min;
+  }
+  if (max !== undefined) {
+    scaleConfig.max = max;
+  }
+  
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -69,15 +84,9 @@ function baseOptions(yLabel = "Count", horizontal = false): Record<string, unkno
       tooltip: { mode: "index" as const, intersect: false },
     },
     scales: horizontal ? {
-      x: {
-        beginAtZero: true,
-        title: { display: true, text: yLabel },
-      },
+      x: scaleConfig,
     } : {
-      y: {
-        beginAtZero: true,
-        title: { display: true, text: yLabel },
-      },
+      y: scaleConfig,
     },
   };
 }
@@ -100,7 +109,7 @@ export function frequencyToChartData(
   if (headers.length === 0 || rows.length === 0) {
     return {
       data: { labels: [], datasets: [] },
-      options: baseOptions(chartLabels.countLabel, horizontal),
+      options: baseOptions(chartLabels.countLabel, horizontal, labelOptions.min, labelOptions.max),
       type: horizontal ? 'horizontalBar' : 'bar',
     };
   }
@@ -135,6 +144,8 @@ export function frequencyToChartData(
           ? chartLabels.countLabel
           : chartLabels.columnLabel(valueCol),
         horizontal,
+        labelOptions.min,
+        labelOptions.max,
       ),
       type: horizontal ? 'horizontalBar' : 'bar',
     };
@@ -175,7 +186,7 @@ export function frequencyToChartData(
 
   return {
     data: { labels: xLabels, datasets },
-    options: baseOptions(chartLabels.countLabel, horizontal),
+    options: baseOptions(chartLabels.countLabel, horizontal, labelOptions.min, labelOptions.max),
     type: horizontal ? 'horizontalBar' : 'bar',
   };
 }
@@ -205,6 +216,10 @@ export function frequencyToLineData(
   const { headers, rows } = parseCSV(result.csv);
   
   if (headers.length === 0 || rows.length === 0) {
+    const yScaleConfig: Record<string, unknown> = { beginAtZero: true };
+    if (labelOptions.min !== undefined) yScaleConfig.min = labelOptions.min;
+    if (labelOptions.max !== undefined) yScaleConfig.max = labelOptions.max;
+    
     return {
       data: { labels: [], datasets: [] },
       options: {
@@ -215,7 +230,7 @@ export function frequencyToLineData(
         },
         scales: {
           x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
-          y: { beginAtZero: true },
+          y: yScaleConfig,
         },
       },
       type: 'line',
@@ -280,6 +295,13 @@ export function frequencyToLineData(
         });
       }
       
+      const yScaleConfig: Record<string, unknown> = { 
+        beginAtZero: true, 
+        title: { display: true, text: chartLabels.meanLabel } 
+      };
+      if (labelOptions.min !== undefined) yScaleConfig.min = labelOptions.min;
+      if (labelOptions.max !== undefined) yScaleConfig.max = labelOptions.max;
+      
       return {
         data: { labels: xLabels, datasets },
         options: {
@@ -290,7 +312,7 @@ export function frequencyToLineData(
           },
           scales: {
             x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
-            y: { beginAtZero: true, title: { display: true, text: chartLabels.meanLabel } },
+            y: yScaleConfig,
           },
         },
         type: 'line',
@@ -319,6 +341,13 @@ export function frequencyToLineData(
         };
       });
       
+      const yScaleConfig: Record<string, unknown> = { 
+        beginAtZero: true, 
+        title: { display: true, text: chartLabels.meanLabel } 
+      };
+      if (labelOptions.min !== undefined) yScaleConfig.min = labelOptions.min;
+      if (labelOptions.max !== undefined) yScaleConfig.max = labelOptions.max;
+      
       return {
         data: { labels: xLabels, datasets },
         options: {
@@ -329,7 +358,7 @@ export function frequencyToLineData(
           },
           scales: {
             x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
-            y: { beginAtZero: true, title: { display: true, text: chartLabels.meanLabel } },
+            y: yScaleConfig,
           },
         },
         type: 'line',
@@ -374,7 +403,7 @@ export function meansToChartData(
   if (headers.length === 0 || rows.length === 0) {
     return {
       data: { labels: [], datasets: [] },
-      options: baseOptions(chartLabels.meanLabel, horizontal),
+      options: baseOptions(chartLabels.meanLabel, horizontal, labelOptions.min, labelOptions.max),
       type: horizontal ? 'horizontalBar' : 'bar',
     };
   }
@@ -402,7 +431,7 @@ export function meansToChartData(
 
   return {
     data: { labels: rowLabels, datasets },
-    options: baseOptions(chartLabels.meanLabel, horizontal),
+    options: baseOptions(chartLabels.meanLabel, horizontal, labelOptions.min, labelOptions.max),
     type: horizontal ? 'horizontalBar' : 'bar',
   };
 }
@@ -432,6 +461,13 @@ export function queryToWaveChart(
   
   // Combine all data into CSV format for processing
   if (!focusSchool.results || focusSchool.results.length === 0) {
+    const yScaleConfig: Record<string, unknown> = { 
+      beginAtZero: true, 
+      title: { display: true, text: chartLabels.meanLabel } 
+    };
+    if (labelOptions.min !== undefined) yScaleConfig.min = labelOptions.min;
+    if (labelOptions.max !== undefined) yScaleConfig.max = labelOptions.max;
+    
     return {
       data: { labels: [], datasets: [] },
       options: {
@@ -440,7 +476,7 @@ export function queryToWaveChart(
         plugins: { legend: { position: "top" as const } },
         scales: {
           x: { title: { display: true, text: chartLabels.columnLabel('wave') } },
-          y: { beginAtZero: true, title: { display: true, text: chartLabels.meanLabel } },
+          y: yScaleConfig,
         },
       },
       type: 'line',

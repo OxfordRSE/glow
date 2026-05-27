@@ -8,15 +8,17 @@ services:
       context: ./api
       dockerfile: Dockerfile
     environment:
-      GLOW_DATA_PATH: /data/data.csv
+      GLOW_ODK_API_URL: ${GLOW_ODK_API_URL:-http://odk-service:8383}
+      GLOW_ODK_API_EMAIL: ${GLOW_ODK_API_EMAIL:-}
+      GLOW_ODK_API_PASSWORD: ${GLOW_ODK_API_PASSWORD:-}
+      GLOW_ODK_PROJECT_ID: ${GLOW_ODK_PROJECT_ID:-1}
+      GLOW_ODK_FORM_ID: ${GLOW_ODK_FORM_ID:-bewell_questionnaire}
+      GLOW_DATA_CACHE_PATH: ${GLOW_DATA_CACHE_PATH:-/data/cache.parquet}
+      GLOW_DATA_REFRESH_HOURS: ${GLOW_DATA_REFRESH_HOURS:-1}
       GLOW_MIN_N: ${GLOW_MIN_N:-5}
       GLOW_SECRET_KEY: ${GLOW_SECRET_KEY:-change-me-in-production}
       GLOW_METADATA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-glow}:${POSTGRES_PASSWORD:-change-me-in-production}@api-db:5432/${POSTGRES_DB:-glow}
       GLOW_CORS_ORIGINS: ${GLOW_CORS_ORIGINS:-["http://localhost:3000","http://127.0.0.1:3000"]}
-      # ODK API integration (values provided via env_file in deployment)
-      ODK_API_URL: ${ODK_API_URL:-}
-      ODK_API_EMAIL: ${ODK_API_EMAIL:-}
-      ODK_API_PASSWORD: ${ODK_API_PASSWORD:-}
     volumes:
       - ./data:/data:ro
       - ./deploy/.deploy/share:/deploy:ro
@@ -210,7 +212,7 @@ services:
       - odk_internal
     restart: unless-stopped
 
-  service:
+  odk-service:
     image: ghcr.io/getodk/central-service:${ODK_CENTRAL_TAG:-v2026.1.2}
     profiles:
       - odk
@@ -268,7 +270,7 @@ services:
     profiles:
       - odk
     depends_on:
-      service:
+      odk-service:
         condition: service_started
       enketo:
         condition: service_started

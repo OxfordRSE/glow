@@ -26,7 +26,7 @@ For the most consistent development experience:
 2. Open this repo in VS Code
 3. Click "Reopen in Container" when prompted (or use Command Palette → "Dev Containers: Reopen in Container")
 4. Wait for the devcontainer to build and app services to start
-5. Place your data file at `data/data.csv` (or copy from `testdata/demo_data.csv`)
+5. Generate and seed test data (see [Data Collection & Format](#data-collection--format) section below)
 6. Create users:
    ```bash
    docker compose exec api glow-api users create --admin admin
@@ -51,14 +51,11 @@ export GLOW_SECRET_KEY="your-strong-secret-here"
 # Set a Postgres password for the local stack
 export POSTGRES_PASSWORD="your-local-postgres-password"
 
-# Place your data file (CSV or Parquet) at data/data.csv
-# The API defaults to /data/data.csv inside the container
-
-# Start the local development stack
-docker compose up --build
-
 # Start the full stack including ODK Central
 docker compose --profile odk up --build
+
+# In a separate terminal: Generate and seed test data
+# (see "Data Collection & Format" section below for detailed steps)
 
 # Create the first admin user (in a separate terminal)
 docker compose exec api glow-api users create --admin admin
@@ -85,8 +82,13 @@ This keeps ODK Central isolated from the dashboard while still allowing API-medi
 
 | Variable | Default | Description |
 |---|---|---|
-| `GLOW_DATA_PATH` | `data/data.csv` | Path to the CSV or Parquet data file |
-| `GLOW_DATA_REFRESH_HOURS` | `24` | How often to reload data from disk |
+| `GLOW_ODK_API_URL` | `http://localhost:8383` | ODK Central API base URL |
+| `GLOW_ODK_API_EMAIL` | `test@example.com` | ODK Central admin email |
+| `GLOW_ODK_API_PASSWORD` | `test-password` | ODK Central admin password |
+| `GLOW_ODK_PROJECT_ID` | `1` | ODK Central project ID |
+| `GLOW_ODK_FORM_ID` | `bewell_questionnaire` | ODK form ID |
+| `GLOW_DATA_CACHE_PATH` | *(none)* | Optional path for DataFrame cache (e.g., `/data/cache.parquet`) |
+| `GLOW_DATA_REFRESH_HOURS` | `1` | How often to poll ODK Central for new data |
 | `GLOW_MIN_N` | `5` | Minimum distinct student count for suppression |
 | `GLOW_SECRET_KEY` | *(insecure default)* | JWT signing secret — **must be set in production** |
 | `GLOW_ALGORITHM` | `HS256` | JWT algorithm |
@@ -239,19 +241,105 @@ See `deploy/terraform/variables.tf` for all available variables. Key ones:
 | `api_min_n` | Minimum N for suppression (default: 5) |
 | `certificate_arn` | ACM certificate ARN for HTTPS (optional) |
 
-## Data Format
+## Data Collection & Format
 
-Data must be in the format produced by [glow-dummies](https://github.com/OxfordRSE/glow-dummies) — a student×wave long format with columns including:
+### Production Data Flow
+
+In production, data is collected via [ODK Central](https://docs.getodk.org/central-intro/):
+
+```
+Real users → ODK Collect app → ODK Central → Glow API (pyODK) → Dashboard
+```
+
+The BeWell questionnaire form is already included in this repo at `odk-forms/bewell_questionnaire.xlsx`. The form includes:
 
 - `uid` — student identifier (used for N counting in suppression)
 - `wave` — survey wave number
 - `school`, `yearGroup`, `class` — school structure
 - `sex`, `ethnicity` — demographics
 - `d_age`, `d_city`, `d_country` — derived/custom fields
-- Questionnaire items from the [#BeeWell GM Survey](https://beewellprogramme.org) (e.g. `bw_wbeing_1`–`bw_wbeing_7` for SWEMWBS wellbeing, `bw_emodies_1`–`bw_emodies_10` for emotional difficulties, and ~120 further items — see [beewell_model.toml](https://github.com/OxfordRSE/glow-dummies/blob/main/examples/beewell_model.toml) for the complete list)
+- Questionnaire items from the [#BeeWell GM Survey](https://beewellprogramme.org) (e.g. `bw_wbeing_1`–`bw_wbeing_7` for SWEMWBS wellbeing, `bw_emodies_1`–`bw_emodies_10` for emotional difficulties, and ~120 further items)
 
-Generate sample data:
+The form is automatically uploaded to ODK Central during deployment (see `deploy/scripts/activate-stack.sh`).
+
+### Development/Testing Data Flow
+
+For local development and testing, synthetic data is generated and seeded into ODK Central:
+
+```
+glow-dummies → data/data.csv → seed_odk_test_data.py → ODK Central → Glow API → Dashboard
+```
+
+#### Step 1: Generate Synthetic Data
+
+Use [glow-dummies](https://github.com/OxfordRSE/glow-dummies) to generate realistic test data:
 
 ```bash
-glow_dummies --config examples/beewell_model.toml --seed 42 --output csv > data/data.csv
+# Install glow-dummies
+pip install glow-dummies
+
+# Generate synthetic BeWell data
+glow_dummies \
+  --config https://raw.githubusercontent.com/OxfordRSE/glow-dummies/main/examples/beewell_model.toml \
+  --seed 42 \
+  --output csv \
+  > data/data.csv
+```
+
+This creates a CSV with the same structure as production data (student×wave long format with ~140 columns).
+
+#### Step 2: Seed ODK Central
+
+Upload the generated data to your local ODK Central instance:
+
+```bash
+cd deploy/scripts
+pip install -r requirements.txt
+
+# Seed all rows from data.csv
+python seed_odk_test_data.py \
+  --csv ../../data/data.csv \
+  --odk-url http://localhost:8080 \
+  --email admin@example.com \
+  --password your-odk-password \
+  --project-id 1 \
+  --form-id bewell_questionnaire
+
+# Or seed just the first 100 rows for faster testing
+python seed_odk_test_data.py \
+  --csv ../../data/data.csv \
+  --odk-url http://localhost:8080 \
+  --email admin@example.com \
+  --password your-odk-password \
+  --project-id 1 \
+  --limit 100
+```
+
+The seeding script is **idempotent** — it uses the `uid` field as the instance ID, so running it multiple times won't create duplicates.
+
+#### Step 3: Verify Data Ingestion
+
+The Glow API polls ODK Central hourly (configurable via `GLOW_DATA_REFRESH_HOURS`). To force an immediate refresh during development:
+
+```bash
+# Restart the API container to trigger a fresh data load
+docker compose restart api
+
+# Check the API logs
+docker compose logs -f api
+```
+
+You should see logs showing data being fetched from ODK Central and cached.
+
+### Minimal Demo Data
+
+For quick testing with minimal data (21 rows, 2 waves, 2 schools), use the included demo dataset:
+
+```bash
+python deploy/scripts/seed_odk_test_data.py \
+  --csv testdata/demo_data.csv \
+  --odk-url http://localhost:8080 \
+  --email admin@example.com \
+  --password your-odk-password \
+  --project-id 1
 ```

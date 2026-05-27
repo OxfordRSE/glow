@@ -45,7 +45,7 @@ This means you can rename files without triggering re-upload, as long as the `xm
 ## Example
 
 ```bash
-deploy/odk-forms/
+./odk-forms/
 ├── baseline_survey.xlsx     # XLSForm - will be converted to XML
 ├── followup_survey.xml       # Pre-converted XForm
 └── README.md                 # This file

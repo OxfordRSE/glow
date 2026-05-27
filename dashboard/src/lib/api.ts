@@ -170,11 +170,17 @@ export interface QueryOptionItem {
   scope?: "shared" | "focus_only";
 }
 
+export interface VariableMetadata {
+  min?: number;
+  max?: number;
+}
+
 export interface QueryOptions {
   variables: string[];
   waves: string[];
   aggregations: QueryOptionItem[];
   filters: QueryOptionItem[];
+  metadata: Record<string, VariableMetadata>;
 }
 
 export interface User {
