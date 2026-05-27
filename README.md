@@ -251,7 +251,7 @@ In production, data is collected via [ODK Central](https://docs.getodk.org/centr
 Real users → ODK Collect app → ODK Central → Glow API (pyODK) → Dashboard
 ```
 
-The BeWell questionnaire form is already included in this repo at `odk-forms/bewell_questionnaire.xlsx`. The form includes:
+The BeWell questionnaire form is already included in this repo at `odk-forms/bewell_questionnaire.xml`. The form includes:
 
 - `uid` — student identifier (used for N counting in suppression)
 - `wave` — survey wave number

@@ -34,9 +34,6 @@ def configure_logging() -> None:
                 "default": {
                     "format": "%(asctime)s %(levelname)s [%(name)s] %(message)s",
                 },
-                "access": {
-                    "format": '%(asctime)s %(levelname)s [%(name)s] %(client_addr)s - "%(request_line)s" %(status_code)s',
-                },
             },
             "handlers": {
                 "console": {
@@ -46,7 +43,6 @@ def configure_logging() -> None:
                 },
                 "access_console": {
                     "class": "logging.StreamHandler",
-                    "formatter": "access",
                     "stream": "ext://sys.stdout",
                 },
             },

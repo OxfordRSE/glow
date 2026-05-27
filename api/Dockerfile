@@ -10,13 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY pyproject.toml .
 COPY src/ src/
-
-# Install the package and its dependencies
-RUN pip install --no-cache-dir -e ".[test,dev]"
-
 COPY alembic.ini alembic.ini
 COPY alembic/ alembic/
 
+# Install the package normally (not editable) to prevent auto-reload
+RUN pip install --no-cache-dir .
+
 EXPOSE 8000
 
-CMD ["uvicorn", "glow_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "glow_api.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../../app.css';
+  import { browser } from '$app/environment';
   import { authStore, isAdmin } from '$lib/stores';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
@@ -23,8 +24,14 @@
 
   const i18n = $derived(createI18n($locale));
   const currentLocale = $derived(data.locale || 'en');
-
-  const publicRoutes = [`/${currentLocale}/login`];
+  const publicRoutes = $derived([`/${currentLocale}/login`]);
+  
+  // Track path in state for use in authStore subscription
+  let currentPath = $state('');
+  
+  $effect(() => {
+    currentPath = $page.url.pathname;
+  });
 
   // API health and version state
   type HealthStatus = 'unknown' | 'ok' | 'down' | 'version-warning' | 'version-error';
@@ -58,21 +65,25 @@
   onMount(() => {
     initializeLocale();
 
-    const unsubscribe = authStore.subscribe(($auth) => {
-      const path = $page.url.pathname;
-      if (!$auth.token && !publicRoutes.includes(path)) {
-        goto(`/${currentLocale}/login`);
-      }
-    });
-
     // Poll API health every 30 seconds
     pollHealth();
     healthInterval = setInterval(pollHealth, 30_000);
 
     return () => {
-      unsubscribe();
       if (healthInterval !== null) clearInterval(healthInterval);
     };
+  });
+  
+  // Handle auth redirects with $effect to access reactive values safely
+  $effect(() => {
+    if (!browser) return; // Only run in browser
+    
+    const path = $page.url.pathname;
+    const token = $authStore.token;
+    
+    if (!token && !publicRoutes.includes(path)) {
+      goto(`/${currentLocale}/login`);
+    }
   });
 
   function logout() {

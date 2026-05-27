@@ -5,7 +5,7 @@ description = "Read-only API for GLOW longitudinal questionnaire data"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
+    "uvicorn>=0.30.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "pandas>=2.0.0",
@@ -19,8 +19,6 @@ dependencies = [
     "alembic>=1.13.0",
     "click>=8.0.0",
     "apscheduler>=3.10.0",
-    "pyodk>=1.2.0",
-    "openpyxl>=3.1.0",
     "requests>=2.31.0",
 ]
 

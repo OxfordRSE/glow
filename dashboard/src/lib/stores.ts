@@ -9,9 +9,16 @@ interface AuthState {
 function createAuthStore() {
   const stored =
     typeof localStorage !== "undefined" ? localStorage.getItem("auth") : null;
-  const initial: AuthState = stored
-    ? (JSON.parse(stored) as AuthState)
-    : { token: null, user: null };
+  let initial: AuthState;
+  try {
+    initial = stored ? (JSON.parse(stored) as AuthState) : { token: null, user: null };
+  } catch {
+    // If localStorage contains invalid JSON, clear it and start fresh
+    initial = { token: null, user: null };
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("auth");
+    }
+  }
 
   const { subscribe, set, update } = writable<AuthState>(initial);
 

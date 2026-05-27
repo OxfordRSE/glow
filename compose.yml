@@ -8,12 +8,15 @@ services:
       context: ./api
       dockerfile: Dockerfile
     environment:
+      GLOW_TESTING: ${GLOW_TESTING:-}
+      GLOW_ALEMBIC_INI: /app/alembic.ini
       GLOW_ODK_API_URL: ${GLOW_ODK_API_URL:-http://odk-service:8383}
       GLOW_ODK_API_EMAIL: ${GLOW_ODK_API_EMAIL:-}
       GLOW_ODK_API_PASSWORD: ${GLOW_ODK_API_PASSWORD:-}
       GLOW_ODK_PROJECT_ID: ${GLOW_ODK_PROJECT_ID:-1}
       GLOW_ODK_FORM_ID: ${GLOW_ODK_FORM_ID:-bewell_questionnaire}
-      GLOW_DATA_CACHE_PATH: ${GLOW_DATA_CACHE_PATH:-/data/cache.parquet}
+      GLOW_ODK_VERIFY_SSL: ${GLOW_ODK_VERIFY_SSL:-true}
+      GLOW_DATA_CACHE_PATH: ${GLOW_DATA_CACHE_PATH:-.cache.parquet}
       GLOW_DATA_REFRESH_HOURS: ${GLOW_DATA_REFRESH_HOURS:-1}
       GLOW_MIN_N: ${GLOW_MIN_N:-5}
       GLOW_SECRET_KEY: ${GLOW_SECRET_KEY:-change-me-in-production}
@@ -25,6 +28,8 @@ services:
     depends_on:
       api-db:
         condition: service_healthy
+      odk-service:
+        condition: service_started
     networks:
       - public
       - api_db
@@ -93,8 +98,6 @@ services:
 
   postgres14:
     image: postgres:14-alpine
-    profiles:
-      - odk
     environment:
       POSTGRES_DB: ${ODK_POSTGRES_DB:-odk}
       POSTGRES_USER: ${ODK_POSTGRES_USER:-odk}
@@ -115,16 +118,12 @@ services:
 
   mail:
     image: axllent/mailpit:v1.27
-    profiles:
-      - odk
     networks:
       - odk_internal
     restart: unless-stopped
 
   secrets:
     image: busybox:1.36
-    profiles:
-      - odk
     command:
       - /bin/sh
       - -ceu
@@ -155,8 +154,6 @@ services:
 
   pyxform:
     image: ghcr.io/getodk/pyxform-http:v4.4.1
-    profiles:
-      - odk
     networks:
       - odk_internal
     restart: unless-stopped
@@ -165,8 +162,6 @@ services:
     build:
       context: ./odk-central/enketo
       dockerfile: Dockerfile
-    profiles:
-      - odk
     depends_on:
       secrets:
         condition: service_healthy
@@ -186,8 +181,6 @@ services:
 
   enketo_redis_main:
     image: redis:8.6.2
-    profiles:
-      - odk
     volumes:
       - ./odk-central/redis/redis-enketo-main.conf:/usr/local/etc/redis/redis.conf:ro
       - ./docker-mount-data/odk-enketo-redis-main:/data
@@ -200,8 +193,6 @@ services:
 
   enketo_redis_cache:
     image: redis:8.6.2
-    profiles:
-      - odk
     volumes:
       - ./odk-central/redis/redis-enketo-cache.conf:/usr/local/etc/redis/redis.conf:ro
       - ./docker-mount-data/odk-enketo-redis-cache:/data
@@ -214,8 +205,6 @@ services:
 
   odk-service:
     image: ghcr.io/getodk/central-service:${ODK_CENTRAL_TAG:-v2026.1.2}
-    profiles:
-      - odk
     depends_on:
       postgres14:
         condition: service_healthy
@@ -227,6 +216,7 @@ services:
         condition: service_started
       mail:
         condition: service_started
+    command: ["/usr/odk/start-odk.sh"]
     environment:
       DOMAIN: ${ODK_DOMAIN:-odk.local}
       SYSADMIN_EMAIL: ${ODK_SYSADMIN_EMAIL:-admin@example.com}
@@ -261,14 +251,14 @@ services:
       - ./docker-mount-data/odk-secrets:/etc/secrets
       - ./docker-mount-data/odk-transfer:/data/transfer
     networks:
-      - odk_internal
-      - odk_api
+      odk_internal:
+        aliases:
+          - service
+      odk_api:
     restart: unless-stopped
 
   nginx:
     image: ghcr.io/getodk/central-nginx:${ODK_CENTRAL_TAG:-v2026.1.2}
-    profiles:
-      - odk
     depends_on:
       odk-service:
         condition: service_started
@@ -276,6 +266,7 @@ services:
         condition: service_started
     environment:
       DOMAIN: ${ODK_DOMAIN:-odk.local}
+      EXTRA_SERVER_NAMES: ${ODK_EXTRA_SERVER_NAMES:-}
       CERTBOT_EMAIL: ${ODK_SYSADMIN_EMAIL:-admin@example.com}
       SSL_TYPE: ${ODK_SSL_TYPE:-selfsign}
       OIDC_ENABLED: ${ODK_OIDC_ENABLED:-false}
@@ -284,6 +275,7 @@ services:
       SENTRY_PROJECT: ${ODK_SENTRY_PROJECT:-1298632}
     volumes:
       - ./odk-central/nginx/odk.conf.template:/usr/share/odk/nginx/odk.conf.template:ro
+      - ./odk-central/nginx/redirector.conf:/usr/share/odk/nginx/redirector.conf:ro
       - ./odk-central/nginx/client-config.json.template:/usr/share/odk/nginx/client-config.json.template:ro
     networks:
       - public

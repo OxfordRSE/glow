@@ -86,7 +86,7 @@ map $request_uri $central_frontend_csp {
 server {
   listen 443 ssl;
   http2 on;
-  server_name ${DOMAIN};
+  server_name ${DOMAIN}${EXTRA_SERVER_NAMES};
 
   ssl_certificate /etc/${SSL_TYPE}/live/${CERT_DOMAIN}/fullchain.pem;
   ssl_certificate_key /etc/${SSL_TYPE}/live/${CERT_DOMAIN}/privkey.pem;

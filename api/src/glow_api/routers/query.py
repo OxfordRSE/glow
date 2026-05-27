@@ -161,4 +161,5 @@ def query(
         waves=request.waves,
         aggregations=request.aggregations,
         filters=request.filters,
+        metadata=query_options.metadata,
     )

@@ -2,7 +2,6 @@
 
 services:
   api:
-    command: uvicorn glow_api.main:app --host 0.0.0.0 --port 8000 --reload
     working_dir: /app
     volumes:
       - ./data:/data
@@ -22,6 +21,10 @@ services:
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: "true"
       PUBLIC_API_BASE: ${PUBLIC_API_BASE:-http://127.0.0.1:8000}
+
+  nginx:
+    environment:
+      EXTRA_SERVER_NAMES: " localhost 127.0.0.1"
 
 volumes:
   dashboard_node_modules:

@@ -15,6 +15,7 @@ import json
 import sys
 
 import click
+from sqlalchemy import select, insert
 
 from glow_api.auth import get_password_hash
 from glow_api.database import (
@@ -33,6 +34,7 @@ from glow_api.database import (
     set_geographical_neighbors,
     set_statistical_neighbors,
 )
+from metadata_models import User
 
 
 @click.group()
@@ -278,7 +280,8 @@ def schools_create(name: str, size: str | None, category: str | None) -> None:
     default=2,
     help="Minimum number of statistical neighbors per school (default: 2)",
 )
-def schools_sync(min_geographical: int, min_statistical: int) -> None:
+@click.option("--no-create-users", is_flag=True, help="Create new users for each school.")
+def schools_sync(min_geographical: int, min_statistical: int, no_create_users: bool = True) -> None:
     """Extract schools from loaded data, create neighbor relationships, and grant admin access.
 
     This command:
@@ -286,6 +289,7 @@ def schools_sync(min_geographical: int, min_statistical: int) -> None:
     2. Creates school records in the metadata database (skips existing)
     3. Creates neighbor relationships (geographical and statistical)
     4. Grants all admin users access to all schools
+    5. Creates new users for each school (using the capitalized letters of the school as username and password)
     """
     from glow_api.data import get_datastore
     import random
@@ -405,11 +409,27 @@ def schools_sync(min_geographical: int, min_statistical: int) -> None:
                         f"   {school.name}: Already has {current_stat_count} statistical neighbors"
                     )
 
-    # Step 3: Grant admin users access to all schools
+    # Step 3: Set up user->school mappings (admin accesses all)
     click.echo("\n3. Granting admin users access to all schools...")
     with SessionLocal() as db:
         updated_count = grant_admins_all_schools(db)
         click.echo(f"   Updated {updated_count} admin user(s)")
+
+        if not no_create_users:
+            click.echo("   Creating users for schools...")
+            for school in schools:
+                username = "".join(c for c in school.name if c.isupper())
+                user = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+                if user is None:
+                    create_user(
+                        db=db,
+                        username=username,
+                        hashed_password=get_password_hash(username),
+                        is_active=True,
+                        is_admin=False,
+                        school_ids=[school.id]
+                    )
+                    click.echo(f"      {school.name} -> {username}:{username}")
 
     # Step 4: Verification
     click.echo("\n4. Verification:")

@@ -3,6 +3,7 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$/api">
       <sourceFolder url="file://$MODULE_DIR$/api/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/api/src/glow_api" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/api/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/api/build" />
     </content>

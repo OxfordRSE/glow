@@ -135,8 +135,10 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Environments (.env.example is tracked, all others ignored)
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -211,7 +213,6 @@ __marimo__/
 node_modules/
 .svelte-kit/
 build/
-.env
 
 # Terraform
 .terraform/
@@ -245,3 +246,6 @@ docker-mount-data/
 # Local data directory — contents are ignored, but the directory is tracked via .gitkeep
 data/*
 !data/.gitkeep
+
+.cache.*
+**/.cache.*

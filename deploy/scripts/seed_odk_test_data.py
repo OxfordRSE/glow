@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
+# /// script
+# dependencies = ["pandas", "requests", "tqdm", "urllib3"]
+# requires-python = ">=3.12"
+# ///
 """
 Seed ODK Central with test data from data.csv
 
@@ -49,6 +53,17 @@ class ODKSeeder:
         self.form_id = form_id
         self.session = requests.Session()
         self.session.auth = self.auth
+        
+        # Disable SSL verification for local development with self-signed certs
+        self.session.verify = False
+        
+        # Add Host header for ODK Central SNI (needed for local HTTPS)
+        if "localhost" in base_url or "127.0.0.1" in base_url:
+            self.session.headers.update({"Host": "odk.local"})
+        
+        # Suppress InsecureRequestWarning
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
     def get_existing_submissions(self) -> Set[str]:
         """Get set of existing submission instance IDs."""

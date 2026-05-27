@@ -1,4 +1,5 @@
 import logging
+import os
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -125,16 +126,18 @@ class DataStore:
                 else:
                     questionnaires_for_totals[subscale] = [c]
 
-        total_scores_computed = 0
-
+        # Collect all computed subscale scores to avoid DataFrame fragmentation
+        computed_scores = {}
+        
         for subscale, columns in questionnaires_for_totals.items():
-            df[subscale] = df[columns].sum(axis=1, skipna=True)
-            total_scores_computed += 1
+            computed_scores[subscale] = df[columns].sum(axis=1, skipna=True)
             logger.debug("Computed %s from %d columns", subscale, len(columns))
 
-        if total_scores_computed > 0:
+        # Concatenate all computed scores at once instead of iteratively assigning
+        if computed_scores:
+            df = pd.concat([df, pd.DataFrame(computed_scores)], axis=1)
             logger.info(
-                "Computed %d subscale/scale total scores", total_scores_computed
+                "Computed %d subscale/scale total scores", len(computed_scores)
             )
         else:
             logger.warning("No questionnaire columns found to compute total scores")
@@ -271,6 +274,7 @@ def _init_singleton():
         password=settings.ODK_API_PASSWORD,
         project_id=settings.ODK_PROJECT_ID,
         form_id=settings.ODK_FORM_ID,
+        verify_ssl=os.getenv("GLOW_ODK_VERIFY_SSL", "true").lower() != "false",
     )
 
     datastore = DataStore(

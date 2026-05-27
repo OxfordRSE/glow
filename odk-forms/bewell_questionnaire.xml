@@ -1,0 +1,854 @@
+<?xml version="1.0" ?>
+<h:html xmlns="http://www.w3.org/2002/xforms" xmlns:h="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" xmlns:odk="http://www.opendatakit.org/xforms">
+  <h:head>
+    <h:title>BeWell Questionnaire</h:title>
+    <model odk:xforms-version="1.0.0">
+      <instance>
+        <data id="bewell_questionnaire" version="1">
+          <wave/>
+          <uid/>
+          <name/>
+          <school/>
+          <yearGroup/>
+          <schoolYear/>
+          <class/>
+          <d_age/>
+          <d_sex/>
+          <d_ethnicity/>
+          <d_sexualOrientation/>
+          <d_genderIdentity/>
+          <bw_migration_1/>
+          <bw_migration_2/>
+          <bw_migration_3/>
+          <bw_arrival_1/>
+          <bw_life_sat_1/>
+          <bw_wbeing_1/>
+          <bw_wbeing_2/>
+          <bw_wbeing_3/>
+          <bw_wbeing_4/>
+          <bw_wbeing_5/>
+          <bw_wbeing_6/>
+          <bw_wbeing_7/>
+          <bw_selfest_1/>
+          <bw_selfest_2/>
+          <bw_selfest_3/>
+          <bw_selfest_4/>
+          <bw_selfest_5/>
+          <bw_emoreg_1/>
+          <bw_emoreg_2/>
+          <bw_emoreg_3/>
+          <bw_appear_1/>
+          <bw_stress_1/>
+          <bw_stress_2/>
+          <bw_coping_1/>
+          <bw_coping_2/>
+          <bw_emodies_1/>
+          <bw_emodies_2/>
+          <bw_emodies_3/>
+          <bw_emodies_4/>
+          <bw_emodies_5/>
+          <bw_emodies_6/>
+          <bw_emodies_7/>
+          <bw_emodies_8/>
+          <bw_emodies_9/>
+          <bw_emodies_10/>
+          <bw_behav_1/>
+          <bw_behav_2/>
+          <bw_behav_3/>
+          <bw_behav_4/>
+          <bw_behav_5/>
+          <bw_behav_6/>
+          <bw_physh_1/>
+          <bw_sleep_1/>
+          <bw_physact_1/>
+          <bw_physdur_1/>
+          <bw_fruitveg_1/>
+          <bw_unhealthy_1/>
+          <bw_unhealthy_2/>
+          <bw_unhealthy_3/>
+          <bw_unhealthy_4/>
+          <bw_freetime_1/>
+          <bw_socmedia_1/>
+          <bw_socmtype_1/>
+          <bw_socmtype_2/>
+          <bw_volunteer_1/>
+          <bw_activ_1/>
+          <bw_activ_2/>
+          <bw_activ_3/>
+          <bw_activ_4/>
+          <bw_activ_5/>
+          <bw_activ_6/>
+          <bw_activ_7/>
+          <bw_activ_8/>
+          <bw_activ_9/>
+          <bw_activ_10/>
+          <bw_activ_11/>
+          <bw_schoolconn_1/>
+          <bw_attain_1/>
+          <bw_staffrel_1/>
+          <bw_staffrel_2/>
+          <bw_staffrel_3/>
+          <bw_staffrel_4/>
+          <bw_iso_1/>
+          <bw_isodays_1/>
+          <bw_isodur_1/>
+          <bw_schpress_1/>
+          <bw_homeenv_1/>
+          <bw_safety_1/>
+          <bw_localenv_1/>
+          <bw_localenv_2/>
+          <bw_localenv_3/>
+          <bw_localenv_4/>
+          <bw_beinheard_1/>
+          <bw_foodsec_1/>
+          <bw_material_1/>
+          <bw_future_1/>
+          <bw_future_2/>
+          <bw_future_3/>
+          <bw_future_4/>
+          <bw_future_5/>
+          <bw_future_6/>
+          <bw_future_7/>
+          <bw_careersed_1/>
+          <bw_careershlp_1/>
+          <bw_plans_1/>
+          <bw_plans_2/>
+          <bw_plans_3/>
+          <bw_plans_4/>
+          <bw_plans_5/>
+          <bw_plans_6/>
+          <bw_plans_7/>
+          <bw_plans_8/>
+          <bw_gmacs_1/>
+          <bw_gmacs_2/>
+          <bw_parentsrel_1/>
+          <bw_parentsrel_2/>
+          <bw_parentsrel_3/>
+          <bw_parentsrel_4/>
+          <bw_friends_1/>
+          <bw_friends_2/>
+          <bw_friends_3/>
+          <bw_friends_4/>
+          <bw_lonely_1/>
+          <bw_discrim_1/>
+          <bw_discrim_2/>
+          <bw_discrim_3/>
+          <bw_discrim_4/>
+          <bw_discrim_5/>
+          <bw_discloc_1/>
+          <bw_discloc_2/>
+          <bw_discloc_3/>
+          <bw_discloc_4/>
+          <bw_discloc_5/>
+          <bw_discloc_6/>
+          <bw_discloc_7/>
+          <bw_bullying_1/>
+          <bw_bullying_2/>
+          <bw_bullying_3/>
+          <bw_support_1/>
+          <bw_mhcontact_1/>
+          <bw_mhcontact_2/>
+          <bw_mhcontact_3/>
+          <bw_mhcontact_4/>
+          <bw_mhcontact_5/>
+          <bw_mhcontact_6/>
+          <bw_kooth_1/>
+          <meta>
+            <instanceID/>
+          </meta>
+        </data>
+      </instance>
+      <instance id="sex">
+        <root>
+          <item>
+            <name>M</name>
+            <label>Male</label>
+          </item>
+          <item>
+            <name>F</name>
+            <label>Female</label>
+          </item>
+          <item>
+            <name>I</name>
+            <label>Intersex</label>
+          </item>
+        </root>
+      </instance>
+      <instance id="ethnicity">
+        <root>
+          <item>
+            <name>White_British</name>
+            <label>White British</label>
+          </item>
+          <item>
+            <name>Asian</name>
+            <label>Asian</label>
+          </item>
+          <item>
+            <name>Black</name>
+            <label>Black</label>
+          </item>
+          <item>
+            <name>Mixed</name>
+            <label>Mixed</label>
+          </item>
+          <item>
+            <name>Other</name>
+            <label>Other</label>
+          </item>
+        </root>
+      </instance>
+      <instance id="sexual_orientation">
+        <root>
+          <item>
+            <name>Heterosexual</name>
+            <label>Heterosexual</label>
+          </item>
+          <item>
+            <name>Gay_or_lesbian</name>
+            <label>Gay or lesbian</label>
+          </item>
+          <item>
+            <name>Bisexual</name>
+            <label>Bisexual</label>
+          </item>
+          <item>
+            <name>Other</name>
+            <label>Other</label>
+          </item>
+        </root>
+      </instance>
+      <instance id="gender_identity">
+        <root>
+          <item>
+            <name>Cisgender</name>
+            <label>Cisgender</label>
+          </item>
+          <item>
+            <name>Transgender</name>
+            <label>Transgender</label>
+          </item>
+          <item>
+            <name>Non_binary</name>
+            <label>Non-binary</label>
+          </item>
+          <item>
+            <name>Other</name>
+            <label>Other</label>
+          </item>
+        </root>
+      </instance>
+      <bind nodeset="/data/wave" type="string" required="false()"/>
+      <bind nodeset="/data/uid" type="string" required="false()"/>
+      <bind nodeset="/data/name" type="string" required="false()"/>
+      <bind nodeset="/data/school" type="string" required="false()"/>
+      <bind nodeset="/data/yearGroup" type="int" required="false()"/>
+      <bind nodeset="/data/schoolYear" type="int" required="false()"/>
+      <bind nodeset="/data/class" type="string" required="false()"/>
+      <bind nodeset="/data/d_age" type="int" constraint=". &gt;= 0" required="false()"/>
+      <bind nodeset="/data/d_sex" type="string" required="false()"/>
+      <bind nodeset="/data/d_ethnicity" type="string" required="false()"/>
+      <bind nodeset="/data/d_sexualOrientation" type="string" required="false()"/>
+      <bind nodeset="/data/d_genderIdentity" type="string" required="false()"/>
+      <bind nodeset="/data/bw_migration_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_migration_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_migration_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_arrival_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_life_sat_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_6" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_7" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_selfest_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_selfest_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_selfest_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_selfest_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_selfest_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emoreg_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emoreg_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emoreg_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_appear_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_stress_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_stress_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_coping_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_coping_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_6" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_7" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_8" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_9" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_10" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_6" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_physh_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_sleep_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_physact_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_physdur_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_fruitveg_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_unhealthy_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_unhealthy_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_unhealthy_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_unhealthy_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_freetime_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_socmedia_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_socmtype_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_socmtype_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_volunteer_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_6" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_7" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_8" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_9" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_10" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_activ_11" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_schoolconn_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_attain_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_staffrel_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_staffrel_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_staffrel_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_staffrel_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_iso_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_isodays_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_isodur_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_schpress_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_homeenv_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_safety_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_localenv_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_localenv_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_localenv_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_localenv_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_beinheard_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_foodsec_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_material_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_future_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_future_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_future_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_future_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_future_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_future_6" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_future_7" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_careersed_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_careershlp_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_plans_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_plans_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_plans_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_plans_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_plans_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_plans_6" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_plans_7" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_plans_8" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_gmacs_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_gmacs_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_parentsrel_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_parentsrel_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_parentsrel_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_parentsrel_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_friends_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_friends_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_friends_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_friends_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_lonely_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discrim_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discrim_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discrim_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discrim_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discrim_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discloc_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discloc_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discloc_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discloc_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discloc_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discloc_6" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_discloc_7" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_bullying_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_bullying_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_bullying_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_support_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_mhcontact_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_mhcontact_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_mhcontact_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_mhcontact_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_mhcontact_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_mhcontact_6" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_kooth_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/meta/instanceID" type="string" readonly="true()" jr:preload="uid"/>
+    </model>
+  </h:head>
+  <h:body>
+    <input ref="/data/wave">
+      <label>Wave</label>
+    </input>
+    <input ref="/data/uid">
+      <label>Unique ID</label>
+    </input>
+    <input ref="/data/name">
+      <label>Name</label>
+    </input>
+    <input ref="/data/school">
+      <label>School</label>
+    </input>
+    <input ref="/data/yearGroup">
+      <label>Year Group</label>
+    </input>
+    <input ref="/data/schoolYear">
+      <label>School Year</label>
+    </input>
+    <input ref="/data/class">
+      <label>Class</label>
+    </input>
+    <input ref="/data/d_age">
+      <label>Age</label>
+    </input>
+    <select1 ref="/data/d_sex">
+      <label>Sex</label>
+      <itemset nodeset="instance('sex')/root/item">
+        <value ref="name"/>
+        <label ref="label"/>
+      </itemset>
+    </select1>
+    <select1 ref="/data/d_ethnicity">
+      <label>Ethnicity</label>
+      <itemset nodeset="instance('ethnicity')/root/item">
+        <value ref="name"/>
+        <label ref="label"/>
+      </itemset>
+    </select1>
+    <select1 ref="/data/d_sexualOrientation">
+      <label>Sexual Orientation</label>
+      <itemset nodeset="instance('sexual_orientation')/root/item">
+        <value ref="name"/>
+        <label ref="label"/>
+      </itemset>
+    </select1>
+    <select1 ref="/data/d_genderIdentity">
+      <label>Gender Identity</label>
+      <itemset nodeset="instance('gender_identity')/root/item">
+        <value ref="name"/>
+        <label ref="label"/>
+      </itemset>
+    </select1>
+    <input ref="/data/bw_migration_1">
+      <label>Migration background: Birth parent or carer 1 was born outside the UK</label>
+    </input>
+    <input ref="/data/bw_migration_2">
+      <label>Migration background: Birth parent or carer 2 was born outside the UK</label>
+    </input>
+    <input ref="/data/bw_migration_3">
+      <label>Migration background: I was born outside the UK</label>
+    </input>
+    <input ref="/data/bw_arrival_1">
+      <label>Arrival in the UK: How old were you when you first arrived in the UK?</label>
+    </input>
+    <input ref="/data/bw_life_sat_1">
+      <label>Life satisfaction: Overall, how satisfied are you with your life nowadays?</label>
+    </input>
+    <input ref="/data/bw_wbeing_1">
+      <label>Psychological wellbeing: I've been feeling optimistic about the future</label>
+    </input>
+    <input ref="/data/bw_wbeing_2">
+      <label>Psychological wellbeing: I've been feeling useful</label>
+    </input>
+    <input ref="/data/bw_wbeing_3">
+      <label>Psychological wellbeing: I've been feeling relaxed</label>
+    </input>
+    <input ref="/data/bw_wbeing_4">
+      <label>Psychological wellbeing: I've been dealing with problems well</label>
+    </input>
+    <input ref="/data/bw_wbeing_5">
+      <label>Psychological wellbeing: I've been thinking clearly</label>
+    </input>
+    <input ref="/data/bw_wbeing_6">
+      <label>Psychological wellbeing: I've been feeling close to other people</label>
+    </input>
+    <input ref="/data/bw_wbeing_7">
+      <label>Psychological wellbeing: I've been able to make up my own mind about things</label>
+    </input>
+    <input ref="/data/bw_selfest_1">
+      <label>Self-esteem: On the whole, I am satisfied with myself</label>
+    </input>
+    <input ref="/data/bw_selfest_2">
+      <label>Self-esteem: I feel that I have a number of good qualities</label>
+    </input>
+    <input ref="/data/bw_selfest_3">
+      <label>Self-esteem: I am able to do things as well as most other people</label>
+    </input>
+    <input ref="/data/bw_selfest_4">
+      <label>Self-esteem: I am a person of value</label>
+    </input>
+    <input ref="/data/bw_selfest_5">
+      <label>Self-esteem: I feel good about myself</label>
+    </input>
+    <input ref="/data/bw_emoreg_1">
+      <label>Emotion regulation: When I am worried, I keep myself from losing control</label>
+    </input>
+    <input ref="/data/bw_emoreg_2">
+      <label>Emotion regulation: When I am worried, I talk to someone until I feel better</label>
+    </input>
+    <input ref="/data/bw_emoreg_3">
+      <label>Emotion regulation: When I am worried, I try to calmly settle the problem</label>
+    </input>
+    <input ref="/data/bw_appear_1">
+      <label>Appearance happiness: How happy are you with your appearance?</label>
+    </input>
+    <input ref="/data/bw_stress_1">
+      <label>Stress: How often have you felt unable to control important things in your life?</label>
+    </input>
+    <input ref="/data/bw_stress_2">
+      <label>Stress: How often have you felt difficulties piling up so high that you could not overcome them?</label>
+    </input>
+    <input ref="/data/bw_coping_1">
+      <label>Coping: How often have you felt confident about your ability to handle personal problems?</label>
+    </input>
+    <input ref="/data/bw_coping_2">
+      <label>Coping: How often have you felt that things were going your way?</label>
+    </input>
+    <input ref="/data/bw_emodies_1">
+      <label>Emotional difficulties: I feel lonely</label>
+    </input>
+    <input ref="/data/bw_emodies_2">
+      <label>Emotional difficulties: I am unhappy</label>
+    </input>
+    <input ref="/data/bw_emodies_3">
+      <label>Emotional difficulties: Nobody likes me</label>
+    </input>
+    <input ref="/data/bw_emodies_4">
+      <label>Emotional difficulties: I cry a lot</label>
+    </input>
+    <input ref="/data/bw_emodies_5">
+      <label>Emotional difficulties: I worry when at school</label>
+    </input>
+    <input ref="/data/bw_emodies_6">
+      <label>Emotional difficulties: I worry a lot</label>
+    </input>
+    <input ref="/data/bw_emodies_7">
+      <label>Emotional difficulties: I have problems sleeping</label>
+    </input>
+    <input ref="/data/bw_emodies_8">
+      <label>Emotional difficulties: I wake up in the night</label>
+    </input>
+    <input ref="/data/bw_emodies_9">
+      <label>Emotional difficulties: I am shy</label>
+    </input>
+    <input ref="/data/bw_emodies_10">
+      <label>Emotional difficulties: I feel scared</label>
+    </input>
+    <input ref="/data/bw_behav_1">
+      <label>Behavioural difficulties: I get very angry</label>
+    </input>
+    <input ref="/data/bw_behav_2">
+      <label>Behavioural difficulties: I lose my temper</label>
+    </input>
+    <input ref="/data/bw_behav_3">
+      <label>Behavioural difficulties: I hit out when I am angry</label>
+    </input>
+    <input ref="/data/bw_behav_4">
+      <label>Behavioural difficulties: I am calm</label>
+    </input>
+    <input ref="/data/bw_behav_5">
+      <label>Behavioural difficulties: I break things on purpose</label>
+    </input>
+    <input ref="/data/bw_behav_6">
+      <label>Behavioural difficulties: I do things to hurt people</label>
+    </input>
+    <input ref="/data/bw_physh_1">
+      <label>Physical health: In general would you say your physical health is:</label>
+    </input>
+    <input ref="/data/bw_sleep_1">
+      <label>Sleep adequacy: Is the amount of sleep you get enough to feel awake and concentrate?</label>
+    </input>
+    <input ref="/data/bw_physact_1">
+      <label>Physical activity days: How many days in a usual week are you physically active?</label>
+    </input>
+    <input ref="/data/bw_physdur_1">
+      <label>Physical activity duration: On active days, how long on average do you spend being physically active?</label>
+    </input>
+    <input ref="/data/bw_fruitveg_1">
+      <label>Fruit and vegetables: How many portions of fruit or veg do you eat in a typical day?</label>
+    </input>
+    <input ref="/data/bw_unhealthy_1">
+      <label>Unhealthy food and drink frequency: Sugary drinks</label>
+    </input>
+    <input ref="/data/bw_unhealthy_2">
+      <label>Unhealthy food and drink frequency: Diet or sugar-free drinks</label>
+    </input>
+    <input ref="/data/bw_unhealthy_3">
+      <label>Unhealthy food and drink frequency: Sweets, chocolate and snacks</label>
+    </input>
+    <input ref="/data/bw_unhealthy_4">
+      <label>Unhealthy food and drink frequency: Take-away and fast food</label>
+    </input>
+    <input ref="/data/bw_freetime_1">
+      <label>Free time: How often can you do things that you like in your free time?</label>
+    </input>
+    <input ref="/data/bw_socmedia_1">
+      <label>Social media time: On a normal weekday, how much time do you spend on social media?</label>
+    </input>
+    <input ref="/data/bw_socmtype_1">
+      <label>Social media use type: Active use such as chatting or posting</label>
+    </input>
+    <input ref="/data/bw_socmtype_2">
+      <label>Social media use type: Passive use such as browsing or scrolling</label>
+    </input>
+    <input ref="/data/bw_volunteer_1">
+      <label>Volunteering: How often do you do volunteer work?</label>
+    </input>
+    <input ref="/data/bw_activ_1">
+      <label>Activities when not at school: Listening to music</label>
+    </input>
+    <input ref="/data/bw_activ_2">
+      <label>Activities when not at school: Going to the cinema or theatre</label>
+    </input>
+    <input ref="/data/bw_activ_3">
+      <label>Activities when not at school: Watching TV shows or films</label>
+    </input>
+    <input ref="/data/bw_activ_4">
+      <label>Activities when not at school: Watching live sport</label>
+    </input>
+    <input ref="/data/bw_activ_5">
+      <label>Activities when not at school: Reading for enjoyment</label>
+    </input>
+    <input ref="/data/bw_activ_6">
+      <label>Activities when not at school: Youth offer activities such as youth clubs or Scouts</label>
+    </input>
+    <input ref="/data/bw_activ_7">
+      <label>Activities when not at school: Attending a religious service</label>
+    </input>
+    <input ref="/data/bw_activ_8">
+      <label>Activities when not at school: Drawing, painting or making things</label>
+    </input>
+    <input ref="/data/bw_activ_9">
+      <label>Activities when not at school: Computer or console gaming</label>
+    </input>
+    <input ref="/data/bw_activ_10">
+      <label>Activities when not at school: Sport, exercise or physical activities not at school</label>
+    </input>
+    <input ref="/data/bw_activ_11">
+      <label>Activities when not at school: Creative hobbies not mentioned above</label>
+    </input>
+    <input ref="/data/bw_schoolconn_1">
+      <label>School connection: I feel that I belong at my school.</label>
+    </input>
+    <input ref="/data/bw_attain_1">
+      <label>Attainment happiness: How happy are you with the marks you get in school?</label>
+    </input>
+    <input ref="/data/bw_staffrel_1">
+      <label>Relationships with school staff: At school there is an adult who is interested in my schoolwork</label>
+    </input>
+    <input ref="/data/bw_staffrel_2">
+      <label>Relationships with school staff: At school there is an adult who believes that I will be a success</label>
+    </input>
+    <input ref="/data/bw_staffrel_3">
+      <label>Relationships with school staff: At school there is an adult who wants me to do my best</label>
+    </input>
+    <input ref="/data/bw_staffrel_4">
+      <label>Relationships with school staff: At school there is an adult who listens to me when I have something to say</label>
+    </input>
+    <input ref="/data/bw_iso_1">
+      <label>School isolation: Think about a typical school week. Are you ever placed in isolation?</label>
+    </input>
+    <input ref="/data/bw_isodays_1">
+      <label>School isolation days: On how many days in a typical week are you placed in isolation?</label>
+    </input>
+    <input ref="/data/bw_isodur_1">
+      <label>School isolation duration: How long does isolation typically last?</label>
+    </input>
+    <input ref="/data/bw_schpress_1">
+      <label>School pressure: How pressured do you feel by the schoolwork you have to do?</label>
+    </input>
+    <input ref="/data/bw_homeenv_1">
+      <label>Home environment happiness: How happy are you with the home that you live in?</label>
+    </input>
+    <input ref="/data/bw_safety_1">
+      <label>Safety in local area: How safe do you feel when in your local area?</label>
+    </input>
+    <input ref="/data/bw_localenv_1">
+      <label>Local environment quality: People around here support each other with their wellbeing</label>
+    </input>
+    <input ref="/data/bw_localenv_2">
+      <label>Local environment quality: You can trust people around here</label>
+    </input>
+    <input ref="/data/bw_localenv_3">
+      <label>Local environment quality: I could ask for help or a favour from neighbours</label>
+    </input>
+    <input ref="/data/bw_localenv_4">
+      <label>Local environment quality: There are good places to spend your free time</label>
+    </input>
+    <input ref="/data/bw_beinheard_1">
+      <label>Being heard outside school and home: Away from school and home, there is an adult who listens to me.</label>
+    </input>
+    <input ref="/data/bw_foodsec_1">
+      <label>Food security: The food that we bought just did not last. How often was this true?</label>
+    </input>
+    <input ref="/data/bw_material_1">
+      <label>Material wellbeing: How happy are you with the things that you have, like money and things you own?</label>
+    </input>
+    <input ref="/data/bw_future_1">
+      <label>Future readiness: I have hope and feel optimistic about my future</label>
+    </input>
+    <input ref="/data/bw_future_2">
+      <label>Future readiness: I feel that my generation will have a better life than my parents' generation</label>
+    </input>
+    <input ref="/data/bw_future_3">
+      <label>Future readiness: I am generally confident in my own skills and abilities</label>
+    </input>
+    <input ref="/data/bw_future_4">
+      <label>Future readiness: I usually cope well with most unexpected problems</label>
+    </input>
+    <input ref="/data/bw_future_5">
+      <label>Future readiness: When I finish education, I will have the skills I need to be prepared for life</label>
+    </input>
+    <input ref="/data/bw_future_6">
+      <label>Future readiness: If I do well with education, I will have the same chances as anyone else of getting a job</label>
+    </input>
+    <input ref="/data/bw_future_7">
+      <label>Future readiness: I feel in control about future education, training and job prospects</label>
+    </input>
+    <input ref="/data/bw_careersed_1">
+      <label>Careers education received: How many types of careers education have you received at school?</label>
+    </input>
+    <input ref="/data/bw_careershlp_1">
+      <label>Careers education helpfulness: How helpful has the careers education you have received at school been?</label>
+    </input>
+    <input ref="/data/bw_plans_1">
+      <label>Post-Year-11 plans: Might do this after Year 11: school sixth form</label>
+    </input>
+    <input ref="/data/bw_plans_2">
+      <label>Post-Year-11 plans: Might do this after Year 11: further education or sixth-form college</label>
+    </input>
+    <input ref="/data/bw_plans_3">
+      <label>Post-Year-11 plans: Might do this after Year 11: UTC or Studio School</label>
+    </input>
+    <input ref="/data/bw_plans_4">
+      <label>Post-Year-11 plans: Might do this after Year 11: apprenticeship or traineeship</label>
+    </input>
+    <input ref="/data/bw_plans_5">
+      <label>Post-Year-11 plans: Might do this after Year 11: supported internship</label>
+    </input>
+    <input ref="/data/bw_plans_6">
+      <label>Post-Year-11 plans: Might do this after Year 11: T level</label>
+    </input>
+    <input ref="/data/bw_plans_7">
+      <label>Post-Year-11 plans: Might do this after Year 11: get a job</label>
+    </input>
+    <input ref="/data/bw_plans_8">
+      <label>Post-Year-11 plans: Might do this after Year 11: start a business</label>
+    </input>
+    <input ref="/data/bw_gmacs_1">
+      <label>GMACS: Do you know what GMACS is?</label>
+    </input>
+    <input ref="/data/bw_gmacs_2">
+      <label>GMACS: Have you used the GMACS website in the last 12 months?</label>
+    </input>
+    <input ref="/data/bw_parentsrel_1">
+      <label>Relationships with parents or carers: At home there is an adult who is interested in my schoolwork</label>
+    </input>
+    <input ref="/data/bw_parentsrel_2">
+      <label>Relationships with parents or carers: At home there is an adult who believes that I will be a success</label>
+    </input>
+    <input ref="/data/bw_parentsrel_3">
+      <label>Relationships with parents or carers: At home there is an adult who wants me to do my best</label>
+    </input>
+    <input ref="/data/bw_parentsrel_4">
+      <label>Relationships with parents or carers: At home there is an adult who listens to me when I have something to say</label>
+    </input>
+    <input ref="/data/bw_friends_1">
+      <label>Friendships and social support: I get along with people around me</label>
+    </input>
+    <input ref="/data/bw_friends_2">
+      <label>Friendships and social support: People like to spend time with me</label>
+    </input>
+    <input ref="/data/bw_friends_3">
+      <label>Friendships and social support: I feel supported by my friends</label>
+    </input>
+    <input ref="/data/bw_friends_4">
+      <label>Friendships and social support: My friends care about me when times are hard</label>
+    </input>
+    <input ref="/data/bw_lonely_1">
+      <label>Loneliness: How often do you feel lonely?</label>
+    </input>
+    <input ref="/data/bw_discrim_1">
+      <label>Discrimination experiences: People make me feel bad because of my race or skin colour</label>
+    </input>
+    <input ref="/data/bw_discrim_2">
+      <label>Discrimination experiences: People make me feel bad because of my gender</label>
+    </input>
+    <input ref="/data/bw_discrim_3">
+      <label>Discrimination experiences: People make me feel bad because of my sexual orientation</label>
+    </input>
+    <input ref="/data/bw_discrim_4">
+      <label>Discrimination experiences: People make me feel bad because of my disability</label>
+    </input>
+    <input ref="/data/bw_discrim_5">
+      <label>Discrimination experiences: People make me feel bad because of my religion or faith</label>
+    </input>
+    <input ref="/data/bw_discloc_1">
+      <label>Where discrimination happened: At home</label>
+    </input>
+    <input ref="/data/bw_discloc_2">
+      <label>Where discrimination happened: Walking to or from school</label>
+    </input>
+    <input ref="/data/bw_discloc_3">
+      <label>Where discrimination happened: On public transport</label>
+    </input>
+    <input ref="/data/bw_discloc_4">
+      <label>Where discrimination happened: At school</label>
+    </input>
+    <input ref="/data/bw_discloc_5">
+      <label>Where discrimination happened: In my local area</label>
+    </input>
+    <input ref="/data/bw_discloc_6">
+      <label>Where discrimination happened: Online</label>
+    </input>
+    <input ref="/data/bw_discloc_7">
+      <label>Where discrimination happened: Somewhere else</label>
+    </input>
+    <input ref="/data/bw_bullying_1">
+      <label>Bullying: Physical bullying</label>
+    </input>
+    <input ref="/data/bw_bullying_2">
+      <label>Bullying: Social bullying</label>
+    </input>
+    <input ref="/data/bw_bullying_3">
+      <label>Bullying: Cyber-bullying</label>
+    </input>
+    <input ref="/data/bw_support_1">
+      <label>Access to wellbeing support: I have a place to seek support for worries or mental health concerns.</label>
+    </input>
+    <input ref="/data/bw_mhcontact_1">
+      <label>Mental health contact: Someone in your family</label>
+    </input>
+    <input ref="/data/bw_mhcontact_2">
+      <label>Mental health contact: A close friend</label>
+    </input>
+    <input ref="/data/bw_mhcontact_3">
+      <label>Mental health contact: A trusted adult who is not at school and not in your family</label>
+    </input>
+    <input ref="/data/bw_mhcontact_4">
+      <label>Mental health contact: A teacher</label>
+    </input>
+    <input ref="/data/bw_mhcontact_5">
+      <label>Mental health contact: A school mental health worker</label>
+    </input>
+    <input ref="/data/bw_mhcontact_6">
+      <label>Mental health contact: Online help such as websites, social media or self-help groups</label>
+    </input>
+    <input ref="/data/bw_kooth_1">
+      <label>Kooth: Have you heard of or used Kooth, the online wellbeing service?</label>
+    </input>
+  </h:body>
+</h:html>

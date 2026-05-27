@@ -1,7 +1,5 @@
-import { env } from "$env/dynamic/public";
-
 // Can be overridden by setting PUBLIC_API_BASE env var (e.g. http://localhost:8000)
-const API_BASE = env.PUBLIC_API_BASE ?? "/api";
+const API_BASE = import.meta.env.PUBLIC_API_BASE ?? "/api";
 
 // Target backend version - update this when making breaking changes to API surface
 export const TARGET_BACKEND_VERSION = "0.1.0";
@@ -219,8 +217,14 @@ export async function login(
     body: body.toString(),
   });
   if (!res.ok) {
-    const j = (await res.json()) as { detail?: string };
-    throw new ApiError(res.status, j.detail ?? res.statusText);
+    try {
+      const j = (await res.json()) as { detail?: string };
+      throw new ApiError(res.status, j.detail ?? res.statusText);
+    } catch (parseError) {
+      // If JSON parsing fails, throw a generic authentication error
+      if (parseError instanceof ApiError) throw parseError;
+      throw new ApiError(res.status, "Authentication failed");
+    }
   }
   return res.json() as Promise<Token>;
 }
@@ -292,8 +296,14 @@ export async function deleteUser(token: string, id: number): Promise<void> {
     headers: authHeaders(token),
   });
   if (!res.ok && res.status !== 204) {
-    const j = (await res.json()) as { detail?: string };
-    throw new ApiError(res.status, j.detail ?? res.statusText);
+    try {
+      const j = (await res.json()) as { detail?: string };
+      throw new ApiError(res.status, j.detail ?? res.statusText);
+    } catch (parseError) {
+      // If JSON parsing fails, throw a generic delete error
+      if (parseError instanceof ApiError) throw parseError;
+      throw new ApiError(res.status, "Failed to delete user");
+    }
   }
 }
 
@@ -378,8 +388,14 @@ export async function deleteSchool(token: string, id: number): Promise<void> {
     headers: authHeaders(token),
   });
   if (!res.ok && res.status !== 204) {
-    const j = (await res.json()) as { detail?: string };
-    throw new ApiError(res.status, j.detail ?? res.statusText);
+    try {
+      const j = (await res.json()) as { detail?: string };
+      throw new ApiError(res.status, j.detail ?? res.statusText);
+    } catch (parseError) {
+      // If JSON parsing fails, throw a generic delete error
+      if (parseError instanceof ApiError) throw parseError;
+      throw new ApiError(res.status, "Failed to delete school");
+    }
   }
 }
 

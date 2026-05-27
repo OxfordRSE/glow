@@ -5,15 +5,22 @@ This module provides a wrapper around pyODK for fetching submissions from ODK Ce
 with ETAG-based caching and metadata extraction from XLSForms.
 """
 import logging
+import os
+from datetime import datetime
+from json import JSONDecodeError
 from typing import Dict, Optional, Tuple
 import re
+from io import BytesIO
 
 import pandas as pd
 import requests
-from pyodk.client import Client as PyODKClient
-from pyodk._utils.session import Session
+import urllib3
 
 logger = logging.getLogger(__name__)
+
+# Disable SSL warnings if SSL verification is disabled
+if os.getenv("GLOW_ODK_VERIFY_SSL", "true").lower() == "false":
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class ODKClient:
@@ -26,6 +33,7 @@ class ODKClient:
         password: str,
         project_id: int,
         form_id: str,
+        verify_ssl: bool = True,
     ):
         """Initialize ODK client.
         
@@ -35,24 +43,54 @@ class ODKClient:
             password: ODK Central password
             project_id: Default project ID
             form_id: Form ID to fetch submissions from
+            verify_ssl: Whether to verify SSL certificates (default: True)
         """
         self.base_url = base_url
         self.username = username
         self.password = password
         self.project_id = project_id
         self.form_id = form_id
+        self.verify_ssl = verify_ssl
         
-        # Initialize pyODK client
-        self.client = PyODKClient(config_path=None)
-        self.client.session = Session(
-            base_url=base_url,
-            username=username,
-            password=password,
+        # For nginx virtual hosting, set Host header to match SSL cert
+        self.default_headers = {}
+        if "nginx" in base_url.lower():
+            self.default_headers["Host"] = "odk.local"
+        
+        # Authenticate with ODK Central
+        response = requests.post(
+            f"{self.base_url}/v1/sessions",
+            json={"email": self.username, "password": self.password},
+            headers=self.default_headers,
+            verify=self.verify_ssl
         )
-        self.client.projects.default_project_id = project_id
-        self.client.forms.default_form_id = form_id
-    
-    def fetch_submissions(self, etag: Optional[str] = None) -> Tuple[pd.DataFrame, Optional[str]]:
+        if response.status_code != 200:
+            response.raise_for_status()
+            raise ConnectionError(f"Failed to connect to ODK Central: {response.status_code}")
+        try:
+            data = response.json()
+            self.access_token = data["token"]
+            self.token_expires = datetime.fromisoformat(data["expiresAt"].replace("Z", "+00:00"))
+        except (JSONDecodeError, KeyError):
+            logger.warning(f"Unexpeted ODK Central response format: {response.content}")
+            raise ValueError("ODK Central response did not match expected shape.")
+        
+    def get(self, *args, **kwargs):
+        # Add SSL verification setting if not explicitly provided
+        if 'verify' not in kwargs:
+            kwargs['verify'] = self.verify_ssl
+        
+        # Merge default headers with provided headers
+        headers = dict(self.default_headers)
+        if 'headers' in kwargs:
+            headers.update(kwargs['headers'])
+        kwargs['headers'] = headers
+        
+        request = requests.get(*args, auth=(self.username, self.password), **kwargs)
+        request.raise_for_status()
+        return request
+
+    def fetch_submissions(self, etag: Optional[str] = None) -> Optional[Tuple[pd.DataFrame, Optional[str]]]:
         """Fetch submissions from ODK Central.
         
         Args:
@@ -67,26 +105,15 @@ class ODKClient:
             self.project_id,
             self.form_id,
         )
-        
-        try:
-            # Use pyODK to fetch submissions as a table
-            # This returns a pandas DataFrame
-            df = self.client.submissions.get_table(
-                form_id=self.form_id,
-                project_id=self.project_id,
-            )
-            
-            # pyODK doesn't expose ETAG directly, so we'll implement our own caching
-            # For now, always return data (we'll add ETAG support separately)
-            new_etag = None  # TODO: Implement ETAG support
-            
-            logger.info("Fetched %d submissions", len(df))
-            
-            return df, new_etag
-        
-        except Exception as e:
-            logger.exception("Failed to fetch submissions from ODK Central")
-            raise
+
+        url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{self.form_id}/submissions.csv"
+        response = self.get(url, headers={"etag": etag})
+        if response.status_code == 304:
+            return None
+        new_etag = response.headers.get("etag")
+        csv_data = response.content
+        df = pd.read_csv(BytesIO(csv_data))
+        return df, new_etag
     
     def get_form_metadata(self) -> Dict[str, Dict[str, int]]:
         """Extract metadata (min/max values) from form definition.
@@ -97,71 +124,74 @@ class ODKClient:
         logger.info("Fetching form metadata for form=%s", self.form_id)
         
         try:
-            # Download XLSForm and extract metadata
-            xlsform_bytes = self.download_xlsform()
-            metadata = self.extract_metadata_from_xlsform(xlsform_bytes)
+            # Download XML form definition and extract metadata
+            xml_content = self.download_form_xml()
+            metadata = self.extract_metadata_from_xml(xml_content)
             
             logger.info("Extracted metadata for %d fields", len(metadata))
             
             return metadata
         
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to fetch form metadata")
             raise
     
-    def download_xlsform(self) -> bytes:
-        """Download XLSForm definition for metadata extraction.
+    def download_form_xml(self) -> str:
+        """Download XML form definition for metadata extraction.
         
         Returns:
-            XLSForm file content as bytes
+            XML form definition as string
         """
-        # Use raw HTTP request since pyODK doesn't expose XLSForm download
-        url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{self.form_id}.xlsx"
+        url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{self.form_id}.xml"
+        response = self.get(url)
         
-        response = requests.get(
-            url,
-            auth=(self.username, self.password),
-        )
-        response.raise_for_status()
-        
-        return response.content
+        return response.text
     
-    def extract_metadata_from_xlsform(self, xlsform_bytes: bytes) -> Dict[str, Dict[str, int]]:
-        """Extract min/max metadata from XLSForm.
+    def extract_metadata_from_xml(self, xml_content: str) -> Dict[str, Dict[str, int]]:
+        """Extract min/max metadata from XML form definition.
         
         Args:
-            xlsform_bytes: XLSForm file content
+            xml_content: XML form definition content
         
         Returns:
             Dict mapping field names to {"min": int, "max": int}
         """
-        from io import BytesIO
-        
-        # Read XLSForm with pandas
-        xl = pd.ExcelFile(BytesIO(xlsform_bytes))
-        survey = pd.read_excel(xl, "survey")
+        import xml.etree.ElementTree as ET
         
         metadata = {}
         
-        for _, row in survey.iterrows():
-            field_name = row.get("name")
-            constraint = row.get("constraint", "")
+        # Parse XML
+        root = ET.fromstring(xml_content)
+        
+        # Find all bind elements (they contain the constraints)
+        # XForms uses namespaces, so we need to handle that
+        # The bind elements are in the default namespace
+        for bind in root.findall(".//{http://www.w3.org/2002/xforms}bind"):
+            nodeset = bind.get("nodeset")
+            constraint = bind.get("constraint", "")
             
-            if not field_name or not constraint:
+            if not nodeset or not constraint:
                 continue
             
+            # Extract field name from nodeset (e.g., "/data/bw_migration_1" -> "bw_migration_1")
+            field_name = nodeset.split("/")[-1]
+            
             # Parse constraint to extract min/max
-            # Constraints look like: ". >= 0 and . <= 5"
+            # Constraints in XML are HTML-encoded: ". &gt;= 0 and . &lt;= 5"
+            # We need to decode them first
+            import html
+            constraint_decoded = html.unescape(constraint)
+            
             min_val = None
             max_val = None
             
             # Extract >= constraints
-            ge_match = re.search(r"\.\s*>=\s*(\d+)", str(constraint))
+            ge_match = re.search(r"\.\s*>=\s*(\d+)", constraint_decoded)
             if ge_match:
                 min_val = int(ge_match.group(1))
             
             # Extract <= constraints
-            le_match = re.search(r"\.\s*<=\s*(\d+)", str(constraint))
+            le_match = re.search(r"\.\s*<=\s*(\d+)", constraint_decoded)
             if le_match:
                 max_val = int(le_match.group(1))
             

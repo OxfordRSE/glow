@@ -1,7 +1,5 @@
 """Alembic environment configuration."""
 
-from logging.config import fileConfig
-
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
@@ -11,9 +9,10 @@ from glow_api.metadata_models import Base
 # this is the Alembic Config object
 config = context.config
 
-# Interpret the config file for Python logging.
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# Skip fileConfig - we configure logging in main.py
+# Calling fileConfig here can cause hangs in Docker environments
+# if config.config_file_name is not None:
+#     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
 

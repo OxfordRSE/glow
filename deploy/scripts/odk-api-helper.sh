@@ -30,8 +30,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RESET='\033[0m'
 
-odk_info()  { echo -e "${GREEN}[ODK]${RESET} $*"; }
-odk_warn()  { echo -e "${YELLOW}[ODK WARN]${RESET} $*"; }
+odk_info()  { echo -e "${GREEN}[ODK]${RESET} $*" >&2; }
+odk_warn()  { echo -e "${YELLOW}[ODK WARN]${RESET} $*" >&2; }
 odk_error() { echo -e "${RED}[ODK ERROR]${RESET} $*" >&2; }
 
 # ─── Authentication ──────────────────────────────────────────────────────────
@@ -226,11 +226,24 @@ odk_assign_role() {
   fi
   
   # Assign role
-  curl -sf -X POST "${ODK_API_BASE}/projects/${project_id}/assignments/${role_id}/${actor_id}" \
-    -H "Authorization: Bearer ${token}" >/dev/null || {
+  local assign_response
+  assign_response=$(curl -s -X POST "${ODK_API_BASE}/projects/${project_id}/assignments/${role_id}/${actor_id}" \
+    -H "Authorization: Bearer ${token}" 2>&1)
+  
+  # Check HTTP status - parse from JSON error response
+  if echo "$assign_response" | jq -e '.code' >/dev/null 2>&1; then
+    local error_code
+    error_code=$(echo "$assign_response" | jq -r '.code // empty')
+    
+    # 409.3 = already exists
+    if [[ "$error_code" == "409.3" ]] || echo "$assign_response" | grep -qi "already exists"; then
+      odk_info "User (Actor ID: ${actor_id}) already has role ${role_id} on project ${project_id}"
+      return 0
+    fi
+    
     odk_error "Failed to assign role ${role_id} to actor ${actor_id} on project ${project_id}"
     return 1
-  }
+  fi
   
   odk_info "Assigned role ${role_id} to actor ${actor_id} on project ${project_id}"
 }
@@ -267,14 +280,33 @@ odk_upload_form() {
   # POST or PUT depending on whether form exists
   # ODK Central creates a new version automatically if xmlFormId exists
   local response
-  response=$(curl -sf -X POST "${ODK_API_BASE}/projects/${project_id}/forms?publish=true" \
+  response=$(curl -s -X POST "${ODK_API_BASE}/projects/${project_id}/forms?publish=true" \
     -H "Authorization: Bearer ${token}" \
     -H "Content-Type: application/xml" \
     -H "X-XmlFormId-Fallback: true" \
-    --data-binary "$xml_content" 2>&1) || {
-    odk_error "Failed to upload form to project ${project_id}"
+    --data-binary "$xml_content" 2>&1)
+  
+  # Check if response contains an error
+  if echo "$response" | jq -e '.code' >/dev/null 2>&1; then
+    local error_code
+    error_code=$(echo "$response" | jq -r '.code // empty')
+    
+    # 409.3 = form already exists with same version
+    if [[ "$error_code" == "409.3" ]]; then
+      # Extract xmlFormId from the XML itself since error doesn't include it
+      local xmlFormId
+      xmlFormId=$(extract_xmlformid_from_xml "$xml_content")
+      
+      if [[ -n "$xmlFormId" ]]; then
+        odk_info "Form already exists: ${xmlFormId}"
+        echo "$xmlFormId"
+        return 0
+      fi
+    fi
+    
+    odk_error "Failed to upload form to project ${project_id}: $(echo "$response" | jq -r '.message // empty')"
     return 1
-  }
+  fi
   
   local xmlFormId
   xmlFormId=$(echo "$response" | jq -r '.xmlFormId // .formId // empty')
@@ -284,6 +316,7 @@ odk_upload_form() {
     return 1
   fi
   
+  odk_info "Form uploaded: ${xmlFormId}"
   echo "$xmlFormId"
 }
 
@@ -301,11 +334,17 @@ convert_xlsform_to_xml() {
     return 1
   fi
   
+  # Get the Docker Compose project name for the network
+  local project_name
+  project_name=$(docker compose config --format json | jq -r '.name // "glow"')
+  local network_name="${project_name}_odk_internal"
+  
+  # Call pyxform via temporary curl container connected to odk_internal network
   local response
-  response=$(docker compose exec -T pyxform curl -sf -X POST \
-    http://localhost/api/v1/convert \
+  response=$(docker run --rm --network "${network_name}" -i curlimages/curl:latest \
+    -sf -X POST http://pyxform/api/v1/convert \
     -H "Content-Type: application/octet-stream" \
-    --data-binary "@${xlsform_path}" 2>&1) || {
+    --data-binary @- < "${xlsform_path}" 2>&1) || {
     odk_error "Failed to convert XLSForm: ${xlsform_path}"
     return 1
   }
@@ -347,7 +386,13 @@ extract_xmlformid_from_xml() {
   local xml_content="$1"
   
   local xmlformid
-  xmlformid=$(echo "$xml_content" | xmllint --xpath 'string(//*[local-name()="data"]/@id)' - 2>/dev/null || true)
+  # Try xmllint first (if available), otherwise use grep
+  if command -v xmllint &>/dev/null; then
+    xmlformid=$(echo "$xml_content" | xmllint --xpath 'string(//*[local-name()="data"]/@id)' - 2>/dev/null || true)
+  else
+    # Fallback: extract using grep (matches <data id="formid">)
+    xmlformid=$(echo "$xml_content" | grep -oP '<data\s+id="\K[^"]+' | head -1)
+  fi
   
   if [[ -z "$xmlformid" ]]; then
     odk_error "Could not extract xmlFormId from XML"

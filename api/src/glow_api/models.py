@@ -189,6 +189,7 @@ class QueryResponse(BaseModel):
     waves: list[str]
     aggregations: list[str]
     filters: dict[str, list]
+    metadata: dict[str, VariableMetadata]
 
 
 # ---------------------------------------------------------------------------

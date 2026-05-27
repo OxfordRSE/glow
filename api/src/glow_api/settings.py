@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     ODK_API_PASSWORD: str = "test-password"  # Default for testing
     ODK_PROJECT_ID: int = 1  # Default for testing
     ODK_FORM_ID: str = "bewell_questionnaire"
-    
+
     # Data refresh configuration
     DATA_CACHE_PATH: Optional[str] = None  # If set, cache DataFrame and ETAG
     DATA_REFRESH_HOURS: int = 1  # Poll ODK Central every hour
