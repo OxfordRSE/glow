@@ -96,7 +96,8 @@ class ODKSeeder:
         meta = ET.SubElement(data, "meta")
         instance_id = ET.SubElement(meta, "instanceID")
         uid = row.get("uid", "")
-        instance_id.text = f"uuid:{uid}"
+        wave = row.get("wave", "")
+        instance_id.text = f"uuid:{uid}-wave{wave}"
         
         # Add all fields from the row
         for field_name, value in row.items():
@@ -161,7 +162,9 @@ class ODKSeeder:
         new_rows = []
         for row in rows:
             uid = row.get("uid", "").strip()
-            if uid and uid not in existing_ids:
+            wave = row.get("wave", "").strip()
+            full_instance_id = f"{uid}-wave{wave}"
+            if full_instance_id and full_instance_id not in existing_ids:
                 new_rows.append(row)
         
         print(f"\n📤 {len(new_rows)} new submissions to upload ({len(rows) - len(new_rows)} already exist)")
@@ -181,12 +184,14 @@ class ODKSeeder:
         print(f"\n⬆️  Uploading {len(new_rows)} submissions...")
         for row in tqdm(new_rows, desc="Submitting", unit="submission"):
             uid = row.get("uid", "").strip()
+            wave = row.get("wave", "").strip()
+            full_instance_id = f"{uid}-wave{wave}"
             
             # Create XML
             xml_data = self.create_submission_xml(row)
             
             # Submit
-            success = self.submit_submission(xml_data, uid)
+            success = self.submit_submission(xml_data, full_instance_id)
             
             if success:
                 stats["submitted"] += 1

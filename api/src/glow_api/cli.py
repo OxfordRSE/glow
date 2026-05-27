@@ -34,7 +34,7 @@ from glow_api.database import (
     set_geographical_neighbors,
     set_statistical_neighbors,
 )
-from metadata_models import User
+from glow_api.metadata_models import User
 
 
 @click.group()
