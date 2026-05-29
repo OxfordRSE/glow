@@ -248,7 +248,7 @@ See `deploy/terraform/variables.tf` for all available variables. Key ones:
 In production, data is collected via [ODK Central](https://docs.getodk.org/central-intro/):
 
 ```
-Real users → ODK Collect app → ODK Central → Glow API (pyODK) → Dashboard
+Real users → ODK Collect app → ODK Central → Glow API → Dashboard
 ```
 
 The BeWell questionnaire form is already included in this repo at `odk-forms/bewell_questionnaire.xml`. The form includes:

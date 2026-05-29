@@ -1,145 +1,146 @@
 # Rework Query Interface
 
-We will move away from a display of focus school data + neighboring schools data.
-Instead, we will present data for the focus school and provide context in terms of mean and standard deviation
-calculated from the whole eligible sample (including the school).
+## Summary
 
-We'll also take the opportunity to move from a school and wave-led structure to a variable-led structure.
+We have moved away from the original neighbor-focused sketch and now have a much clearer direction.
 
-## Things to change
+The API should move to a rich JSON query contract designed for messy longitudinal data rather than a wave-led or neighbor-led model. The key design decision is that time is no longer treated as a normal grouping dimension. Instead, the API will derive its own collection `period_id` values from submission timestamps, return all periods, and treat periods as a privileged boundary for suppression.
 
-### Remove neighbour code
+The frontend will then receive enough structured information to cache a response and explore it locally without asking the backend to distinguish between filters and groupings.
 
-- Neighbor calculation helper script
-- Neighbor metadata columns
-- Neighbor query calculations
-- Neighbor query data
-- Neighbor data representation in Dashboard and Storybook
+## Direction Agreed So Far
 
-### Restructure query output
+### Core API shape
 
-Queries will now be responded to in a new shape:
+- The response should be rich JSON, not CSV-in-a-string.
+- The response should use a top-level envelope rather than a bare variable map.
+- The response should include query-level schema and period definitions.
+- The response should echo the normalized query the API actually executed.
+- The response should use `dimensions` terminology throughout.
+
+Current intended shape, at a human level:
 
 ```typescript
-type FilteredQueryString = string; // QueryString syle encoding e.g. sex=M&age=13&wave=2
-type FilteredQueryResponse = {
-    data?: Record<FilteredQueryString, {
-        value: number | null;
-        n?: number;
-        n_all: number;
-        mean_all: number | null;
-        sd_all: number | null;
-    }>;
-    metadata: {
-        limits?: {
-            min?: number;
-            max?: number;
-        };
-        suppression?: {
-            reason: string;
-        }
-    };
-}
-// Indexed by variable name
-type QueryResponse = Record<string, FilteredQueryResponse>
+type QueryResponse = {
+  query: {
+    school_id?: number;
+    variables: string[];
+    dimensions: string[];
+  };
+  dimensions: QueryDimensionDefinition[];
+  periods: QueryPeriod[];
+  variables: Record<string, VariableResponse>;
+};
 ```
 
-Examples:
+### Periods and time
 
-```json
-{
-  "bw_wbeing_1": {
-    "metadata": {
-      "limits": {
-        "max": 5
-      }
-    },
-    "data": {
-      "sex=M&age=13&wave=1": {
-        "value": 3.8,
-        "n": 12,
-        "n_all": 1342,
-        "mean_all": 2.5,
-        "sd_all": 1.2
-      },
-      "sex=M&age=13&wave=2": {
-        "value": 3.9,
-        "n": 12,
-        "n_all": 1342,
-        "mean_all": 2.8,
-        "sd_all": 1.1
-      },
-      "sex=F&age=13&wave=1": {
-        "value": 2.9,
-        "n": 17,
-        "n_all": 1412,
-        "mean_all": 2.9,
-        "sd_all": 0.8
-      },
-      "sex=F&age=13&wave=2": {
-        "value": 2.4,
-        "n": 14,
-        "n_all": 1400,
-        "mean_all": 2.7,
-        "sd_all": 1.0
-      }
-    }
-  },
-  "bw_wbeing_23": {
-    "metadata": {
-      "suppression": {
-        "reason": "too-few-records"
-      }
-    }
-  }
-}
-```
-
-The Dashboard can thus figure out which facets each data value applies to. 
-Through simple statistics, the Dashboard can also figure out how to produce weighted means for any aggregation 
-it desires, e.g. calculating mean/sd for all sex=M records by combining the two sex=M records and weighting
-the value by n and the mean_all/sd_all by n_all.
-
-### Calcuation of `_all` variables
-
-These are essentially given by not applying school={focus school} as a filter. 
-So we know `n_all` will always be >= `n`, and we know that if `n` is great enough to avoid suppression
-then `n_all` is also. 
+- The API should derive `period_id` from submission timestamps.
+- Period definitions should be exposed explicitly with boundaries.
+- Period boundaries should be deployment-configurable by timezone and cutoff rule.
+- Open/current periods should be included.
+- `period_id` should be kept separate from normal dimensions in the response.
 
 ### Suppression
 
-Suppression continues to obey the 'if any then all' rule.
-We can naively calculate the response we're about to send out, then simply check in each facet for n < N_MIN. 
-If that's the case, that entire variable can be replaced with 
-`{ "metadata": { "suppression": { "reason": "too-few-records" } } }`.
+- Suppression remains blanket suppression using canonical machine-readable reasons.
+- Because open periods must be included, `period_id` should be a privileged suppression boundary.
+- That means suppression is evaluated independently within each period, across the other requested dimensions inside that period.
+- A variable may therefore be available for some periods and suppressed for others.
+- Suppressed or incompatible variables/periods should still be represented explicitly rather than silently omitted.
 
-There's a potential problem with overly-keen suppression triggering because of incomplete data collection during a wave.
-E.g. if only 3 records for a school are registered in a wave, ALL data for ANY query about that school will 
-be suppressed. 
-If this turns out to be an issue we'll address it later.
+### Variable data
 
-## Dashboard queries in
+- Variable results should be organised by period.
+- Each period slice should either contain aggregate cells or a suppression reason.
+- Aggregate cells should carry only non-period coordinates.
+- Coordinate values should be scalar values or `null`, not arrays.
+- The API should return observed cells only, not full Cartesian grids.
+- General queries with no focus school should omit focus-school values entirely.
 
-Queries will now send a target school, a list of variables, and an optional set of grouping variables.
-The backend doesn't distinguish between filters and groupings 
-('if any then all' allows us to treat everything as a grouping, 
-always send back all groups, and let the recipient choose what to keep).
+### Focus and sample statistics
 
-## Dashboard display
+- School-targeted queries should return both focus-school values and whole-sample reference values.
+- General queries should return only whole-sample values.
+- Exact counts are still wanted because the frontend needs them for weighted recombination.
 
-The Dashboard will always send the target school, at least one variable, and at least 'wave' as a grouping variable.
-We'll move to have fewer pages and each page shows a whole subscale of questions (so sends multiple varaibles)
-on one graph, and then shows the total on a second graph. 
+### Deduplication and totals
 
-Grand means and SDs are plotted for each `value` datapoint for reference.
+- Deduplication should happen per variable.
+- The rule is: take the latest non-null value for each `uid` within each school-period bucket.
+- Derived totals should be computed from those deduped item values.
 
+### Version handling
 
-## General queries
+- We assume that unchanged variable names with compatible declared limits are comparable.
+- If limits differ but are trivially compatible, values should be linearly rescaled from the narrower range to the wider range.
+- If trivial unification is not possible, the affected period should be suppressed with an incompatible-version reason.
+- The response should include vague machine-readable notes such as `values-rescaled` rather than detailed provenance.
+- The response should include sample-wide `question_versions` counts in metadata.
 
-The API will support general queries where there's no target school included.
-In these cases, `value` and `n` will be undefined, and values will instead reflect the entire sample.
+### Request shape
 
-## Concerns
+- The backend should not have a concept of filters.
+- The request should be minimal and dimension-driven.
+- The backend should always return all periods.
 
-Have we reintroduced a potential for differencing attacks with exposing Ns and facets in this way? 
-The numbers will be high, but potentially still arithmetically exploitable.
+Human-level request sketch:
+
+```typescript
+type QueryRequest = {
+  school_id?: number;
+  variables: string[];
+  dimensions?: string[];
+};
+```
+
+### Auth and discovery
+
+- Anonymous general queries are in scope.
+- School-targeted queries must still check that the requested `school_id` is in the user's allowed schools.
+- `/me` should replace the current bootstrap use of `/admin/me`.
+- `/me` should include auth state and available schools.
+- `/schools` should be removed.
+- Query discovery should move to `/dimensions`.
+- `/dimensions` should be school-scoped when a school is supplied, dataset-scoped otherwise.
+
+### Determinism and caching
+
+- Response ordering should be deterministic.
+- ETag support should be included as part of this rework.
+
+## Important Codebase Reality Checks
+
+These are design-relevant facts from the current implementation:
+
+- The current query API is still wave-first, single-variable, and neighbor-focused.
+- The current dashboard page is tightly coupled to that old shape.
+- `/schools` currently mixes school listing with query-schema discovery.
+- The data-loading path currently has no explicit normalization for periods, duplicate submissions, or version-aware rescaling.
+- The current ODK client only fetches the current form XML, not historical form definitions.
+
+## Remaining Open Questions
+
+These still need to be nailed down before implementation starts in earnest:
+
+- The exact `/me` response shape and discriminator field name.
+- The exact `/dimensions` response shape beyond variables, dimensions, and likely limits metadata.
+- The exact canonical suppression reason codes.
+- The exact ODK-export timestamp field name used for period derivation.
+- The exact ODK mechanism for retrieving historical form definitions for version comparison.
+- The exact ETag behaviour to ship immediately, though deterministic canonicalization is already agreed.
+
+## Implementation Consequences
+
+This is no longer a small tweak.
+
+The rework now implies:
+
+- replacing the query request and response models
+- rewriting query execution and suppression logic around period slices
+- introducing a normalization layer ahead of query execution
+- removing neighbor logic from API, DB metadata, admin surfaces, dashboard code, stories, and contract examples
+- replacing `/schools`-driven query discovery with `/me` plus `/dimensions`
+- updating dashboard data access and page structure to use multi-variable period-organised responses
+
+The next step should be to turn this into an implementation plan that follows the project rules in `AGENTS.md`, especially the API and dashboard testing requirements.

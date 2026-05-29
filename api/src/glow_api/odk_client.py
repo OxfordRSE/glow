@@ -1,7 +1,7 @@
 """
 ODK Central client for fetching submissions and form metadata.
 
-This module provides a wrapper around pyODK for fetching submissions from ODK Central
+This module provides for fetching submissions from ODK Central
 with ETAG-based caching and metadata extraction from XLSForms.
 """
 import logging
