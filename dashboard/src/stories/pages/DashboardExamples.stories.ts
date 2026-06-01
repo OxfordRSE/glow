@@ -34,8 +34,9 @@ export const Default: Story = {
     msw: withApiResponses({
       'POST /auth/login': 'auth.login.success',
       'GET /admin/me': 'admin.me.user',
-      'GET /schools': 'schools.user-default',
-      'POST /api/query': 'query.default',
+      'GET /me': 'me.authenticated',
+      'GET /dimensions': 'dimensions.dataset',
+      'GET /query': 'query.period-based.simple',
     }),
   },
   decorators: [
@@ -76,8 +77,9 @@ export const AdminUser: Story = {
   parameters: {
     msw: withApiResponses({
       'GET /admin/me': 'admin.me.admin',
-      'GET /schools': 'schools.admin-all',
-      'POST /api/query': 'query.default',
+      'GET /me': 'me.authenticated.admin',
+      'GET /dimensions': 'dimensions.dataset',
+      'GET /query': 'query.period-based.simple',
     }),
   },
   decorators: [
@@ -109,8 +111,9 @@ export const SuppressedFocusSchool: Story = {
   parameters: {
     msw: withApiResponses({
       'GET /admin/me': 'admin.me.user',
-      'GET /schools': 'schools.user-default',
-      'POST /api/query': 'query.suppressed-focus',
+      'GET /me': 'me.authenticated',
+      'GET /dimensions': 'dimensions.dataset',
+      'GET /query': 'query.period-based.simple',
     }),
   },
   decorators: [
@@ -145,7 +148,8 @@ export const NoSchools: Story = {
   parameters: {
     msw: withApiResponses({
       'GET /admin/me': 'admin.me.no-schools',
-      'GET /schools': 'schools.empty',
+      'GET /me': 'me.anonymous',  // User with no schools appears as anonymous
+      'GET /dimensions': 'dimensions.dataset',
     }),
   },
   decorators: [
@@ -208,8 +212,9 @@ export const ErrorUnauthorized: Story = {
   parameters: {
     msw: withApiResponses({
       'GET /admin/me': 'admin.me.user',
-      'GET /schools': 'schools.user-default',
-      'POST /api/query': 'query.error-403',
+      'GET /me': 'me.authenticated',
+      'GET /dimensions': 'dimensions.dataset',
+      'GET /query': 'query.period-based.simple',  // Will be overridden with error
     }),
   },
   decorators: [
@@ -241,8 +246,9 @@ export const ErrorBadRequest: Story = {
   parameters: {
     msw: withApiResponses({
       'GET /admin/me': 'admin.me.user',
-      'GET /schools': 'schools.user-default',
-      'POST /api/query': 'query.error-400',
+      'GET /me': 'me.authenticated',
+      'GET /dimensions': 'dimensions.dataset',
+      'GET /query': 'query.period-based.simple',  // Will be overridden with error
     }),
   },
   decorators: [
@@ -274,8 +280,9 @@ export const ErrorServerError: Story = {
   parameters: {
     msw: withApiResponses({
       'GET /admin/me': 'admin.me.user',
-      'GET /schools': 'schools.user-default',
-      'POST /api/query': 'query.error-500',
+      'GET /me': 'me.authenticated',
+      'GET /dimensions': 'dimensions.dataset',
+      'GET /query': 'query.period-based.simple',  // Will be overridden with error
     }),
   },
   decorators: [

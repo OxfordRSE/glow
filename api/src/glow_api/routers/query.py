@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from glow_api import __version__
 from glow_api.canonical_query import normalize_query
 from glow_api.query_execution import execute_query, compute_query_etag
-from glow_api.normalization import normalize_submissions
 from glow_api.data import DataStore, get_datastore
 from glow_api.database import get_db, get_school_by_id
 from glow_api.settings import settings
@@ -129,23 +128,35 @@ def query_get(
         # Filter data to this school
         df = dfwl.df
         df = df[df["school"] == school.name]
+        school_name = school.name
     else:
         # Dataset-scoped query
         df = dfwl.df
+        school_name = None
     
-    # Normalize submissions (add period_id if not already present)
+    # Data should already be normalized with period_id column from DataStore
+    # But verify it exists
     if "period_id" not in df.columns:
-        df = normalize_submissions(df)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Data normalization error: period_id column missing",
+        )
     
-    # Get numerical whitelist
+    # Get numerical whitelist and observed periods from pre-computed metadata
     numerical_whitelist = dfwl.numerical_whitelist
+    observed_periods = dfwl.observed_periods.get(school_name, [])
+    
+    # Get form metadata for version compatibility
+    form_metadata = dfwl.metadata
     
     # Execute query
     result = execute_query(
         df=df,
         query=canonical,
         numerical_whitelist=numerical_whitelist,
+        observed_periods=observed_periods,
         min_n=settings.MIN_N,
+        form_metadata=form_metadata,
     )
     
     return result

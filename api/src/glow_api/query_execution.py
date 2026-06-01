@@ -54,16 +54,17 @@ def deduplicate_submissions(
     """Deduplicate submissions using latest-non-null rule.
     
     Args:
-        df: DataFrame with submissions (must have uid, period_id, createdAt, and variable)
+        df: DataFrame with submissions (must have uid, period_id, school, createdAt, and variable)
         variable: Variable name to deduplicate on
     
     Returns:
-        Deduped DataFrame with one row per uid per period
+        Deduped DataFrame with one row per uid per school-period bucket
     
     Rules:
-        - For each uid in each period, keep only the latest non-null value
-        - If all values are null for a uid in a period, keep the latest submission anyway
-        - Deduplication happens independently per period
+        - For each uid in each school-period bucket, keep only the latest non-null value
+        - If all values are null for a uid in a bucket, drop that uid entirely for this variable
+        - Deduplication happens independently per period and per school
+        - This prevents collapsing records from different schools
     """
     if df.empty:
         return df
@@ -75,6 +76,11 @@ def deduplicate_submissions(
             logger.warning(f"Missing column {col} for deduplication")
             return df
     
+    # Determine grouping columns - include school if it exists
+    group_cols = ["uid", "period_id"]
+    if "school" in df.columns:
+        group_cols.append("school")
+    
     # Parse createdAt if it's a string
     df = df.copy()
     if df["createdAt"].dtype == object:
@@ -83,20 +89,18 @@ def deduplicate_submissions(
     # Sort by createdAt descending (latest first)
     df = df.sort_values("createdAt", ascending=False)
     
-    # For each uid-period group, keep the first non-null value
-    # or if all are null, keep the first (latest) row
+    # For each uid-school-period group, keep the first non-null value
+    # If all are null, drop the group entirely (don't keep null submissions)
     deduped_rows = []
     
-    for (uid, period_id), group in df.groupby(["uid", "period_id"], sort=False):
+    for group_key, group in df.groupby(group_cols, sort=False):
         # Try to find first non-null value
         non_null = group[group[variable].notna()]
         
         if not non_null.empty:
             # Keep first non-null (which is latest due to sorting)
             deduped_rows.append(non_null.iloc[0])
-        else:
-            # All null - keep latest submission
-            deduped_rows.append(group.iloc[0])
+        # If all null, drop this group entirely (don't keep null records)
     
     if not deduped_rows:
         return pd.DataFrame(columns=df.columns)
@@ -104,10 +108,88 @@ def deduplicate_submissions(
     return pd.DataFrame(deduped_rows).reset_index(drop=True)
 
 
+def is_derived_total(variable: str) -> bool:
+    """Check if a variable is a derived total.
+    
+    Args:
+        variable: Variable name to check
+    
+    Returns:
+        True if the variable is a derived total (ends with '_total')
+    """
+    return variable.endswith("_total")
+
+
+def get_constituent_items(variable: str, available_columns: list[str]) -> list[str]:
+    """Get the constituent item columns for a derived total variable.
+    
+    Args:
+        variable: Derived total variable name (e.g., "bw_swemwbs_total")
+        available_columns: List of all available column names in the dataset
+    
+    Returns:
+        List of constituent item column names
+    
+    Rules:
+        - For a total like "bw_swemwbs_total", constituents are "bw_swemwbs_1", "bw_swemwbs_2", etc.
+        - Prefix is everything before "_total"
+        - Items end with "_<number>"
+    """
+    if not is_derived_total(variable):
+        return []
+    
+    # Remove "_total" suffix to get the prefix
+    prefix = variable[:-6]  # Remove "_total"
+    prefix_with_underscore = prefix + "_"
+    
+    # Find all columns that match the pattern prefix_<number>
+    constituents = []
+    for col in available_columns:
+        if col.startswith(prefix_with_underscore):
+            # Check if it ends with _<number>
+            suffix = col[len(prefix_with_underscore):]
+            if suffix.isdigit():
+                constituents.append(col)
+    
+    return sorted(constituents)
+
+
+def recompute_derived_total(df: pd.DataFrame, variable: str, constituent_items: list[str]) -> pd.DataFrame:
+    """Recompute a derived total from constituent item values in deduped data.
+    
+    Args:
+        df: Deduped DataFrame
+        variable: Derived total variable name
+        constituent_items: List of constituent item column names
+    
+    Returns:
+        DataFrame with the derived total recomputed
+    
+    Rules:
+        - Sum across constituent items (skipna=True for row-wise sum)
+        - Only recompute if all constituent items exist in the DataFrame
+    """
+    df = df.copy()
+    
+    # Check if all constituents exist
+    missing = [item for item in constituent_items if item not in df.columns]
+    if missing:
+        logger.warning(
+            f"Cannot recompute {variable}: missing constituent items {missing}"
+        )
+        return df
+    
+    # Recompute the total
+    df[variable] = df[constituent_items].sum(axis=1, skipna=True)
+    
+    return df
+
+
 def execute_query(
     df: pd.DataFrame,
     query: CanonicalQuery,
     numerical_whitelist: Optional[list[str]] = None,
+    observed_periods: Optional[list[str]] = None,
     min_n: int = 5,
     form_metadata: Optional[dict] = None,
 ) -> dict:
@@ -117,8 +199,9 @@ def execute_query(
         df: Normalized DataFrame with period_id column
         query: Canonical query with variables, dimensions, and prefixes
         numerical_whitelist: List of valid numerical variable names
+        observed_periods: Pre-computed list of observed periods for this scope
         min_n: Minimum N for suppression
-        form_metadata: Optional form metadata for version compatibility
+        form_metadata: Form metadata for version compatibility (min/max ranges)
     
     Returns:
         Query response dict matching NewQueryResponse model
@@ -133,13 +216,8 @@ def execute_query(
     # Determine which variables to query
     selected_variables = _select_variables(df, query, numerical_whitelist)
     
-    # Get observed periods
-    if "school" in df.columns and query.school_id is not None:
-        # School-scoped query - need to map school_id to school name
-        # For now, assume df is already filtered to the school
-        observed_periods = get_observed_periods(df)
-    else:
-        # Dataset-scoped query
+    # Use provided observed periods, or compute them if not provided
+    if observed_periods is None:
         observed_periods = get_observed_periods(df)
     
     # Execute query for each variable
@@ -239,6 +317,39 @@ def _execute_variable_query(
     # Deduplicate submissions for this variable first
     df_deduped = deduplicate_submissions(df, variable)
     
+    # If this is a derived total, recompute it from deduped constituent items
+    if is_derived_total(variable):
+        constituent_items = get_constituent_items(variable, df.columns.tolist())
+        if constituent_items:
+            # First deduplicate each constituent item
+            deduped_constituents = df_deduped.copy()
+            for item in constituent_items:
+                if item in df.columns:
+                    # Deduplicate this constituent item
+                    item_deduped = deduplicate_submissions(df, item)
+                    # Merge the deduped values back
+                    # Use uid, period_id, and school (if exists) as merge keys
+                    merge_keys = ["uid", "period_id"]
+                    if "school" in df.columns:
+                        merge_keys.append("school")
+                    
+                    # Keep only the item column from the deduped data
+                    item_data = item_deduped[merge_keys + [item]]
+                    
+                    # Drop the item column if it exists in deduped_constituents
+                    if item in deduped_constituents.columns:
+                        deduped_constituents = deduped_constituents.drop(columns=[item])
+                    
+                    # Merge in the deduped item values
+                    deduped_constituents = deduped_constituents.merge(
+                        item_data,
+                        on=merge_keys,
+                        how="left"
+                    )
+            
+            # Now recompute the total from deduped constituents
+            df_deduped = recompute_derived_total(deduped_constituents, variable, constituent_items)
+    
     # Build period results
     period_results = {}
     
@@ -260,6 +371,7 @@ def _execute_variable_query(
         
         # Check version compatibility if we have version metadata
         notes = []
+        question_versions = None
         if form_metadata and "__version" in period_df.columns:
             # Check if multiple versions exist in this period
             versions = period_df["__version"].dropna().unique()
@@ -268,28 +380,35 @@ def _execute_variable_query(
                 # Multiple versions - check compatibility
                 from glow_api.version_compatibility import check_version_compatibility, apply_rescaling
                 
-                # For simplicity, check compatibility between all pairs
-                # In real implementation, might want to check against a reference version
-                incompatible = False
-                rescale_needed = False
+                # Determine reference version (use the most common one)
+                version_counts = period_df["__version"].value_counts()
+                reference_version = version_counts.index[0]
+                ref_meta = form_metadata
                 
-                for i, v1 in enumerate(versions):
-                    for v2 in versions[i+1:]:
-                        # Get metadata for each version (simplified - would need actual version lookup)
-                        v1_meta = form_metadata.get(str(v1), form_metadata)
-                        v2_meta = form_metadata.get(str(v2), form_metadata)
-                        
-                        compat = check_version_compatibility(variable, v1_meta, v2_meta)
-                        
-                        if not compat["compatible"]:
-                            incompatible = True
-                            break
-                        
-                        if compat["rescale_needed"]:
-                            rescale_needed = True
+                # Check compatibility of all other versions against reference
+                incompatible = False
+                rescale_mapping = {}  # version -> (from_range, to_range)
+                
+                for version in versions:
+                    if version == reference_version:
+                        continue
                     
-                    if incompatible:
+                    # Get metadata for this version
+                    # In real implementation, this would look up historical form definitions
+                    # For now, assume metadata is the same for all versions
+                    ver_meta = form_metadata
+                    
+                    compat = check_version_compatibility(variable, ver_meta, ref_meta)
+                    
+                    if not compat["compatible"]:
+                        incompatible = True
                         break
+                    
+                    if compat["rescale_needed"]:
+                        rescale_mapping[version] = (
+                            compat["rescale_from"],
+                            compat["rescale_to"],
+                        )
                 
                 if incompatible:
                     # Suppress this period due to incompatible versions
@@ -300,8 +419,23 @@ def _execute_variable_query(
                     }
                     continue
                 
-                if rescale_needed:
+                # Apply rescaling if needed
+                if rescale_mapping:
+                    period_df = period_df.copy()
+                    for version, (from_range, to_range) in rescale_mapping.items():
+                        # Rescale rows with this version
+                        mask = period_df["__version"] == version
+                        if mask.any():
+                            period_df.loc[mask] = apply_rescaling(
+                                period_df[mask],
+                                variable,
+                                from_range,
+                                to_range,
+                            )
                     notes.append("values-rescaled")
+            
+            # Record versions observed in this period
+            question_versions = sorted([int(v) for v in versions if pd.notna(v)])
         
         # Compute aggregated results for this period
         period_slice = _compute_period_slice(
@@ -314,6 +448,10 @@ def _execute_variable_query(
         # Add notes if any
         if notes:
             period_slice["notes"] = notes
+        
+        # Add question_versions if we have them
+        if question_versions:
+            period_slice["question_versions"] = question_versions
         
         period_results[period_id] = period_slice
     

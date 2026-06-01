@@ -17,7 +17,9 @@ const API_BASE = '/api'
 export interface ApiResponseConfig {
   'POST /auth/login'?: string
   'GET /admin/me'?: string
-  'GET /schools'?: string
+  'GET /me'?: string
+  'GET /dimensions'?: string
+  'GET /query'?: string
   'POST /api/query'?: string
 }
 
@@ -53,16 +55,48 @@ export function createHandlersFromExamples(
     )
   }
   
-  // Schools handler
-  const schoolsExampleId = config['GET /schools'] || 'schools.user-default'
-  const schoolsExample = getExample(schoolsExampleId)
-  if (schoolsExample) {
+  // Identity endpoint handler (/me)
+  const identityExampleId = config['GET /me'] || 'me.authenticated'
+  const identityExample = getExample(identityExampleId)
+  if (identityExample) {
     handlers.push(
-      http.get(`${API_BASE}/schools`, async () => {
-        await delay(200)
-        return HttpResponse.json(schoolsExample.response, { status: schoolsExample.status })
+      http.get(`${API_BASE}/me`, async () => {
+        await delay(100)
+        return HttpResponse.json(identityExample.response, { status: identityExample.status })
       })
     )
+  }
+  
+  // Dimensions endpoint handler
+  const dimensionsExampleId = config['GET /dimensions'] || 'dimensions.dataset'
+  const dimensionsExample = getExample(dimensionsExampleId)
+  if (dimensionsExample) {
+    handlers.push(
+      http.get(`${API_BASE}/dimensions`, async ({ request }) => {
+        await delay(150)
+        // Support school_id query parameter
+        const url = new URL(request.url)
+        const schoolId = url.searchParams.get('school_id')
+        
+        // If a school-scoped example is requested, try to find it
+        // Otherwise use the configured or default example
+        return HttpResponse.json(dimensionsExample.response, { status: dimensionsExample.status })
+      })
+    )
+  }
+  
+  // Query handler (GET /query)
+  const getQueryExampleId = config['GET /query']
+  if (getQueryExampleId) {
+    const getQueryExample = getExample(getQueryExampleId)
+    if (getQueryExample) {
+      handlers.push(
+        http.get(`${API_BASE}/query`, async () => {
+          await delay(500)
+          return HttpResponse.json(getQueryExample.response, { status: getQueryExample.status })
+        })
+      )
+    }
   }
   
   // Query handler

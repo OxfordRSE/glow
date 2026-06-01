@@ -1,5 +1,6 @@
 """Router for the /dimensions endpoint."""
 
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
@@ -86,28 +87,31 @@ def get_dimensions(
             )
         
         # Get data scoped to this school
-        df = datastore.to_frozen().df
+        dfwl = datastore.to_frozen()
+        df = dfwl.df
         df = df[df["school"] == school.name]
     else:
         # Dataset-scoped query - use full dataset
-        df = datastore.to_frozen().df
-    
-    # Get numerical and categorical whitelists
-    dfwl = datastore.to_frozen()
+        dfwl = datastore.to_frozen()
+        df = dfwl.df
     
     # Build variables list (all numeric measures including derived totals)
     variables = sorted([col for col in dfwl.numerical_whitelist if col in df.columns])
     variable_defs = [VariableDefinition(key=var) for var in variables]
     
     # Build dimensions list (categorical columns, excluding school)
-    # Infer type based on whether values can be parsed as numbers
+    # Infer type based on whether column is numeric or not
     dimension_defs = []
     for dim in sorted(dfwl.categorical_whitelist):
         if dim in df.columns and dim not in ["school", "wave"]:
-            # Try to determine if this is a numeric or string dimension
-            # For simplicity, assume all are strings for now
-            # TODO: Add proper type inference if needed
-            dimension_defs.append(DimensionDefinition(key=dim, type="string"))
+            # Determine dimension type based on pandas dtype
+            col_dtype = df[dim].dtype
+            if pd.api.types.is_numeric_dtype(col_dtype):
+                dim_type = "number"
+            else:
+                dim_type = "string"
+            
+            dimension_defs.append(DimensionDefinition(key=dim, type=dim_type))
     
     return DimensionsResponse(
         school_id=school_id,

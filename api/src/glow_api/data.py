@@ -1,7 +1,6 @@
 import logging
 import os
 import threading
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -22,6 +21,7 @@ class DataFrameWithWhitelists(BaseModel):
     categorical_whitelist: List[str]
     numerical_whitelist: List[str]
     metadata: Dict[str, Dict[str, int]]
+    observed_periods: Dict[Optional[str], List[str]]  # school_name -> list of periods
 
     model_config = {
         "arbitrary_types_allowed": True,
@@ -47,6 +47,7 @@ class DataStore:
         self._scheduler = BackgroundScheduler()
         self._categorical_whitelist: List[str] = []
         self._numerical_whitelist: List[str] = []
+        self._observed_periods: Dict[Optional[str], List[str]] = {}
 
     def _load(self) -> pd.DataFrame:
         with log_duration("Load data from ODK Central") as log_data:
@@ -80,9 +81,42 @@ class DataStore:
             return df
 
     def _process_loaded_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Process loaded data by normalizing, computing derived scores, and extracting metadata.
+        
+        This method is called once during data loading to prepare the analytic dataset.
+        """
+        from glow_api.normalization import normalize_submissions
+        
+        # Normalize submissions (add period_id column)
+        df = normalize_submissions(df)
+        
+        # Compute derived scores
         df = self._compute_derived_scores(df)
+        
+        # Extract whitelists
         self._extract_whitelists(df)
+        
+        # Pre-compute observed periods for dataset-scoped and each school
+        self._compute_observed_periods(df)
+        
         return df
+    
+    def _compute_observed_periods(self, df: pd.DataFrame) -> None:
+        """Pre-compute observed periods for the dataset and each school.
+        
+        Stores results in self._observed_periods:
+        - None key: dataset-scoped periods
+        - school_name keys: school-scoped periods
+        """
+        from glow_api.normalization import get_observed_periods
+        
+        # Dataset-scoped periods
+        self._observed_periods[None] = get_observed_periods(df)
+        
+        # School-scoped periods
+        if "school" in df.columns:
+            for school_name in df["school"].dropna().unique():
+                self._observed_periods[str(school_name)] = get_observed_periods(df, school_name=str(school_name))
 
     def _extract_whitelists(self, df: pd.DataFrame) -> None:
         categorical: List[str] = [
@@ -214,6 +248,7 @@ class DataStore:
                 categorical_whitelist=self._categorical_whitelist,
                 numerical_whitelist=self._numerical_whitelist,
                 metadata=self._metadata.copy(),
+                observed_periods=self._observed_periods.copy(),
             )
 
     def startup(self) -> None:

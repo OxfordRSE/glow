@@ -2,10 +2,11 @@
   import { onMount } from 'svelte';
   import { authStore, isAuthenticated, currentSchools } from '$lib/stores';
   import { 
-    getDimensions, 
+    getDimensions,
     queryPeriodBased,
-    listSchools,
-    type School,
+    me,
+    type MeResponse,
+    type SchoolSummary,
     type DimensionsResponse,
     type NewQueryResponse,
     type VariableDefinition,
@@ -19,7 +20,8 @@
 
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let schools = $state<School[]>([]);
+  let meResponse = $state<MeResponse | null>(null);
+  let schools = $state<SchoolSummary[]>([]);
   let selectedSchoolId = $state<number | null>(null);
   
   // Dimensions from the API
@@ -39,9 +41,13 @@
 
   onMount(async () => {
     try {
-      // For authenticated users, fetch their schools
-      if ($isAuthenticated && $authStore.token) {
-        schools = await listSchools($authStore.token);
+      // Get user identity (works for both anonymous and authenticated)
+      const token = $authStore.token;
+      meResponse = await me(token);
+      
+      // Extract schools from authenticated response
+      if (meResponse.kind === "authenticated") {
+        schools = meResponse.schools;
         
         // Pre-select user's first school if available
         if ($currentSchools && $currentSchools.length > 0) {
@@ -53,7 +59,6 @@
       
       // Fetch dimensions - works for both anonymous and authenticated
       // If authenticated with a selected school, get school-specific dimensions
-      const token = $authStore.token;
       const school_id = selectedSchoolId ?? undefined;
       
       dimensions = await getDimensions({ school_id, token });
@@ -66,6 +71,37 @@
       error = e instanceof Error ? e.message : i18n.t('dashboard.loadErrorHelp');
     } finally {
       loading = false;
+    }
+  });
+
+  // Refetch dimensions when school selection changes
+  $effect(() => {
+    if (!loading && meResponse?.kind === "authenticated") {
+      const school_id = selectedSchoolId ?? undefined;
+      const token = $authStore.token;
+      
+      // Refetch dimensions for the new school scope
+      getDimensions({ school_id, token })
+        .then(newDimensions => {
+          dimensions = newDimensions;
+          
+          // Clear current selections if they're no longer valid
+          if (selectedVariables.length > 0) {
+            const validVars = new Set(newDimensions.variables.map(v => v.key));
+            selectedVariables = selectedVariables.filter(v => validVars.has(v));
+            
+            // If no variables remain selected, select first available
+            if (selectedVariables.length === 0 && newDimensions.variables.length > 0) {
+              selectedVariables = [newDimensions.variables[0].key];
+            }
+          }
+          
+          // Clear query results when school changes
+          queryResult = null;
+        })
+        .catch(e => {
+          error = e instanceof Error ? e.message : i18n.t('dashboard.loadErrorHelp');
+        });
     }
   });
 
@@ -151,7 +187,7 @@
           <h2 class="text-lg font-semibold mb-4">{i18n.t('explore.queryParameters')}</h2>
 
           <!-- School Selector (only for authenticated users) -->
-          {#if $isAuthenticated && schools.length > 0}
+          {#if meResponse?.kind === "authenticated" && schools.length > 0}
             <div class="mb-4">
               <label for="school-select" class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.school')}</label>
               <select

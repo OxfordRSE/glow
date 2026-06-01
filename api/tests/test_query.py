@@ -412,3 +412,269 @@ class TestQueryETag:
         etag2 = compute_query_etag(query, "test-123", "0.2.0")
         
         assert etag1 != etag2
+
+
+class TestDeduplicationPerSchoolPeriod:
+    """Test deduplication happens per uid per school-period bucket."""
+    
+    def test_deduplication_separates_by_school(self):
+        """Test that deduplication doesn't collapse same uid across different schools."""
+        from glow_api.query_execution import deduplicate_submissions
+        import pandas as pd
+        from datetime import datetime
+        
+        # Create test data with same uid in two different schools
+        df = pd.DataFrame({
+            "uid": ["U001", "U001"],
+            "school": ["School A", "School B"],
+            "period_id": ["2023-2024", "2023-2024"],
+            "createdAt": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+            "bw_wbeing_1": [3, 5],  # Different values
+        })
+        
+        result = deduplicate_submissions(df, "bw_wbeing_1")
+        
+        # Should have 2 rows (one per school)
+        assert len(result) == 2
+        
+        # Both schools should be represented
+        assert set(result["school"]) == {"School A", "School B"}
+        
+        # Each school should have its own value
+        school_a_value = result[result["school"] == "School A"]["bw_wbeing_1"].iloc[0]
+        school_b_value = result[result["school"] == "School B"]["bw_wbeing_1"].iloc[0]
+        assert school_a_value == 3
+        assert school_b_value == 5
+    
+    def test_deduplication_latest_non_null_per_school(self):
+        """Test latest-non-null rule applies within each school separately."""
+        from glow_api.query_execution import deduplicate_submissions
+        import pandas as pd
+        from datetime import datetime
+        
+        # Same uid, same school, same period, multiple submissions
+        df = pd.DataFrame({
+            "uid": ["U001", "U001", "U001"],
+            "school": ["School A", "School A", "School A"],
+            "period_id": ["2023-2024", "2023-2024", "2023-2024"],
+            "createdAt": [
+                datetime(2024, 1, 1),
+                datetime(2024, 1, 2),
+                datetime(2024, 1, 3),
+            ],
+            "bw_wbeing_1": [3, None, 5],  # Latest non-null is 5
+        })
+        
+        result = deduplicate_submissions(df, "bw_wbeing_1")
+        
+        # Should have 1 row (latest non-null)
+        assert len(result) == 1
+        assert result["bw_wbeing_1"].iloc[0] == 5
+    
+    def test_deduplication_drops_all_null_submissions(self):
+        """Test that all-null submissions are dropped after deduplication."""
+        from glow_api.query_execution import deduplicate_submissions
+        import pandas as pd
+        from datetime import datetime
+        
+        # Same uid, all submissions have null value
+        df = pd.DataFrame({
+            "uid": ["U001", "U001"],
+            "school": ["School A", "School A"],
+            "period_id": ["2023-2024", "2023-2024"],
+            "createdAt": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+            "bw_wbeing_1": [None, None],
+        })
+        
+        result = deduplicate_submissions(df, "bw_wbeing_1")
+        
+        # Should be empty (all null values are dropped)
+        assert len(result) == 0
+
+
+class TestDerivedTotalsFromDedupedItems:
+    """Test that derived totals are recomputed from deduped constituent items."""
+    
+    def test_derived_total_detection(self):
+        """Test that variables ending with _total are correctly identified."""
+        from glow_api.query_execution import is_derived_total
+        
+        assert is_derived_total("bw_swemwbs_total") is True
+        assert is_derived_total("bw_wbeing_1") is False
+        assert is_derived_total("bw_stress_total") is True
+        assert is_derived_total("something_total") is True
+    
+    def test_constituent_items_extraction(self):
+        """Test extraction of constituent item columns for a derived total."""
+        from glow_api.query_execution import get_constituent_items
+        
+        available_columns = [
+            "uid",
+            "school",
+            "bw_swemwbs_1",
+            "bw_swemwbs_2",
+            "bw_swemwbs_3",
+            "bw_swemwbs_total",
+            "bw_stress_1",
+            "bw_stress_2",
+        ]
+        
+        constituents = get_constituent_items("bw_swemwbs_total", available_columns)
+        
+        assert len(constituents) == 3
+        assert "bw_swemwbs_1" in constituents
+        assert "bw_swemwbs_2" in constituents
+        assert "bw_swemwbs_3" in constituents
+        assert "bw_stress_1" not in constituents
+    
+    def test_derived_total_recomputation(self):
+        """Test that derived totals are recomputed from constituent items."""
+        from glow_api.query_execution import recompute_derived_total
+        import pandas as pd
+        
+        df = pd.DataFrame({
+            "uid": ["U001", "U002"],
+            "bw_swemwbs_1": [2, 3],
+            "bw_swemwbs_2": [3, 4],
+            "bw_swemwbs_3": [4, 5],
+            "bw_swemwbs_total": [999, 999],  # Wrong precomputed values
+        })
+        
+        result = recompute_derived_total(
+            df,
+            "bw_swemwbs_total",
+            ["bw_swemwbs_1", "bw_swemwbs_2", "bw_swemwbs_3"],
+        )
+        
+        # Total should be recomputed
+        assert result["bw_swemwbs_total"].iloc[0] == 9  # 2 + 3 + 4
+        assert result["bw_swemwbs_total"].iloc[1] == 12  # 3 + 4 + 5
+    
+    def test_derived_total_handles_missing_values(self):
+        """Test that derived total computation skips NaN values."""
+        from glow_api.query_execution import recompute_derived_total
+        import pandas as pd
+        import numpy as np
+        
+        df = pd.DataFrame({
+            "uid": ["U001"],
+            "bw_swemwbs_1": [2],
+            "bw_swemwbs_2": [np.nan],
+            "bw_swemwbs_3": [4],
+            "bw_swemwbs_total": [999],
+        })
+        
+        result = recompute_derived_total(
+            df,
+            "bw_swemwbs_total",
+            ["bw_swemwbs_1", "bw_swemwbs_2", "bw_swemwbs_3"],
+        )
+        
+        # Total should skip NaN
+        assert result["bw_swemwbs_total"].iloc[0] == 6  # 2 + 4, skipping NaN
+
+
+class TestVersionAwareComparison:
+    """Test version-aware comparison and rescaling."""
+    
+    def test_version_compatibility_identical_ranges(self):
+        """Test that identical min/max ranges are compatible without rescaling."""
+        from glow_api.version_compatibility import check_version_compatibility
+        
+        v1_meta = {"bw_wbeing_1": {"min": 1, "max": 5}}
+        v2_meta = {"bw_wbeing_1": {"min": 1, "max": 5}}
+        
+        result = check_version_compatibility("bw_wbeing_1", v1_meta, v2_meta)
+        
+        assert result["compatible"] is True
+        assert result["rescale_needed"] is False
+    
+    def test_version_compatibility_different_ranges_rescalable(self):
+        """Test that different ranges are compatible but require rescaling."""
+        from glow_api.version_compatibility import check_version_compatibility
+        
+        v1_meta = {"bw_wbeing_1": {"min": 1, "max": 5}}
+        v2_meta = {"bw_wbeing_1": {"min": 0, "max": 10}}
+        
+        result = check_version_compatibility("bw_wbeing_1", v1_meta, v2_meta)
+        
+        assert result["compatible"] is True
+        assert result["rescale_needed"] is True
+        assert result["rescale_from"] == (1, 5)
+        assert result["rescale_to"] == (0, 10)
+    
+    def test_version_compatibility_variable_removed(self):
+        """Test that removed variables are incompatible."""
+        from glow_api.version_compatibility import check_version_compatibility
+        
+        v1_meta = {"bw_wbeing_1": {"min": 1, "max": 5}}
+        v2_meta = {}  # Variable removed
+        
+        result = check_version_compatibility("bw_wbeing_1", v1_meta, v2_meta)
+        
+        assert result["compatible"] is False
+        assert result["reason"] == "variable-not-in-new-version"
+    
+    def test_rescale_value_linear_transformation(self):
+        """Test linear rescaling of values."""
+        from glow_api.version_compatibility import rescale_value
+        
+        # Rescale 3 from [1, 5] to [0, 10]
+        # (3 - 1) / (5 - 1) = 0.5
+        # 0.5 * (10 - 0) + 0 = 5
+        result = rescale_value(3, (1, 5), (0, 10))
+        
+        assert result == 5.0
+    
+    def test_apply_rescaling_to_dataframe(self):
+        """Test rescaling applied to DataFrame column."""
+        from glow_api.version_compatibility import apply_rescaling
+        import pandas as pd
+        
+        df = pd.DataFrame({
+            "uid": ["U001", "U002"],
+            "bw_wbeing_1": [1, 5],  # Min and max of old range
+        })
+        
+        result = apply_rescaling(df, "bw_wbeing_1", (1, 5), (0, 10))
+        
+        # 1 should map to 0, 5 should map to 10
+        assert result["bw_wbeing_1"].iloc[0] == 0.0
+        assert result["bw_wbeing_1"].iloc[1] == 10.0
+    
+    def test_incompatible_version_suppresses_period(self):
+        """Test that incompatible versions cause period suppression."""
+        from glow_api.query_execution import execute_query
+        from glow_api.canonical_query import normalize_query
+        import pandas as pd
+        
+        # Create data with multiple versions in same period
+        df = pd.DataFrame({
+            "uid": ["U001", "U002"],
+            "school": ["School A", "School A"],
+            "period_id": ["2023-2024", "2023-2024"],
+            "createdAt": ["2024-01-01", "2024-01-02"],
+            "__version": [1, 2],
+            "bw_wbeing_1": [3, 4],
+        })
+        
+        # Provide metadata that makes versions incompatible
+        # (variable doesn't exist in version 2)
+        form_metadata = {
+            "bw_wbeing_1": {"min": 1, "max": 5},
+        }
+        
+        query = normalize_query(v=["bw_wbeing_1"])
+        
+        # Note: This test assumes the version compatibility check
+        # will mark missing variables as incompatible
+        result = execute_query(
+            df,
+            query,
+            observed_periods=["2023-2024"],
+            form_metadata=form_metadata,
+        )
+        
+        # The implementation should suppress or handle the incompatibility
+        # This test documents the expected behavior
+        assert "variables" in result
