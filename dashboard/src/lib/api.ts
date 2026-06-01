@@ -233,6 +233,77 @@ export async function getMe(token: string): Promise<User> {
   return apiFetch<User>("/admin/me", { headers: authHeaders(token) });
 }
 
+// ─── New /me Endpoint ────────────────────────────────────────────────────────
+
+export interface SchoolSummary {
+  id: number;
+  name: string;
+}
+
+export interface MeAnonymous {
+  kind: "anonymous";
+}
+
+export interface MeAuthenticated {
+  kind: "authenticated";
+  id: number;
+  username: string;
+  is_admin: boolean;
+  schools: SchoolSummary[];
+}
+
+export type MeResponse = MeAnonymous | MeAuthenticated;
+
+/**
+ * Get current user identity (works for both anonymous and authenticated users).
+ * Returns anonymous response if no token provided or token is invalid.
+ */
+export async function me(token?: string): Promise<MeResponse> {
+  const options: RequestInit = token ? { headers: authHeaders(token) } : {};
+  try {
+    return await apiFetch<MeResponse>("/me", options);
+  } catch (error) {
+    // If authentication fails, return anonymous
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      return { kind: "anonymous" };
+    }
+    throw error;
+  }
+}
+
+// ─── New /dimensions Endpoint ────────────────────────────────────────────────
+
+export interface DimensionDefinition {
+  key: string;
+  type: "string" | "number";
+}
+
+export interface VariableDefinition {
+  key: string;
+}
+
+export interface DimensionsResponse {
+  school_id?: number;
+  variables: VariableDefinition[];
+  dimensions: DimensionDefinition[];
+}
+
+/**
+ * Get available variables and dimensions for querying.
+ * - No school_id: returns dataset-level dimensions (public, no auth required)
+ * - With school_id: returns school-specific dimensions (requires auth for that school)
+ */
+export async function getDimensions(params: {
+  school_id?: number;
+  token?: string;
+}): Promise<DimensionsResponse> {
+  const { school_id, token } = params;
+  const queryParams = school_id ? `?school_id=${school_id}` : "";
+  const options: RequestInit = token ? { headers: authHeaders(token) } : {};
+  
+  return apiFetch<DimensionsResponse>(`/dimensions${queryParams}`, options);
+}
+
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 // Legacy /data endpoints removed - use query_options from /schools instead
@@ -408,4 +479,76 @@ export async function query(
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(request),
   });
+}
+
+// ─── New Period-Based GET /query Endpoint ────────────────────────────────────
+
+export interface CanonicalQuery {
+  school_id?: number;
+  variables: string[];
+  dimensions: string[];
+  variable_prefixes: string[];
+}
+
+export interface PeriodSliceCell {
+  mean?: number;
+  n: number;
+  [key: string]: unknown; // Dynamic coordinate fields
+}
+
+export interface PeriodSlice {
+  suppressed: boolean;
+  suppression_reason?: "small-n" | "incompatible-version";
+  notes?: ("values-rescaled")[];
+  question_versions?: Record<string, number>;
+  cells?: PeriodSliceCell[];
+}
+
+export interface VariableSlice {
+  variable: string;
+  periods: Record<string, PeriodSlice>; // period_id -> PeriodSlice
+}
+
+export interface NewQueryResponse {
+  query: CanonicalQuery;
+  dimensions: string[];
+  periods: string[]; // Observed period IDs in chronological order
+  variables: VariableSlice[];
+}
+
+export interface QueryParams {
+  v?: string[]; // Variable names (repeatable)
+  d?: string[]; // Dimension names (repeatable)
+  variable_prefix?: string[]; // Variable prefixes (repeatable)
+  school_id?: number; // Optional school ID for school-scoped query
+  token?: string; // Optional token (required for school-scoped queries)
+}
+
+/**
+ * Execute a new period-oriented multi-variable query.
+ * 
+ * This endpoint supports:
+ * - Dataset-scoped queries (no school_id, anonymous access OK)
+ * - School-scoped queries (with school_id, requires authorization)
+ * - Variable selection via 'v' params or 'variable_prefix' params
+ * - Dimension selection via 'd' params
+ * - Period-organized results with independent suppression per period
+ * - ETag-based caching with If-None-Match support
+ */
+export async function queryPeriodBased(params: QueryParams): Promise<NewQueryResponse> {
+  const { v = [], d = [], variable_prefix = [], school_id, token } = params;
+  
+  // Build query string with repeated parameters
+  const queryParts: string[] = [];
+  v.forEach(variable => queryParts.push(`v=${encodeURIComponent(variable)}`));
+  d.forEach(dimension => queryParts.push(`d=${encodeURIComponent(dimension)}`));
+  variable_prefix.forEach(prefix => queryParts.push(`variable_prefix=${encodeURIComponent(prefix)}`));
+  if (school_id !== undefined) {
+    queryParts.push(`school_id=${school_id}`);
+  }
+  
+  const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+  const options: RequestInit = token ? { headers: authHeaders(token) } : {};
+  
+  return apiFetch<NewQueryResponse>(`/query${queryString}`, options);
 }

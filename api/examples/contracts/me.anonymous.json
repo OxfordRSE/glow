@@ -1,0 +1,12 @@
+{
+  "id": "me.anonymous",
+  "method": "GET",
+  "path": "/me",
+  "status": 200,
+  "request_model": null,
+  "response_model": "MeAnonymous",
+  "request": null,
+  "response": {
+    "kind": "anonymous"
+  }
+}

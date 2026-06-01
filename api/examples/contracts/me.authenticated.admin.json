@@ -1,0 +1,25 @@
+{
+  "id": "me.authenticated.admin",
+  "method": "GET",
+  "path": "/me",
+  "status": 200,
+  "request_model": null,
+  "response_model": "MeAuthenticated",
+  "request": null,
+  "response": {
+    "kind": "authenticated",
+    "id": 2,
+    "username": "admin@example.com",
+    "is_admin": true,
+    "schools": [
+      {
+        "id": 1,
+        "name": "Focus School Academy"
+      },
+      {
+        "id": 2,
+        "name": "Neighbouring School"
+      }
+    ]
+  }
+}

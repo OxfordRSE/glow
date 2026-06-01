@@ -1,0 +1,27 @@
+{
+  "id": "dimensions.dataset",
+  "method": "GET",
+  "path": "/dimensions",
+  "status": 200,
+  "request_model": null,
+  "response_model": "DimensionsResponse",
+  "request": null,
+  "response": {
+    "school_id": null,
+    "variables": [
+      {"key": "bw_wbeing_1"},
+      {"key": "bw_wbeing_2"},
+      {"key": "bw_wbeing_3"},
+      {"key": "bw_wbeing_total"}
+    ],
+    "dimensions": [
+      {"key": "class", "type": "string"},
+      {"key": "d_age", "type": "string"},
+      {"key": "d_city", "type": "string"},
+      {"key": "d_country", "type": "string"},
+      {"key": "d_ethnicity", "type": "string"},
+      {"key": "d_sex", "type": "string"},
+      {"key": "yearGroup", "type": "string"}
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "query.period-based.simple",
+  "method": "GET",
+  "path": "/query?v=bw_wbeing_1",
+  "status": 200,
+  "request_model": null,
+  "response_model": "NewQueryResponse",
+  "request": null,
+  "response": {
+    "query": {
+      "school_id": null,
+      "variables": ["bw_wbeing_1"],
+      "dimensions": [],
+      "variable_prefixes": []
+    },
+    "dimensions": [],
+    "periods": ["2023-2024", "2024-2025"],
+    "variables": [
+      {
+        "variable": "bw_wbeing_1",
+        "periods": {
+          "2023-2024": {
+            "suppressed": false,
+            "cells": [
+              {
+                "mean": 3.5,
+                "n": 10
+              }
+            ]
+          },
+          "2024-2025": {
+            "suppressed": false,
+            "cells": [
+              {
+                "mean": 3.8,
+                "n": 12
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

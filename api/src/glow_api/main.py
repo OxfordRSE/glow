@@ -12,7 +12,7 @@ from glow_api.auth import authenticate_user, create_access_token
 from glow_api.data import get_datastore
 from glow_api.database import run_migrations, get_db
 from glow_api.models import Token
-from glow_api.routers import admin, auth, query, schools
+from glow_api.routers import admin, auth, dimensions, me, query, schools
 from glow_api.settings import settings
 
 
@@ -119,6 +119,8 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(me.router)
+app.include_router(dimensions.router)
 app.include_router(schools.router)
 app.include_router(query.router)
 

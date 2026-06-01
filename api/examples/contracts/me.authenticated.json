@@ -1,0 +1,21 @@
+{
+  "id": "me.authenticated",
+  "method": "GET",
+  "path": "/me",
+  "status": 200,
+  "request_model": null,
+  "response_model": "MeAuthenticated",
+  "request": null,
+  "response": {
+    "kind": "authenticated",
+    "id": 1,
+    "username": "user@example.com",
+    "is_admin": false,
+    "schools": [
+      {
+        "id": 1,
+        "name": "Focus School Academy"
+      }
+    ]
+  }
+}

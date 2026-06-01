@@ -130,8 +130,12 @@ class DataStore:
         computed_scores = {}
         
         for subscale, columns in questionnaires_for_totals.items():
-            computed_scores[subscale] = df[columns].sum(axis=1, skipna=True)
-            logger.debug("Computed %s from %d columns", subscale, len(columns))
+            # Only compute if the column doesn't already exist
+            if subscale not in df.columns:
+                computed_scores[subscale] = df[columns].sum(axis=1, skipna=True)
+                logger.debug("Computed %s from %d columns", subscale, len(columns))
+            else:
+                logger.debug("Skipping %s - already exists in data", subscale)
 
         # Concatenate all computed scores at once instead of iteratively assigning
         if computed_scores:

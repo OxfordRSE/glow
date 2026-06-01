@@ -79,495 +79,271 @@ export const contractExamplesData = [
     }
   },
   {
-    "id": "query.default",
-    "method": "POST",
-    "path": "/api/query",
+    "id": "dimensions.dataset",
+    "method": "GET",
+    "path": "/dimensions",
     "status": 200,
-    "request_model": "QueryRequest",
-    "response_model": "QueryResponse",
-    "request": {
-      "school_id": 1,
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {},
-      "include_neighbors": true
-    },
+    "request_model": null,
+    "response_model": "DimensionsResponse",
+    "request": null,
     "response": {
-      "focus_school": {
-        "school_id": 1,
-        "results": {
-          "1": {
-            "suppressed": false,
-            "suppression_message": null,
-            "results": [
-              {
-                "mean": 75.5,
-                "student_n": 120
-              }
-            ]
-          },
-          "2": {
-            "suppressed": false,
-            "suppression_message": null,
-            "results": [
-              {
-                "mean": 78.2,
-                "student_n": 125
-              }
-            ]
-          }
-        }
-      },
-      "neighbors": [
+      "school_id": null,
+      "variables": [
         {
-          "school_id": 2,
-          "results": {
-            "1": {
+          "key": "bw_wbeing_1"
+        },
+        {
+          "key": "bw_wbeing_2"
+        },
+        {
+          "key": "bw_wbeing_3"
+        },
+        {
+          "key": "bw_wbeing_total"
+        }
+      ],
+      "dimensions": [
+        {
+          "key": "class",
+          "type": "string"
+        },
+        {
+          "key": "d_age",
+          "type": "string"
+        },
+        {
+          "key": "d_city",
+          "type": "string"
+        },
+        {
+          "key": "d_country",
+          "type": "string"
+        },
+        {
+          "key": "d_ethnicity",
+          "type": "string"
+        },
+        {
+          "key": "d_sex",
+          "type": "string"
+        },
+        {
+          "key": "yearGroup",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  {
+    "id": "dimensions.school",
+    "method": "GET",
+    "path": "/dimensions?school_id=1",
+    "status": 200,
+    "request_model": null,
+    "response_model": "DimensionsResponse",
+    "request": null,
+    "response": {
+      "school_id": 1,
+      "variables": [
+        {
+          "key": "bw_wbeing_1"
+        },
+        {
+          "key": "bw_wbeing_2"
+        },
+        {
+          "key": "bw_wbeing_3"
+        },
+        {
+          "key": "bw_wbeing_total"
+        }
+      ],
+      "dimensions": [
+        {
+          "key": "class",
+          "type": "string"
+        },
+        {
+          "key": "d_age",
+          "type": "string"
+        },
+        {
+          "key": "d_city",
+          "type": "string"
+        },
+        {
+          "key": "d_country",
+          "type": "string"
+        },
+        {
+          "key": "d_ethnicity",
+          "type": "string"
+        },
+        {
+          "key": "d_sex",
+          "type": "string"
+        },
+        {
+          "key": "yearGroup",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  {
+    "id": "me.anonymous",
+    "method": "GET",
+    "path": "/me",
+    "status": 200,
+    "request_model": null,
+    "response_model": "MeAnonymous",
+    "request": null,
+    "response": {
+      "kind": "anonymous"
+    }
+  },
+  {
+    "id": "me.authenticated.admin",
+    "method": "GET",
+    "path": "/me",
+    "status": 200,
+    "request_model": null,
+    "response_model": "MeAuthenticated",
+    "request": null,
+    "response": {
+      "kind": "authenticated",
+      "id": 2,
+      "username": "admin@example.com",
+      "is_admin": true,
+      "schools": [
+        {
+          "id": 1,
+          "name": "Focus School Academy"
+        },
+        {
+          "id": 2,
+          "name": "Neighbouring School"
+        }
+      ]
+    }
+  },
+  {
+    "id": "me.authenticated",
+    "method": "GET",
+    "path": "/me",
+    "status": 200,
+    "request_model": null,
+    "response_model": "MeAuthenticated",
+    "request": null,
+    "response": {
+      "kind": "authenticated",
+      "id": 1,
+      "username": "user@example.com",
+      "is_admin": false,
+      "schools": [
+        {
+          "id": 1,
+          "name": "Focus School Academy"
+        }
+      ]
+    }
+  },
+  {
+    "id": "query.period-based.simple",
+    "method": "GET",
+    "path": "/query?v=bw_wbeing_1",
+    "status": 200,
+    "request_model": null,
+    "response_model": "NewQueryResponse",
+    "request": null,
+    "response": {
+      "query": {
+        "school_id": null,
+        "variables": [
+          "bw_wbeing_1"
+        ],
+        "dimensions": [],
+        "variable_prefixes": []
+      },
+      "dimensions": [],
+      "periods": [
+        "2023-2024",
+        "2024-2025"
+      ],
+      "variables": [
+        {
+          "variable": "bw_wbeing_1",
+          "periods": {
+            "2023-2024": {
               "suppressed": false,
-              "suppression_message": null,
-              "results": [
+              "cells": [
                 {
-                  "mean": 72.1,
-                  "student_n": 110
+                  "mean": 3.5,
+                  "n": 10
                 }
               ]
             },
-            "2": {
+            "2024-2025": {
               "suppressed": false,
-              "suppression_message": null,
-              "results": [
+              "cells": [
                 {
-                  "mean": 74.8,
-                  "student_n": 115
+                  "mean": 3.8,
+                  "n": 12
                 }
               ]
             }
           }
         }
-      ],
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {}
+      ]
     }
   },
   {
-    "id": "query.error-400",
-    "method": "POST",
-    "path": "/api/query",
-    "status": 400,
-    "request_model": "QueryRequest",
-    "response_model": "ErrorDetailResponse",
-    "request": {
-      "school_id": 1,
-      "variable": "invalid_variable",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {},
-      "include_neighbors": true
-    },
-    "response": {
-      "detail": "Variable 'invalid_variable' not found in dataset"
-    }
-  },
-  {
-    "id": "query.error-403",
-    "method": "POST",
-    "path": "/api/query",
-    "status": 403,
-    "request_model": "QueryRequest",
-    "response_model": "ErrorDetailResponse",
-    "request": {
-      "school_id": 999,
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {},
-      "include_neighbors": true
-    },
-    "response": {
-      "detail": "You do not have permission to access this school"
-    }
-  },
-  {
-    "id": "query.error-500",
-    "method": "POST",
-    "path": "/api/query",
-    "status": 500,
-    "request_model": "QueryRequest",
-    "response_model": "ErrorDetailResponse",
-    "request": {
-      "school_id": 1,
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {},
-      "include_neighbors": true
-    },
-    "response": {
-      "detail": "Internal server error"
-    }
-  },
-  {
-    "id": "query.filter-sex-f",
-    "method": "POST",
-    "path": "/api/query",
+    "id": "query.period-based.with-dimensions",
+    "method": "GET",
+    "path": "/query?v=bw_wbeing_1&d=d_sex",
     "status": 200,
-    "request_model": "QueryRequest",
-    "response_model": "QueryResponse",
-    "request": {
-      "school_id": 1,
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {
-        "d_sex": [
-          "F"
-        ]
-      },
-      "include_neighbors": true
-    },
+    "request_model": null,
+    "response_model": "NewQueryResponse",
+    "request": null,
     "response": {
-      "focus_school": {
-        "school_id": 1,
-        "results": {
-          "1": {
-            "suppressed": false,
-            "suppression_message": null,
-            "results": [
-              {
-                "mean": 74.8,
-                "student_n": 60
-              }
-            ]
-          },
-          "2": {
-            "suppressed": false,
-            "suppression_message": null,
-            "results": [
-              {
-                "mean": 77.3,
-                "student_n": 63
-              }
-            ]
-          }
-        }
+      "query": {
+        "school_id": null,
+        "variables": [
+          "bw_wbeing_1"
+        ],
+        "dimensions": [
+          "d_sex"
+        ],
+        "variable_prefixes": []
       },
-      "neighbors": [
-        {
-          "school_id": 2,
-          "results": {
-            "1": {
-              "suppressed": false,
-              "suppression_message": null,
-              "results": [
-                {
-                  "mean": 70.7,
-                  "student_n": 55
-                }
-              ]
-            },
-            "2": {
-              "suppressed": false,
-              "suppression_message": null,
-              "results": [
-                {
-                  "mean": 73.4,
-                  "student_n": 57
-                }
-              ]
-            }
-          }
-        }
-      ],
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {
-        "d_sex": [
-          "F"
-        ]
-      }
-    }
-  },
-  {
-    "id": "query.group-by-sex",
-    "method": "POST",
-    "path": "/api/query",
-    "status": 200,
-    "request_model": "QueryRequest",
-    "response_model": "QueryResponse",
-    "request": {
-      "school_id": 1,
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [
+      "dimensions": [
         "d_sex"
       ],
-      "filters": {},
-      "include_neighbors": true
-    },
-    "response": {
-      "focus_school": {
-        "school_id": 1,
-        "results": {
-          "1": {
-            "suppressed": false,
-            "suppression_message": null,
-            "results": [
-              {
-                "d_sex": "M",
-                "mean": 76.2,
-                "student_n": 60
-              },
-              {
-                "d_sex": "F",
-                "mean": 74.8,
-                "student_n": 60
-              }
-            ]
-          },
-          "2": {
-            "suppressed": false,
-            "suppression_message": null,
-            "results": [
-              {
-                "d_sex": "M",
-                "mean": 79.1,
-                "student_n": 62
-              },
-              {
-                "d_sex": "F",
-                "mean": 77.3,
-                "student_n": 63
-              }
-            ]
-          }
-        }
-      },
-      "neighbors": [
+      "periods": [
+        "2023-2024"
+      ],
+      "variables": [
         {
-          "school_id": 2,
-          "results": {
-            "1": {
+          "variable": "bw_wbeing_1",
+          "periods": {
+            "2023-2024": {
               "suppressed": false,
-              "suppression_message": null,
-              "results": [
+              "cells": [
                 {
-                  "d_sex": "M",
-                  "mean": 73.5,
-                  "student_n": 55
+                  "mean": 3.2,
+                  "n": 5,
+                  "d_sex": "M"
                 },
                 {
-                  "d_sex": "F",
-                  "mean": 70.7,
-                  "student_n": 55
-                }
-              ]
-            },
-            "2": {
-              "suppressed": false,
-              "suppression_message": null,
-              "results": [
-                {
-                  "d_sex": "M",
-                  "mean": 76.2,
-                  "student_n": 58
-                },
-                {
-                  "d_sex": "F",
-                  "mean": 73.4,
-                  "student_n": 57
+                  "mean": 3.8,
+                  "n": 5,
+                  "d_sex": "F"
                 }
               ]
             }
           }
         }
-      ],
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [
-        "d_sex"
-      ],
-      "filters": {}
-    }
-  },
-  {
-    "id": "query.school-2",
-    "method": "POST",
-    "path": "/api/query",
-    "status": 200,
-    "request_model": "QueryRequest",
-    "response_model": "QueryResponse",
-    "request": {
-      "school_id": 2,
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {},
-      "include_neighbors": true
-    },
-    "response": {
-      "focus_school": {
-        "school_id": 2,
-        "results": {
-          "1": {
-            "suppressed": false,
-            "suppression_message": null,
-            "results": [
-              {
-                "mean": 72.1,
-                "student_n": 110
-              }
-            ]
-          },
-          "2": {
-            "suppressed": false,
-            "suppression_message": null,
-            "results": [
-              {
-                "mean": 74.8,
-                "student_n": 115
-              }
-            ]
-          }
-        }
-      },
-      "neighbors": [
-        {
-          "school_id": 1,
-          "results": {
-            "1": {
-              "suppressed": false,
-              "suppression_message": null,
-              "results": [
-                {
-                  "mean": 75.5,
-                  "student_n": 120
-                }
-              ]
-            },
-            "2": {
-              "suppressed": false,
-              "suppression_message": null,
-              "results": [
-                {
-                  "mean": 78.2,
-                  "student_n": 125
-                }
-              ]
-            }
-          }
-        }
-      ],
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {}
-    }
-  },
-  {
-    "id": "query.suppressed-focus",
-    "method": "POST",
-    "path": "/api/query",
-    "status": 200,
-    "request_model": "QueryRequest",
-    "response_model": "QueryResponse",
-    "request": {
-      "school_id": 1,
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {},
-      "include_neighbors": true
-    },
-    "response": {
-      "focus_school": {
-        "school_id": 1,
-        "results": {
-          "1": {
-            "suppressed": true,
-            "suppression_message": "Results suppressed due to small sample size (n < 10)",
-            "results": null
-          },
-          "2": {
-            "suppressed": true,
-            "suppression_message": "Results suppressed due to small sample size (n < 10)",
-            "results": null
-          }
-        }
-      },
-      "neighbors": [
-        {
-          "school_id": 2,
-          "results": {
-            "1": {
-              "suppressed": false,
-              "suppression_message": null,
-              "results": [
-                {
-                  "mean": 72.1,
-                  "student_n": 110
-                }
-              ]
-            },
-            "2": {
-              "suppressed": false,
-              "suppression_message": null,
-              "results": [
-                {
-                  "mean": 74.8,
-                  "student_n": 115
-                }
-              ]
-            }
-          }
-        }
-      ],
-      "variable": "score",
-      "waves": [
-        "1",
-        "2"
-      ],
-      "aggregations": [],
-      "filters": {}
+      ]
     }
   },
   {

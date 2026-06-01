@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Literal, Optional
+from typing import Dict, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, RootModel, model_validator
 
@@ -54,7 +54,6 @@ class SchoolRead(BaseModel):
     category: Optional[str] = None
     geographical_neighbor_ids: list[int] = Field(default_factory=list)
     statistical_neighbor_ids: list[int] = Field(default_factory=list)
-    query_options: Optional["QueryOptions"] = None  # Added for dashboard metadata
     model_config = {"from_attributes": True}
 
 
@@ -73,123 +72,117 @@ class SchoolUpdate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Query Options Models (canonical metadata for dashboard)
+# /me endpoint models
 # ---------------------------------------------------------------------------
-class VariableMetadata(BaseModel):
-    """Metadata for a single variable (min/max values for axis scaling)."""
+
+
+class SchoolSummary(BaseModel):
+    """Summary of a school for the /me endpoint."""
+
+    id: int
+    name: str
+
+
+class MeAnonymous(BaseModel):
+    """Response for /me when no valid token is provided."""
+
+    kind: Literal["anonymous"] = "anonymous"
+
+
+class MeAuthenticated(BaseModel):
+    """Response for /me when a valid token is provided."""
+
+    kind: Literal["authenticated"] = "authenticated"
+    id: int
+    username: str
+    is_admin: bool
+    schools: list[SchoolSummary]
+
+
+MeResponse = Union[MeAnonymous, MeAuthenticated]
+
+
+# ---------------------------------------------------------------------------
+# /dimensions endpoint models
+# ---------------------------------------------------------------------------
+
+
+class DimensionDefinition(BaseModel):
+    """Definition of a single dimension."""
+
+    key: str
+    type: Literal["string", "number"]
+
+
+class VariableDefinition(BaseModel):
+    """Definition of a single variable."""
+
+    key: str
+
+
+class DimensionsResponse(BaseModel):
+    """Response for /dimensions endpoint."""
+
+    school_id: Optional[int] = None
+    variables: list[VariableDefinition]
+    dimensions: list[DimensionDefinition]
+
+
+# ---------------------------------------------------------------------------
+# New Period-Based Query Models
+# ---------------------------------------------------------------------------
+
+
+class CanonicalQuery(BaseModel):
+    """Normalized internal form of a query request.
     
-    min: Optional[int] = None
-    max: Optional[int] = None
-
-
-class QueryOptionItem(BaseModel):
-    """A single query option (aggregation or filter) with scope information."""
-
-    value: str  # The dimension name (e.g., "yearGroup", "class")
-    values: list[str] = Field(default_factory=list)  # Possible values (for filters)
-    scope: Literal["shared", "focus_only"] = (
-        "shared"  # Whether this applies to neighbors too
-    )
-
-
-class QueryOptions(BaseModel):
-    """Query capabilities for a specific school.
-
-    This is the canonical source of truth for what queries can be performed
-    and is used for both metadata delivery and request validation.
+    Used for response echoes, deterministic behavior, and ETag generation.
+    All lists are sorted and deduped.
     """
 
-    variables: list[str]  # All numeric measures including derived totals
-    waves: list[str]  # Available wave values
-    aggregations: list[QueryOptionItem]  # Grouping dimensions with scope
-    filters: list[QueryOptionItem]  # Filter dimensions with scope and possible values
-    metadata: Dict[str, VariableMetadata] = Field(default_factory=dict)  # Min/max values for variables
+    school_id: Optional[int] = None
+    variables: list[str] = Field(default_factory=list)  # Sorted, deduped
+    dimensions: list[str] = Field(default_factory=list)  # Sorted, deduped
+    variable_prefixes: list[str] = Field(default_factory=list)  # Sorted, deduped
 
 
-class ColumnsResponse(RootModel[list[str]]):
-    """List of column names response wrapper for OpenAPI examples."""
-
-    pass
-
-
-# ---------------------------------------------------------------------------
-# Safe Query Models (with blanket suppression)
-# ---------------------------------------------------------------------------
-
-
-class QueryRequest(BaseModel):
-    """Request for a query with blanket suppression.
-
-    All queries must specify at least one wave. Results are returned
-    separately for each wave.
-    """
-
-    school_id: int
-    variable: str  # Question column or derived score
-    waves: list[str]  # Required: one or more waves to query
-    aggregations: list[str] = Field(
-        default_factory=list
-    )  # e.g., ["yearGroup", "d_sex"]
-    filters: dict[str, list] = Field(
-        default_factory=dict
-    )  # e.g., {"d_ethnicity": ["White"]} (wave is handled separately)
-    include_neighbors: bool = False
-    neighbor_type: Literal["geographical", "statistical"] = "geographical"
-
-    @model_validator(mode="after")
-    def validate_waves(self) -> "QueryRequest":
-        if not self.waves:
-            raise ValueError("At least one wave must be specified.")
-        return self
-
-
-class QueryResult(BaseModel):
-    """Wave-indexed results for a single school with optional suppression.
-
-    Each wave produces its own result, keyed by wave value.
-    """
-
-    school_id: int
-    results: dict[str, "QueryResultForWave"]
-
-
-class QueryRow(BaseModel):
-    """A single row in a query result.
-
-    Contains mean and student count, plus any grouping columns.
-    Additional fields are allowed to support dynamic group_by columns.
-    """
+class PeriodSliceCell(BaseModel):
+    """A single cell in a period slice result."""
 
     mean: Optional[float] = None
-    student_n: int
-    # Dynamic fields for group_by columns (d_sex, yearGroup, d_ethnicity, class_)
-    # These are validated at runtime based on the aggregations parameter
+    n: int
+    # Dynamic coordinate fields based on requested dimensions
     model_config = {"extra": "allow"}
 
 
-class QueryResultForWave(BaseModel):
-    """Single school result for a specific wave."""
+class PeriodSlice(BaseModel):
+    """Results or suppression metadata for a single variable within a period."""
 
-    suppressed: bool
-    suppression_message: Optional[str] = None
-    results: Optional[list[QueryRow]] = (
-        None  # List of result rows (group_by cols + mean + student_n)
-    )
+    suppressed: bool = False
+    suppression_reason: Optional[Literal["small-n", "incompatible-version"]] = None
+    notes: list[Literal["values-rescaled"]] = Field(default_factory=list)
+    question_versions: Optional[dict[str, int]] = None  # version -> count
+    cells: Optional[list[PeriodSliceCell]] = None
 
 
-class QueryResponse(BaseModel):
-    """Response for a query including focus school and neighbors.
+class VariableSlice(BaseModel):
+    """Results for a single variable across periods."""
 
-    Results are wave-indexed - each school has separate results for each wave.
+    variable: str
+    # period_id -> PeriodSlice (missing keys mean not collected/not applicable)
+    periods: dict[str, PeriodSlice]
+
+
+class NewQueryResponse(BaseModel):
+    """New period-oriented multi-variable query response.
+    
+    Replaces the old wave-first, neighbor-oriented QueryResponse.
     """
 
-    focus_school: QueryResult
-    neighbors: list[QueryResult] = Field(default_factory=list)
-    variable: str
-    waves: list[str]
-    aggregations: list[str]
-    filters: dict[str, list]
-    metadata: dict[str, VariableMetadata]
+    query: CanonicalQuery  # Echo of the normalized request
+    dimensions: list[str]  # Ordered list of requested dimension keys
+    periods: list[str]  # Observed period IDs in chronological order
+    variables: list[VariableSlice]  # One per requested variable
 
 
 # ---------------------------------------------------------------------------

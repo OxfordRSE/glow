@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     DATA_PREFIXES: List[str] = ["bw"]
     DATA_DEMOGRAPHIC_PREFIXES: List[str] = ["d"]
     
+    # Period derivation configuration
+    PERIOD_TIMEZONE: str = "Europe/London"  # Deployment timezone for period calculations
+    PERIOD_CUTOFF_MONTH: int = 9  # September (academic year starts)
+    PERIOD_CUTOFF_DAY: int = 1  # 1st of month
+    
     # Security
     MIN_N: int = 5
     SECRET_KEY: str = "change-me-in-production"
