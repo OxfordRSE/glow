@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores';
-  import { login, getMe, ApiError } from '$lib/api';
+  import { login, me, ApiError } from '$lib/api';
   import { createI18n, locale, type Locale } from '$lib/i18n';
 
   interface Props {
@@ -24,8 +24,8 @@
     loading = true;
     try {
       const token = await login(username, password);
-      const user = await getMe(token.access_token);
-      authStore.login(token.access_token, user);
+      const identity = await me(token.access_token);
+      authStore.setIdentity(identity, token.access_token);
       goto(`/${currentLocale}`);
     } catch (e: unknown) {
       if (e instanceof ApiError && e.status === 401) {

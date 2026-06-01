@@ -1,4 +1,4 @@
-import type { QueryResult } from "./api";
+import type { QueryResult, NewQueryResponse } from "./api";
 import { parseCSV } from "./csvUtils";
 
 const PALETTE = [
@@ -508,4 +508,180 @@ export function queryToWaveChart(
     labelOptions,
     focusSchool.school_name,
   );
+}
+
+/**
+ * Convert NewQueryResponse (period-based multi-variable) to ChartJsData
+ * 
+ * For single variable:
+ * - Multiple periods: line chart with periods on x-axis
+ * - Single period: bar chart with dimension values on x-axis
+ * 
+ * For multiple variables:
+ * - Multiple periods: line chart with one line per variable
+ * - Single period: bar chart with one bar per variable
+ * 
+ * Handles suppression and rescaling notes appropriately
+ */
+export function newQueryToChartData(
+  response: NewQueryResponse,
+  labelOptions: ChartLabelOptions = {},
+): ChartOutput {
+  const chartLabels = resolveChartLabels(labelOptions);
+  const { variables, periods, dimensions } = response;
+  
+  if (variables.length === 0 || periods.length === 0) {
+    return {
+      data: { labels: [], datasets: [] },
+      options: baseOptions(chartLabels.meanLabel, false, labelOptions.min, labelOptions.max),
+      type: 'bar',
+    };
+  }
+  
+  // Multi-period: line chart
+  if (periods.length > 1) {
+    const datasets: ChartDataset[] = [];
+    
+    variables.forEach((variableSlice, varIdx) => {
+      // For each variable, create a line across periods
+      const data: (number | null)[] = periods.map(periodId => {
+        const periodSlice = variableSlice.periods[periodId];
+        if (!periodSlice || periodSlice.suppressed || !periodSlice.cells || periodSlice.cells.length === 0) {
+          return null;
+        }
+        // If no dimensions, take the single cell's mean
+        // If dimensions exist, we'd need to aggregate - for now, take first cell
+        const mean = periodSlice.cells[0].mean;
+        return mean !== undefined ? mean : null;
+      });
+      
+      datasets.push({
+        label: variableSlice.variable,
+        data,
+        tension: 0.3,
+        fill: false,
+        backgroundColor: PALETTE[varIdx % PALETTE.length],
+        borderColor: PALETTE[varIdx % PALETTE.length],
+        borderWidth: 2,
+      });
+    });
+    
+    const yScaleConfig: Record<string, unknown> = { 
+      beginAtZero: true, 
+      title: { display: true, text: chartLabels.meanLabel } 
+    };
+    if (labelOptions.min !== undefined) yScaleConfig.min = labelOptions.min;
+    if (labelOptions.max !== undefined) yScaleConfig.max = labelOptions.max;
+    
+    return {
+      data: { labels: periods, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "top" as const },
+        },
+        scales: {
+          x: { title: { display: true, text: "Period" } },
+          y: yScaleConfig,
+        },
+      },
+      type: 'line',
+    };
+  } else {
+    // Single period: horizontal bar chart
+    const periodId = periods[0];
+    const labels: string[] = [];
+    const data: (number | null)[] = [];
+    
+    variables.forEach(variableSlice => {
+      const periodSlice = variableSlice.periods[periodId];
+      if (!periodSlice || periodSlice.suppressed || !periodSlice.cells || periodSlice.cells.length === 0) {
+        labels.push(variableSlice.variable);
+        data.push(null);
+      } else {
+        // If no dimensions, single value per variable
+        if (dimensions.length === 0) {
+          labels.push(variableSlice.variable);
+          const mean = periodSlice.cells[0].mean;
+          data.push(mean !== undefined ? mean : null);
+        } else {
+          // With dimensions, each cell represents a coordinate
+          // For simplicity, show variable + first dimension value
+          periodSlice.cells.forEach(cell => {
+            const dimLabel = dimensions.map(d => `${d}=${cell[d]}`).join(', ');
+            labels.push(`${variableSlice.variable} (${dimLabel})`);
+            const mean = cell.mean;
+            data.push(mean !== undefined ? mean : null);
+          });
+        }
+      }
+    });
+    
+    return {
+      data: {
+        labels,
+        datasets: [{
+          label: chartLabels.meanLabel,
+          data,
+          backgroundColor: PALETTE[0] + "CC",
+          borderColor: PALETTE[0],
+          borderWidth: 1,
+        }],
+      },
+      options: baseOptions(chartLabels.meanLabel, true, labelOptions.min, labelOptions.max),
+      type: 'horizontalBar',
+    };
+  }
+}
+
+/**
+ * Convert NewQueryResponse to CSV format
+ * 
+ * CSV structure:
+ * Variable, Period, [Dimension1, Dimension2, ...], Mean, N
+ */
+export function newQueryToCSV(response: NewQueryResponse): string {
+  const { variables, periods, dimensions } = response;
+  
+  // Build header
+  const headers = ['Variable', 'Period', ...dimensions, 'Mean', 'N'];
+  const rows = [headers.join(',')];
+  
+  // Add data rows
+  variables.forEach(variableSlice => {
+    periods.forEach(periodId => {
+      const periodSlice = variableSlice.periods[periodId];
+      
+      if (!periodSlice || periodSlice.suppressed || !periodSlice.cells) {
+        // Suppressed period - add a row with empty values
+        const csvRow = [
+          variableSlice.variable,
+          periodId,
+          ...dimensions.map(() => ''),
+          'SUPPRESSED',
+          '0',
+        ];
+        rows.push(csvRow.join(','));
+      } else {
+        // Add row for each cell
+        periodSlice.cells.forEach(cell => {
+          const dimValues = dimensions.map(d => String(cell[d] ?? ''));
+          const mean = cell.mean !== undefined ? cell.mean.toFixed(2) : '';
+          const n = String(cell.n);
+          
+          const csvRow = [
+            variableSlice.variable,
+            periodId,
+            ...dimValues,
+            mean,
+            n,
+          ];
+          rows.push(csvRow.join(','));
+        });
+      }
+    });
+  });
+  
+  return rows.join('\n');
 }

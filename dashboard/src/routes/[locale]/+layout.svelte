@@ -1,11 +1,11 @@
 <script lang="ts">
   import '../../app.css';
   import { browser } from '$app/environment';
-  import { authStore, isAdmin } from '$lib/stores';
+  import { authStore, isAdmin, isAuthenticated } from '$lib/stores';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { onMount, onDestroy } from 'svelte';
-  import { checkHealth, checkVersionCompatibility, type VersionCompatibility } from '$lib/api';
+  import { checkHealth, checkVersionCompatibility, me, type VersionCompatibility } from '$lib/api';
   import { createI18n, initializeLocale, locale, setLocale, type Locale } from '$lib/i18n';
 
   interface Props {
@@ -24,7 +24,6 @@
 
   const i18n = $derived(createI18n($locale));
   const currentLocale = $derived(data.locale || 'en');
-  const publicRoutes = $derived([`/${currentLocale}/login`]);
   
   // Track path in state for use in authStore subscription
   let currentPath = $state('');
@@ -62,8 +61,24 @@
     }
   }
 
+  // Bootstrap: fetch user identity from /me endpoint
+  async function bootstrapIdentity() {
+    try {
+      const token = $authStore.token;
+      const identity = await me(token || undefined);
+      authStore.setIdentity(identity, token || undefined);
+    } catch (error) {
+      console.error('Failed to fetch identity:', error);
+      // Fall back to anonymous
+      authStore.setIdentity({ kind: "anonymous" });
+    }
+  }
+
   onMount(() => {
     initializeLocale();
+
+    // Bootstrap identity on mount
+    bootstrapIdentity();
 
     // Poll API health every 30 seconds
     pollHealth();
@@ -74,17 +89,7 @@
     };
   });
   
-  // Handle auth redirects with $effect to access reactive values safely
-  $effect(() => {
-    if (!browser) return; // Only run in browser
-    
-    const path = $page.url.pathname;
-    const token = $authStore.token;
-    
-    if (!token && !publicRoutes.includes(path)) {
-      goto(`/${currentLocale}/login`);
-    }
-  });
+  // No redirects - allow anonymous users to access dashboard
 
   function logout() {
     authStore.logout();
@@ -92,6 +97,15 @@
   }
 
   let mobileMenuOpen = $state(false);
+
+  // Get display name from identity
+  const displayName = $derived(() => {
+    const identity = $authStore.identity;
+    if (identity?.kind === "authenticated") {
+      return identity.username;
+    }
+    return null;
+  });
 </script>
 
 {#if $page.url.pathname.endsWith('/login')}
@@ -170,17 +184,21 @@
               {/if}
             </span>
 
-            {#if $authStore.user}
+            {#if displayName()}
               <div class="hidden md:flex items-center gap-2">
                 <span class="text-sm text-gray-500">
-                  {$authStore.user.username}
+                  {displayName()}
                 </span>
-                {#if $authStore.user.is_admin}
+                {#if $isAdmin}
                   <span class="badge badge-blue">{i18n.t('nav.adminBadge')}</span>
                 {/if}
               </div>
             {/if}
-            <button class="btn-secondary btn-sm" onclick={logout}>{i18n.t('nav.signOut')}</button>
+            {#if $isAuthenticated}
+              <button class="btn-secondary btn-sm" onclick={logout}>{i18n.t('nav.signOut')}</button>
+            {:else}
+              <a href="/{currentLocale}/login" class="btn-primary btn-sm">{i18n.t('nav.signIn')}</a>
+            {/if}
             <button
               class="md:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100"
               onclick={() => (mobileMenuOpen = !mobileMenuOpen)}
@@ -201,8 +219,8 @@
           {#if $isAdmin}
             <a href="/{currentLocale}/admin" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100" onclick={() => (mobileMenuOpen = false)}>{i18n.t('nav.admin')}</a>
           {/if}
-          {#if $authStore.user}
-            <div class="px-3 py-2 text-sm text-gray-500">{$authStore.user.username}</div>
+          {#if displayName()}
+            <div class="px-3 py-2 text-sm text-gray-500">{displayName()}</div>
           {/if}
           <!-- API health in mobile menu -->
           <div class="px-3 py-2 text-xs text-gray-400">
