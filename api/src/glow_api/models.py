@@ -118,6 +118,8 @@ class VariableDefinition(BaseModel):
     """Definition of a single variable."""
 
     key: str
+    raw_key: Optional[str] = None
+    form_id: Optional[str] = None
 
 
 class DimensionsResponse(BaseModel):

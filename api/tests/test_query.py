@@ -94,6 +94,97 @@ class TestNewQueryExecution:
         var_names = [v["variable"] for v in result["variables"]]
         assert "bw_wbeing_1" in var_names
         assert "bw_stress_1" in var_names
+
+    def test_query_namespaced_variable_selection(self):
+        """Test selecting namespaced multi-form variables."""
+        from glow_api.query_execution import execute_query
+        from glow_api.canonical_query import normalize_query
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "uid": ["S001"],
+            "school": ["School A"],
+            "period_id": ["2023-2024"],
+            "createdAt": ["2024-01-01T10:00:00Z"],
+            "bewell_questionnaire__bw_wbeing_1": [3],
+            "phq9_questionnaire__phq9_1": [2],
+        })
+
+        numerical_whitelist = [
+            "bewell_questionnaire__bw_wbeing_1",
+            "phq9_questionnaire__phq9_1",
+        ]
+
+        query = normalize_query(v=["phq9_questionnaire__phq9_1"])
+        result = execute_query(df, query, numerical_whitelist=numerical_whitelist)
+
+        assert len(result["variables"]) == 1
+        assert result["variables"][0]["variable"] == "phq9_questionnaire__phq9_1"
+
+    def test_query_namespaced_variable_prefix_expansion(self):
+        """Test prefix expansion against the raw variable part of namespaced variables."""
+        from glow_api.query_execution import execute_query
+        from glow_api.canonical_query import normalize_query
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "uid": ["S001"],
+            "school": ["School A"],
+            "period_id": ["2023-2024"],
+            "createdAt": ["2024-01-01T10:00:00Z"],
+            "bewell_questionnaire__bw_wbeing_1": [3],
+            "phq9_questionnaire__phq9_1": [2],
+        })
+
+        numerical_whitelist = [
+            "bewell_questionnaire__bw_wbeing_1",
+            "phq9_questionnaire__phq9_1",
+        ]
+
+        query = normalize_query(variable_prefix=["phq9_"])
+        result = execute_query(df, query, numerical_whitelist=numerical_whitelist)
+
+        assert len(result["variables"]) == 1
+        assert result["variables"][0]["variable"] == "phq9_questionnaire__phq9_1"
+
+    def test_query_reports_question_version_counts_for_namespaced_variable(self):
+        """Test question_versions uses version->count mapping for namespaced variables."""
+        from glow_api.query_execution import execute_query
+        from glow_api.canonical_query import normalize_query
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "uid": ["S001", "S002"],
+            "school": ["School A", "School A"],
+            "period_id": ["2023-2024", "2023-2024"],
+            "createdAt": ["2024-01-01T10:00:00Z", "2024-01-02T10:00:00Z"],
+            "bewell_questionnaire__version": ["1", "2"],
+            "bewell_questionnaire__bw_wbeing_1": [3, 4],
+        })
+
+        metadata = {
+            "_forms": {
+                "bewell_questionnaire": {
+                    "1": {"variables": {"bw_wbeing_1": {"min": 1, "max": 6}}},
+                    "2": {"variables": {"bw_wbeing_1": {"min": 0, "max": 5}}},
+                }
+            },
+            "_current_versions": {"bewell_questionnaire": "2"},
+        }
+
+        query = normalize_query(v=["bewell_questionnaire__bw_wbeing_1"])
+        result = execute_query(
+            df,
+            query,
+            numerical_whitelist=["bewell_questionnaire__bw_wbeing_1"],
+            observed_periods=["2023-2024"],
+            form_metadata=metadata,
+            min_n=1,
+        )
+
+        period_slice = result["variables"][0]["periods"]["2023-2024"]
+        assert period_slice["question_versions"] == {"1": 1, "2": 1}
+        assert period_slice["notes"] == ["values-rescaled"]
     
     def test_query_variable_prefix_expansion(self):
         """Test expanding variable_prefix to matching variables."""

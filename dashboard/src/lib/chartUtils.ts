@@ -437,7 +437,7 @@ export function meansToChartData(
 }
 
 export function queryToChartData(
-  result: QueryResult,
+  result: { csv: string },
   groupBy: string[],
   labelOptions: ChartLabelOptions = {},
 ): ChartOutput {
@@ -483,7 +483,7 @@ export function queryToWaveChart(
     };
   }
   
-  const allResults = [
+  const allResults: Array<Record<string, unknown> & { school: string; _isFocus: boolean }> = [
     ...focusSchool.results.map(r => ({ ...r, school: focusSchool.school_name, _isFocus: true })),
     ...neighbors.flatMap(n => 
       (n.results || []).map(r => ({ ...r, school: n.school_name, _isFocus: false }))
@@ -556,7 +556,7 @@ export function newQueryToChartData(
       });
       
       datasets.push({
-        label: variableSlice.variable,
+        label: chartLabels.columnLabel(variableSlice.variable),
         data,
         tension: 0.3,
         fill: false,
@@ -596,21 +596,21 @@ export function newQueryToChartData(
     
     variables.forEach(variableSlice => {
       const periodSlice = variableSlice.periods[periodId];
-      if (!periodSlice || periodSlice.suppressed || !periodSlice.cells || periodSlice.cells.length === 0) {
-        labels.push(variableSlice.variable);
-        data.push(null);
-      } else {
-        // If no dimensions, single value per variable
-        if (dimensions.length === 0) {
-          labels.push(variableSlice.variable);
-          const mean = periodSlice.cells[0].mean;
-          data.push(mean !== undefined ? mean : null);
+        if (!periodSlice || periodSlice.suppressed || !periodSlice.cells || periodSlice.cells.length === 0) {
+          labels.push(chartLabels.columnLabel(variableSlice.variable));
+          data.push(null);
         } else {
+          // If no dimensions, single value per variable
+          if (dimensions.length === 0) {
+          labels.push(chartLabels.columnLabel(variableSlice.variable));
+            const mean = periodSlice.cells[0].mean;
+            data.push(mean !== undefined ? mean : null);
+          } else {
           // With dimensions, each cell represents a coordinate
           // For simplicity, show variable + first dimension value
-          periodSlice.cells.forEach(cell => {
-            const dimLabel = dimensions.map(d => `${d}=${cell[d]}`).join(', ');
-            labels.push(`${variableSlice.variable} (${dimLabel})`);
+            periodSlice.cells.forEach(cell => {
+              const dimLabel = dimensions.map(d => `${d}=${cell[d]}`).join(', ');
+            labels.push(`${chartLabels.columnLabel(variableSlice.variable)} (${dimLabel})`);
             const mean = cell.mean;
             data.push(mean !== undefined ? mean : null);
           });
@@ -642,6 +642,14 @@ export function newQueryToChartData(
  * Variable, Period, [Dimension1, Dimension2, ...], Mean, N
  */
 export function newQueryToCSV(response: NewQueryResponse): string {
+  return newQueryToCSVWithLabels(response);
+}
+
+export function newQueryToCSVWithLabels(
+  response: NewQueryResponse,
+  labelOptions: ChartLabelOptions = {},
+): string {
+  const chartLabels = resolveChartLabels(labelOptions);
   const { variables, periods, dimensions } = response;
   
   // Build header
@@ -653,10 +661,10 @@ export function newQueryToCSV(response: NewQueryResponse): string {
     periods.forEach(periodId => {
       const periodSlice = variableSlice.periods[periodId];
       
-      if (!periodSlice || periodSlice.suppressed || !periodSlice.cells) {
-        // Suppressed period - add a row with empty values
-        const csvRow = [
-          variableSlice.variable,
+        if (!periodSlice || periodSlice.suppressed || !periodSlice.cells) {
+          // Suppressed period - add a row with empty values
+          const csvRow = [
+          chartLabels.columnLabel(variableSlice.variable),
           periodId,
           ...dimensions.map(() => ''),
           'SUPPRESSED',
@@ -671,7 +679,7 @@ export function newQueryToCSV(response: NewQueryResponse): string {
           const n = String(cell.n);
           
           const csvRow = [
-            variableSlice.variable,
+            chartLabels.columnLabel(variableSlice.variable),
             periodId,
             ...dimValues,
             mean,

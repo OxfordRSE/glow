@@ -280,6 +280,8 @@ export interface DimensionDefinition {
 
 export interface VariableDefinition {
   key: string;
+  raw_key?: string | null;
+  form_id?: string | null;
 }
 
 export interface DimensionsResponse {

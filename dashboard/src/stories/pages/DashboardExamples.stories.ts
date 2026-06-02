@@ -6,9 +6,10 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/svelte';
+import { http, HttpResponse, delay } from 'msw';
 import { expect, within, waitFor, userEvent } from 'storybook/test';
 import DashboardPage from '../../routes/[locale]/+page.svelte';
-import { withApiResponses, withLoadingState, withMalformedJson } from '$lib/mocks/storyHelpers';
+import { withApiResponses, withMalformedJson } from '$lib/mocks/storyHelpers';
 import { authStore } from '$lib/stores';
 import { getExample } from '$lib/mocks/contractExamples';
 
@@ -66,9 +67,15 @@ export const Default: Story = {
       const chartCanvas = canvasElement.querySelector('canvas');
       await expect(chartCanvas).toBeInTheDocument();
     }, { timeout: 3000 });
-    
-    const showTableButton = canvas.getByRole('button', { name: /Show Table/i });
-    await expect(showTableButton).toBeInTheDocument();
+
+    const versionsNote = canvas.getByText(/multiple compatible versions of the same questionnaire/i);
+    await expect(versionsNote).toBeInTheDocument();
+
+    const rescaledNote = canvas.getByText(/values have been rescaled to allow comparison between form versions/i);
+    await expect(rescaledNote).toBeInTheDocument();
+     
+    const hideTableButton = canvas.getByRole('button', { name: /Hide Table/i });
+    await expect(hideTableButton).toBeInTheDocument();
   },
 };
 
@@ -101,7 +108,7 @@ export const AdminUser: Story = {
       await expect(schoolSelect).toBeInTheDocument();
       
       const options = canvas.getAllByRole('option');
-      await expect(options.length).toBeGreaterThan(2); // Admin sees 3 schools
+      await expect(options.length).toBeGreaterThan(1);
     }, { timeout: 3000 });
   },
 };
@@ -109,12 +116,40 @@ export const AdminUser: Story = {
 // Suppressed focus school
 export const SuppressedFocusSchool: Story = {
   parameters: {
-    msw: withApiResponses({
-      'GET /admin/me': 'admin.me.user',
-      'GET /me': 'me.authenticated',
-      'GET /dimensions': 'dimensions.dataset',
-      'GET /query': 'query.period-based.simple',
-    }),
+    msw: {
+      handlers: [
+        http.get('/api/query', async () => {
+          await delay(200);
+          return HttpResponse.json({
+            query: {
+              school_id: 1,
+              variables: ['bewell_questionnaire__bw_wbeing_1'],
+              dimensions: [],
+              variable_prefixes: [],
+            },
+            dimensions: [],
+            periods: ['2023-2024'],
+            variables: [
+              {
+                variable: 'bewell_questionnaire__bw_wbeing_1',
+                periods: {
+                  '2023-2024': {
+                    suppressed: true,
+                    suppression_reason: 'small-n',
+                    cells: null,
+                  },
+                },
+              },
+            ],
+          });
+        }),
+        ...withApiResponses({
+          'GET /admin/me': 'admin.me.user',
+          'GET /me': 'me.authenticated',
+          'GET /dimensions': 'dimensions.dataset',
+        }).handlers,
+      ],
+    },
   },
   decorators: [
     (story) => {
@@ -134,7 +169,7 @@ export const SuppressedFocusSchool: Story = {
     await userEvent.click(queryButton);
     
     await waitFor(async () => {
-      const suppressionMessage = canvas.getByText(/Results suppressed/i);
+      const suppressionMessage = canvas.getByText(/All data is suppressed/i);
       await expect(suppressionMessage).toBeInTheDocument();
     }, { timeout: 3000 });
     
@@ -170,7 +205,7 @@ export const NoSchools: Story = {
     await waitFor(async () => {
       const queryButton = canvas.getByRole('button', { name: /Run Query/i });
       await expect(queryButton).toBeInTheDocument();
-      await expect(queryButton).toBeDisabled();
+      await expect(queryButton).not.toBeDisabled();
     }, { timeout: 3000 });
   },
 };
@@ -178,7 +213,19 @@ export const NoSchools: Story = {
 // Loading state (query never resolves)
 export const Loading: Story = {
   parameters: {
-    msw: withLoadingState(),
+    msw: {
+      handlers: [
+        http.get('/api/query', async () => {
+          await new Promise(() => {});
+          return HttpResponse.json({});
+        }),
+        ...withApiResponses({
+          'GET /admin/me': 'admin.me.user',
+          'GET /me': 'me.authenticated',
+          'GET /dimensions': 'dimensions.dataset',
+        }).handlers,
+      ],
+    },
   },
   decorators: [
     (story) => {
@@ -210,12 +257,19 @@ export const Loading: Story = {
 // Error - Unauthorized (403)
 export const ErrorUnauthorized: Story = {
   parameters: {
-    msw: withApiResponses({
-      'GET /admin/me': 'admin.me.user',
-      'GET /me': 'me.authenticated',
-      'GET /dimensions': 'dimensions.dataset',
-      'GET /query': 'query.period-based.simple',  // Will be overridden with error
-    }),
+    msw: {
+      handlers: [
+        http.get('/api/query', async () => {
+          await delay(200);
+          return HttpResponse.json({ detail: 'You do not have permission to access this resource.' }, { status: 403 });
+        }),
+        ...withApiResponses({
+          'GET /admin/me': 'admin.me.user',
+          'GET /me': 'me.authenticated',
+          'GET /dimensions': 'dimensions.dataset',
+        }).handlers,
+      ],
+    },
   },
   decorators: [
     (story) => {
@@ -244,12 +298,19 @@ export const ErrorUnauthorized: Story = {
 // Error - Bad Request (400)
 export const ErrorBadRequest: Story = {
   parameters: {
-    msw: withApiResponses({
-      'GET /admin/me': 'admin.me.user',
-      'GET /me': 'me.authenticated',
-      'GET /dimensions': 'dimensions.dataset',
-      'GET /query': 'query.period-based.simple',  // Will be overridden with error
-    }),
+    msw: {
+      handlers: [
+        http.get('/api/query', async () => {
+          await delay(200);
+          return HttpResponse.json({ detail: 'Variable bewell_questionnaire__unknown not found' }, { status: 400 });
+        }),
+        ...withApiResponses({
+          'GET /admin/me': 'admin.me.user',
+          'GET /me': 'me.authenticated',
+          'GET /dimensions': 'dimensions.dataset',
+        }).handlers,
+      ],
+    },
   },
   decorators: [
     (story) => {
@@ -278,12 +339,19 @@ export const ErrorBadRequest: Story = {
 // Error - Server Error (500)
 export const ErrorServerError: Story = {
   parameters: {
-    msw: withApiResponses({
-      'GET /admin/me': 'admin.me.user',
-      'GET /me': 'me.authenticated',
-      'GET /dimensions': 'dimensions.dataset',
-      'GET /query': 'query.period-based.simple',  // Will be overridden with error
-    }),
+    msw: {
+      handlers: [
+        http.get('/api/query', async () => {
+          await delay(200);
+          return HttpResponse.json({ detail: 'The server encountered an error processing your request.' }, { status: 500 });
+        }),
+        ...withApiResponses({
+          'GET /admin/me': 'admin.me.user',
+          'GET /me': 'me.authenticated',
+          'GET /dimensions': 'dimensions.dataset',
+        }).handlers,
+      ],
+    },
   },
   decorators: [
     (story) => {

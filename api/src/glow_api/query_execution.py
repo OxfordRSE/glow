@@ -12,8 +12,59 @@ import pandas as pd
 
 from glow_api.canonical_query import CanonicalQuery, canonical_query_to_etag_key
 from glow_api.normalization import get_observed_periods
+from glow_api.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+def split_namespaced_variable(variable: str) -> tuple[Optional[str], str]:
+    """Split `form__field` into `(form, field)` or return `(None, variable)`."""
+    if "__" in variable:
+        form_id, field_name = variable.split("__", 1)
+        return form_id, field_name
+    return None, variable
+
+
+def get_version_column_name(variable: str) -> str:
+    """Return the version column associated with a variable."""
+    form_id, _ = split_namespaced_variable(variable)
+    if form_id is None:
+        return "__version"
+    return f"{form_id}__version"
+
+
+def get_variable_part(variable: str) -> str:
+    """Return the raw field name part of a namespaced variable."""
+    _, field_name = split_namespaced_variable(variable)
+    return field_name
+
+
+def get_version_metadata_map(
+    form_metadata: Optional[dict],
+    variable: str,
+    version: str,
+) -> dict:
+    """Get the variable metadata map for one form version.
+
+    For legacy unnamespaced variables, fall back to the flat metadata mapping.
+    """
+    if not form_metadata:
+        return {}
+
+    form_id, _ = split_namespaced_variable(variable)
+    if form_id is None:
+        return {
+            key: value
+            for key, value in form_metadata.items()
+            if not key.startswith("_")
+        }
+
+    return (
+        form_metadata.get("_forms", {})
+        .get(form_id, {})
+        .get(str(version), {})
+        .get("variables", {})
+    )
 
 
 def compute_query_etag(
@@ -287,7 +338,7 @@ def _select_variables(
     # Add prefix-matched variables
     for prefix in query.variable_prefixes:
         for var in numerical_whitelist:
-            if var.startswith(prefix):
+            if var.startswith(prefix) or get_variable_part(var).startswith(prefix):
                 selected.add(var)
     
     return sorted(list(selected))
@@ -372,18 +423,20 @@ def _execute_variable_query(
         # Check version compatibility if we have version metadata
         notes = []
         question_versions = None
-        if form_metadata and "__version" in period_df.columns:
+        version_col = get_version_column_name(variable)
+        if form_metadata and version_col in period_df.columns:
             # Check if multiple versions exist in this period
-            versions = period_df["__version"].dropna().unique()
+            versions = period_df[version_col].dropna().unique()
+            version_counts = period_df[version_col].value_counts()
             
             if len(versions) > 1:
                 # Multiple versions - check compatibility
                 from glow_api.version_compatibility import check_version_compatibility, apply_rescaling
                 
                 # Determine reference version (use the most common one)
-                version_counts = period_df["__version"].value_counts()
                 reference_version = version_counts.index[0]
-                ref_meta = form_metadata
+                _, base_variable = split_namespaced_variable(variable)
+                ref_meta = get_version_metadata_map(form_metadata, variable, str(reference_version))
                 
                 # Check compatibility of all other versions against reference
                 incompatible = False
@@ -393,12 +446,9 @@ def _execute_variable_query(
                     if version == reference_version:
                         continue
                     
-                    # Get metadata for this version
-                    # In real implementation, this would look up historical form definitions
-                    # For now, assume metadata is the same for all versions
-                    ver_meta = form_metadata
+                    ver_meta = get_version_metadata_map(form_metadata, variable, str(version))
                     
-                    compat = check_version_compatibility(variable, ver_meta, ref_meta)
+                    compat = check_version_compatibility(base_variable, ver_meta, ref_meta)
                     
                     if not compat["compatible"]:
                         incompatible = True
@@ -424,7 +474,7 @@ def _execute_variable_query(
                     period_df = period_df.copy()
                     for version, (from_range, to_range) in rescale_mapping.items():
                         # Rescale rows with this version
-                        mask = period_df["__version"] == version
+                        mask = period_df[version_col] == version
                         if mask.any():
                             period_df.loc[mask] = apply_rescaling(
                                 period_df[mask],
@@ -435,7 +485,11 @@ def _execute_variable_query(
                     notes.append("values-rescaled")
             
             # Record versions observed in this period
-            question_versions = sorted([int(v) for v in versions if pd.notna(v)])
+            question_versions = {
+                str(version): int(count)
+                for version, count in version_counts.items()
+                if pd.notna(version)
+            }
         
         # Compute aggregated results for this period
         period_slice = _compute_period_slice(

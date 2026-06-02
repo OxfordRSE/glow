@@ -86,6 +86,10 @@ def normalize_submissions(df: pd.DataFrame) -> pd.DataFrame:
     # Make a copy to avoid modifying original
     df_normalized = df.copy()
     
+    # ODK CSV export names the timestamp column SubmissionDate. Normalize it to createdAt.
+    if "createdAt" not in df_normalized.columns and "SubmissionDate" in df_normalized.columns:
+        df_normalized["createdAt"] = df_normalized["SubmissionDate"]
+
     # Parse createdAt timestamps and derive period_id
     if "createdAt" in df_normalized.columns:
         # Convert to datetime if not already

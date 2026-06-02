@@ -18,6 +18,14 @@ router = APIRouter(tags=["discovery"])
 security = HTTPBearer(auto_error=False)
 
 
+def split_variable_key(variable_key: str) -> tuple[Optional[str], str]:
+    """Split a namespaced variable key into form id and raw field name."""
+    if "__" in variable_key:
+        form_id, raw_key = variable_key.split("__", 1)
+        return form_id, raw_key
+    return None, variable_key
+
+
 @router.get("/dimensions", response_model=DimensionsResponse)
 def get_dimensions(
     school_id: Optional[int] = Query(None, description="Optional school ID for school-scoped discovery"),
@@ -97,7 +105,16 @@ def get_dimensions(
     
     # Build variables list (all numeric measures including derived totals)
     variables = sorted([col for col in dfwl.numerical_whitelist if col in df.columns])
-    variable_defs = [VariableDefinition(key=var) for var in variables]
+    variable_defs = []
+    for var in variables:
+        form_id, raw_key = split_variable_key(var)
+        variable_defs.append(
+            VariableDefinition(
+                key=var,
+                raw_key=raw_key,
+                form_id=form_id,
+            )
+        )
     
     # Build dimensions list (categorical columns, excluding school)
     # Infer type based on whether column is numeric or not

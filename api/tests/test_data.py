@@ -261,7 +261,7 @@ class TestDataStore:
         assert ds._df.empty
         assert isinstance(ds._lock, type(threading.Lock()))
         assert ds._metadata == {}
-        assert ds._etag is None
+        assert ds._response_etags == {}
 
     def test_load_from_odk(self):
         """Test loading data from ODK Central (mocked)."""
@@ -295,7 +295,9 @@ class TestDataStore:
         assert loaded_df.loc[1, "bw_wbeing_total"] == 7  # 4 + 3
         
         # Verify metadata was fetched
-        assert ds._metadata == metadata
+        assert ds._metadata["bw_wbeing_1"] == metadata["bw_wbeing_1"]
+        assert ds._metadata["bw_wbeing_2"] == metadata["bw_wbeing_2"]
+        assert ds._metadata["_current_versions"] == {"bewell_questionnaire": "1"}
         assert mock_client.fetch_count == 1
         assert mock_client.metadata_fetch_count == 1
 
@@ -316,7 +318,7 @@ class TestDataStore:
         # First load
         df1 = ds._load()
         assert len(df1) == 2
-        assert ds._etag == "test-etag-123"
+        assert ds._response_etags == {"bewell_questionnaire": "test-etag-123"}
         
         # Simulate what refresh() does - store the loaded data
         ds._df = df1
@@ -371,7 +373,7 @@ class TestDataStore:
         """Test that refresh handles ODK errors gracefully."""
         # Create a mock that raises an error
         class ErrorODKClient(MockODKClient):
-            def fetch_submissions(self, etag=None):
+            def fetch_submissions(self, etags=None):
                 raise RuntimeError("ODK Central connection failed")
         
         mock_client = ErrorODKClient()
@@ -526,9 +528,173 @@ class TestDataStore:
             
             cached = ds2._load_cache()
             assert cached is not None
-            cached_df, cached_etag = cached
+            cached_df, cached_etags = cached
             assert len(cached_df) == 2
-            assert cached_etag == "test-etag"
+            assert cached_etags == {"bewell_questionnaire": "test-etag"}
+
+    def test_load_from_multiple_forms(self):
+        """Test loading and materializing submissions across multiple forms."""
+        bewell_df = pd.DataFrame(
+            {
+                "uid": ["S001"],
+                "school": ["School A"],
+                "createdAt": ["2024-01-01T10:00:00Z"],
+                "__version": ["2"],
+                "bw_wbeing_1": [3],
+            }
+        )
+        phq_df = pd.DataFrame(
+            {
+                "uid": ["S001"],
+                "school": ["School A"],
+                "createdAt": ["2024-01-02T10:00:00Z"],
+                "__version": ["1"],
+                "phq9_1": [2],
+            }
+        )
+        demographics_df = pd.DataFrame(
+            {
+                "uid": ["S001"],
+                "school": ["School A"],
+                "createdAt": ["2024-01-03T10:00:00Z"],
+                "yearGroup": [9],
+                "d_age": [14],
+                "d_sex": ["F"],
+            }
+        )
+        metadata = {
+            "_forms": {
+                "bewell_questionnaire": {
+                    "2": {"variables": {"bw_wbeing_1": {"min": 0, "max": 5}}},
+                },
+                "phq9_questionnaire": {
+                    "1": {"variables": {"phq9_1": {"min": 0, "max": 3}}},
+                },
+            },
+            "_current_versions": {
+                "bewell_questionnaire": "2",
+                "phq9_questionnaire": "1",
+            },
+        }
+
+        mock_client = MockODKClient(
+            submissions_by_form={
+                "bewell_questionnaire": bewell_df,
+                "phq9_questionnaire": phq_df,
+                "demographics_questionnaire": demographics_df,
+            },
+            metadata=metadata,
+            response_etags={
+                "bewell_questionnaire": "etag-bw",
+                "phq9_questionnaire": "etag-phq",
+                "demographics_questionnaire": "etag-demo",
+            },
+        )
+        ds = DataStore(odk_client=mock_client, refresh_hours=0)
+
+        loaded_df = ds._load()
+
+        assert len(loaded_df) == 1
+        assert "bewell_questionnaire__bw_wbeing_1" in loaded_df.columns
+        assert "phq9_questionnaire__phq9_1" in loaded_df.columns
+        assert "bewell_questionnaire__version" in loaded_df.columns
+        assert "phq9_questionnaire__version" in loaded_df.columns
+        assert loaded_df.loc[0, "bewell_questionnaire__bw_wbeing_1"] == 3
+        assert loaded_df.loc[0, "phq9_questionnaire__phq9_1"] == 2
+        assert loaded_df.loc[0, "bewell_questionnaire__version"] == "2"
+        assert loaded_df.loc[0, "yearGroup"] == 9
+        assert loaded_df.loc[0, "d_age"] == 14
+        assert ds._response_etags == {
+            "bewell_questionnaire": "etag-bw",
+            "phq9_questionnaire": "etag-phq",
+            "demographics_questionnaire": "etag-demo",
+        }
+        assert ds._metadata["_current_versions"] == metadata["_current_versions"]
+        assert ds._metadata["bw_wbeing_1"] == {"min": 0, "max": 5}
+        assert ds._metadata["phq9_1"] == {"min": 0, "max": 3}
+
+    def test_partial_etag_refresh_reuses_cached_unchanged_forms(self):
+        """Test that unchanged forms are reused from cached data."""
+        bewell_df = pd.DataFrame(
+            {
+                "uid": ["S001"],
+                "school": ["School A"],
+                "createdAt": ["2024-01-01T10:00:00Z"],
+                "bw_wbeing_1": [3],
+            }
+        )
+        phq_df = pd.DataFrame(
+            {
+                "uid": ["S001"],
+                "school": ["School A"],
+                "createdAt": ["2024-01-02T10:00:00Z"],
+                "phq9_1": [1],
+            }
+        )
+        mock_client = MockODKClient(
+            submissions_by_form={
+                "bewell_questionnaire": bewell_df,
+                "phq9_questionnaire": phq_df,
+            },
+            metadata={},
+            response_etags={
+                "bewell_questionnaire": "etag-bw-1",
+                "phq9_questionnaire": "etag-phq-1",
+            },
+        )
+        ds = DataStore(odk_client=mock_client, refresh_hours=0)
+        first = ds._load()
+        ds._df = first
+
+        # Only PHQ changes on second load.
+        mock_client.submissions_by_form["phq9_questionnaire"] = pd.DataFrame(
+            {
+                "uid": ["S001"],
+                "school": ["School A"],
+                "createdAt": ["2024-01-04T10:00:00Z"],
+                "phq9_1": [3],
+            }
+        )
+        mock_client.response_etags["phq9_questionnaire"] = "etag-phq-2"
+
+        second = ds._load()
+        assert len(second) == 1
+        assert second.iloc[0]["bewell_questionnaire__bw_wbeing_1"] == 3
+        assert second.iloc[0]["phq9_questionnaire__phq9_1"] == 3
+
+    def test_materialize_uses_demographics_authority(self):
+        """Test that demographics form is authoritative for yearGroup and d_* fields."""
+        stacked = pd.DataFrame(
+            {
+                "uid": ["S001", "S001", "S001"],
+                "school": ["School A", "School A", "School A"],
+                "createdAt": [
+                    "2024-01-01T10:00:00Z",
+                    "2024-01-02T10:00:00Z",
+                    "2024-01-03T10:00:00Z",
+                ],
+                "period_id": ["2023-2024", "2023-2024", "2023-2024"],
+                "__xmlFormId": [
+                    "bewell_questionnaire",
+                    "phq9_questionnaire",
+                    "demographics_questionnaire",
+                ],
+                "bw_wbeing_1": [3, None, None],
+                "phq9_1": [None, 2, None],
+                "yearGroup": [7, 7, 9],
+                "d_age": [12, 12, 14],
+                "d_sex": ["M", "M", "F"],
+            }
+        )
+        ds = DataStore.__new__(DataStore)
+        materialized = ds._materialize_analytic_rows(stacked)
+
+        assert len(materialized) == 1
+        assert materialized.loc[0, "yearGroup"] == 9
+        assert materialized.loc[0, "d_age"] == 14
+        assert materialized.loc[0, "d_sex"] == "F"
+        assert materialized.loc[0, "bewell_questionnaire__bw_wbeing_1"] == 3
+        assert materialized.loc[0, "phq9_questionnaire__phq9_1"] == 2
 
 
 class TestDataStoreIntegration:

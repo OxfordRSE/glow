@@ -9,10 +9,10 @@
   "response": {
     "school_id": 1,
     "variables": [
-      {"key": "bw_wbeing_1"},
-      {"key": "bw_wbeing_2"},
-      {"key": "bw_wbeing_3"},
-      {"key": "bw_wbeing_total"}
+      {"key": "bewell_questionnaire__bw_wbeing_1", "raw_key": "bw_wbeing_1", "form_id": "bewell_questionnaire"},
+      {"key": "bewell_questionnaire__bw_wbeing_2", "raw_key": "bw_wbeing_2", "form_id": "bewell_questionnaire"},
+      {"key": "phq9_questionnaire__phq9_1", "raw_key": "phq9_1", "form_id": "phq9_questionnaire"},
+      {"key": "bewell_questionnaire__bw_wbeing_total", "raw_key": "bw_wbeing_total", "form_id": "bewell_questionnaire"}
     ],
     "dimensions": [
       {"key": "class", "type": "string"},

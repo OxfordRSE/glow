@@ -13,7 +13,7 @@
     type DimensionDefinition
   } from '$lib/api';
   import ChartCard from '$lib/components/ChartCard.svelte';
-  import { newQueryToChartData, newQueryToCSV } from '$lib/chartUtils';
+  import { newQueryToChartData, newQueryToCSVWithLabels } from '$lib/chartUtils';
   import { createI18n, locale } from '$lib/i18n';
 
   const i18n = $derived(createI18n($locale));
@@ -149,11 +149,11 @@
   }
 
   // Chart rendering using utility functions
-  const chartData = $derived(queryResult ? newQueryToChartData(queryResult).data : { labels: [], datasets: [] });
-  const chartCSV = $derived(queryResult ? newQueryToCSV(queryResult) : '');
+  const chartData = $derived(queryResult ? newQueryToChartData(queryResult, i18n.chartFormatters).data : { labels: [], datasets: [] });
+  const chartCSV = $derived(queryResult ? newQueryToCSVWithLabels(queryResult, i18n.chartFormatters) : '');
   const chartType = $derived.by(() => {
     if (!queryResult) return 'bar' as const;
-    const output = newQueryToChartData(queryResult);
+    const output = newQueryToChartData(queryResult, i18n.chartFormatters);
     return output.type ?? 'bar';
   });
 
@@ -162,8 +162,35 @@
   );
 
   const variableLabels = $derived(
-    selectedVariables.map(v => i18n.t(`api.${v}`)).join(', ')
+    selectedVariables.map(v => i18n.columnLabel(v)).join(', ')
   );
+
+  const queryNotes = $derived.by(() => {
+    if (!queryResult) return [] as string[];
+
+    let hasRescaled = false;
+    let hasMultipleVersions = false;
+
+    for (const variableSlice of queryResult.variables) {
+      for (const periodSlice of Object.values(variableSlice.periods)) {
+        if (periodSlice.notes?.includes('values-rescaled')) {
+          hasRescaled = true;
+        }
+        if (periodSlice.question_versions && Object.keys(periodSlice.question_versions).length > 1) {
+          hasMultipleVersions = true;
+        }
+      }
+    }
+
+    const notes: string[] = [];
+    if (hasMultipleVersions) {
+      notes.push(i18n.t('explore.multipleCompatibleVersionsNote'));
+    }
+    if (hasRescaled) {
+      notes.push(i18n.t('explore.rescaledValuesNote'));
+    }
+    return notes;
+  });
 
 </script>
 
@@ -204,7 +231,7 @@
 
           <!-- Variable Selector (multi-select checkboxes) -->
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.variables')}</label>
+            <p class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.variables')}</p>
             <div class="space-y-2 max-h-48 overflow-y-auto">
               {#each availableVariables as variable}
                 <label class="flex items-center">
@@ -214,7 +241,7 @@
                     onchange={() => toggleVariable(variable.key)}
                     class="mr-2"
                   />
-                  <span class="text-sm">{i18n.t(`api.${variable.key}`)} [{variable.key}]</span>
+                  <span class="text-sm">{i18n.columnLabel(variable.key)} [{variable.key}]</span>
                 </label>
               {/each}
             </div>
@@ -222,7 +249,7 @@
 
           <!-- Dimension Selector (optional grouping) -->
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.groupBy')}</label>
+            <p class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.groupBy')}</p>
             <div class="space-y-2">
               {#each availableDimensions as dimension}
                 <label class="flex items-center">
@@ -265,6 +292,13 @@
             <p class="text-sm text-gray-600 mt-1">
               <strong>{i18n.t('explore.variablesSelected')}:</strong> {variableLabels}
             </p>
+            {#if queryNotes.length > 0}
+              <div class="mt-3 space-y-1">
+                {#each queryNotes as note}
+                  <p class="text-xs text-gray-500">(i) {note}</p>
+                {/each}
+              </div>
+            {/if}
           </div>
 
           <!-- Check if all periods are suppressed for all variables -->

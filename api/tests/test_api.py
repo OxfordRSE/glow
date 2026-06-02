@@ -1,6 +1,7 @@
 """Tests for the GLOW API."""
 
 import io
+import threading
 
 import pandas as pd
 from fastapi import status
@@ -312,9 +313,78 @@ def test_dimensions_public_dataset_scope(auth_client):
         # Should have some variables from the data
         if len(data["variables"]) > 0:
             assert "key" in data["variables"][0]
+            assert "raw_key" in data["variables"][0]
     else:
         # For now, expect 404 since endpoint doesn't exist yet
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_dimensions_exposes_namespaced_variable_metadata(db_session, sample_user, sample_schools):
+    """/dimensions should identify the source form for namespaced variables."""
+    from fastapi.testclient import TestClient
+    from glow_api.data import get_datastore
+    from glow_api.database import get_db
+    from glow_api.main import app
+    from glow_api.models import UserRead
+
+    namespaced_df = pd.DataFrame(
+        {
+            "uid": ["S001"],
+            "school": ["Focus School Academy"],
+            "period_id": ["2023-2024"],
+            "yearGroup": [9],
+            "d_age": [14],
+            "bewell_questionnaire__bw_wbeing_1": [3],
+            "phq9_questionnaire__phq9_1": [2],
+        }
+    )
+
+    from tests.conftest import _make_mock_datastore
+
+    fake_store = _make_mock_datastore(namespaced_df)
+    fake_store._df = namespaced_df
+    fake_store._categorical_whitelist = ["yearGroup", "d_age"]
+    fake_store._numerical_whitelist = [
+        "bewell_questionnaire__bw_wbeing_1",
+        "phq9_questionnaire__phq9_1",
+    ]
+    fake_store._observed_periods = {None: ["2023-2024"], "Focus School Academy": ["2023-2024"]}
+    fake_store._lock = threading.Lock()
+
+    def override_get_db():
+        yield db_session
+
+    def override_get_datastore():
+        return fake_store
+
+    def override_get_current_user():
+        return UserRead(
+            id=sample_user.id,
+            username=sample_user.username,
+            school_ids=[s.id for s in sample_user.schools],
+            school_names=[s.name for s in sample_user.schools],
+            is_active=True,
+            is_admin=False,
+        )
+
+    from glow_api.auth import get_current_user
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_datastore] = override_get_datastore
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    with TestClient(app, raise_server_exceptions=True) as client:
+        response = client.get("/dimensions")
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    variables = {item["key"]: item for item in data["variables"]}
+    assert variables["bewell_questionnaire__bw_wbeing_1"]["raw_key"] == "bw_wbeing_1"
+    assert variables["bewell_questionnaire__bw_wbeing_1"]["form_id"] == "bewell_questionnaire"
+    assert variables["phq9_questionnaire__phq9_1"]["raw_key"] == "phq9_1"
+    assert variables["phq9_questionnaire__phq9_1"]["form_id"] == "phq9_questionnaire"
 
 
 def test_dimensions_school_scope_requires_auth(auth_client, sample_schools):

@@ -132,7 +132,7 @@ export const behaviorHandlers = {
   /**
    * Handler that never resolves (for testing loading states).
    */
-  loading: http.post(`${API_BASE}/query`, async () => {
+  loading: http.get(`${API_BASE}/query`, async () => {
     await delay('infinite')
     return HttpResponse.json({})
   }),
@@ -140,7 +140,7 @@ export const behaviorHandlers = {
   /**
    * Handler that returns malformed JSON (for testing error handling).
    */
-  malformedJson: http.post(`${API_BASE}/query`, async () => {
+  malformedJson: http.get(`${API_BASE}/query`, async () => {
     await delay(300)
     return new HttpResponse('not valid json{', {
       status: 200,

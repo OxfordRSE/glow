@@ -1,8 +1,10 @@
+import json
 import logging
 import os
 import threading
+import copy
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -20,7 +22,7 @@ class DataFrameWithWhitelists(BaseModel):
     df: pd.DataFrame
     categorical_whitelist: List[str]
     numerical_whitelist: List[str]
-    metadata: Dict[str, Dict[str, int]]
+    metadata: Dict[str, Any]
     observed_periods: Dict[Optional[str], List[str]]  # school_name -> list of periods
 
     model_config = {
@@ -41,8 +43,9 @@ class DataStore:
         self._refresh_hours = refresh_hours
         self._cache_path = cache_path
         self._df: pd.DataFrame = pd.DataFrame()
-        self._metadata: Dict[str, Dict[str, int]] = {}
-        self._etag: Optional[str] = None
+        self._metadata: Dict[str, Any] = {}
+        self._response_etags: Dict[str, Optional[str]] = {}
+        self._form_frames_cache: Dict[str, pd.DataFrame] = {}
         self._lock = threading.Lock()
         self._scheduler = BackgroundScheduler()
         self._categorical_whitelist: List[str] = []
@@ -51,24 +54,36 @@ class DataStore:
 
     def _load(self) -> pd.DataFrame:
         with log_duration("Load data from ODK Central") as log_data:
-            # Fetch submissions from ODK Central
-            df, new_etag = self._odk_client.fetch_submissions(etag=self._etag)
-            
-            # If ETAG matched (304), df will be empty - keep existing data
-            if df.empty and self._etag is not None:
+            form_frames, new_etags = self._odk_client.fetch_submissions(etags=self._response_etags)
+
+            if all(frame is None for frame in form_frames.values()) and self._response_etags:
                 logger.info("Data unchanged (ETAG match)")
                 log_data["etag_matched"] = True
                 return self._df
-            
-            # Update ETAG
-            self._etag = new_etag
-            
-            # Fetch form metadata (min/max values)
-            self._metadata = self._odk_client.get_form_metadata()
-            
+
+            for form_id, frame in list(form_frames.items()):
+                if frame is None and form_id not in self._form_frames_cache:
+                    frame, refreshed_etag = self._odk_client.fetch_form_submissions(form_id=form_id, etag=None)
+                    form_frames[form_id] = frame
+                    new_etags[form_id] = refreshed_etag
+
+            df = self._merge_form_frames(form_frames)
+            self._response_etags = new_etags
+
+            metadata_map = self._odk_client.get_form_metadata()
+            flat_metadata = self._flatten_current_metadata(metadata_map)
+            dataset_version = self._odk_client.dataset_version_from_etags(new_etags)
+            self._metadata = {
+                **flat_metadata,
+                **metadata_map,
+                "_response_etags": dict(new_etags),
+                "_etag": dataset_version,
+            }
+
             log_data["row_count"] = len(df)
             log_data["original_col_count"] = len(df.columns)
-            log_data["metadata_fields"] = len(self._metadata)
+            log_data["metadata_fields"] = len(flat_metadata)
+            log_data["forms_seen"] = len(form_frames)
             
             # Pre-compute derived scores
             df = self._process_loaded_data(df)
@@ -76,9 +91,56 @@ class DataStore:
             
             # Cache if configured
             if self._cache_path:
-                self._save_cache(df, new_etag)
+                self._save_cache(df, new_etags)
             
             return df
+
+    def _merge_form_frames(
+        self,
+        form_frames: dict[str, Optional[pd.DataFrame]],
+    ) -> pd.DataFrame:
+        """Merge changed form frames with cached unchanged raw form slices."""
+        merged: list[pd.DataFrame] = []
+        for form_id, frame in form_frames.items():
+            if frame is not None:
+                self._form_frames_cache[form_id] = frame.copy()
+                merged.append(frame)
+                continue
+
+            cached = self._form_frames_cache.get(form_id)
+            if cached is not None and not cached.empty:
+                merged.append(cached.copy())
+
+        if not merged:
+            return pd.DataFrame()
+        return pd.concat(merged, ignore_index=True, sort=False)
+
+    @staticmethod
+    def _flatten_current_metadata(
+        metadata_map: dict[str, Any],
+    ) -> dict[str, dict[str, int]]:
+        """Flatten current-version variable metadata for legacy query consumers.
+
+        If multiple forms define the same raw variable name, prefer non-demographics
+        forms before the configured demographics form.
+        """
+        flat: dict[str, dict[str, int]] = {}
+        forms = metadata_map.get("_forms", {})
+        current_versions = metadata_map.get("_current_versions", {})
+        ordered_form_ids = sorted(
+            forms,
+            key=lambda form_id: (form_id == settings.ODK_DEMOGRAPHICS_FORM_ID, form_id),
+        )
+
+        for form_id in ordered_form_ids:
+            versions = forms[form_id]
+            current_version = current_versions.get(form_id)
+            if not current_version:
+                continue
+            version_payload = versions.get(current_version, {})
+            for variable, variable_metadata in version_payload.get("variables", {}).items():
+                flat.setdefault(variable, variable_metadata)
+        return flat
 
     def _process_loaded_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Process loaded data by normalizing, computing derived scores, and extracting metadata.
@@ -86,9 +148,16 @@ class DataStore:
         This method is called once during data loading to prepare the analytic dataset.
         """
         from glow_api.normalization import normalize_submissions
+
+        if not hasattr(self, "_observed_periods"):
+            self._observed_periods = {}
         
         # Normalize submissions (add period_id column)
         df = normalize_submissions(df)
+
+        # Materialize one analytic row per uid+school+period for real multi-form ODK data.
+        if "__xmlFormId" in df.columns and "createdAt" in df.columns:
+            df = self._materialize_analytic_rows(df)
         
         # Compute derived scores
         df = self._compute_derived_scores(df)
@@ -132,11 +201,124 @@ class DataStore:
         ]
         numerical: List[str] = []
         for col in df.columns:
-            split = col.split("_")
+            variable_part = col.split("__", 1)[1] if "__" in col else col
+            split = variable_part.split("_")
             if len(split) > 1 and split[0] in settings.DATA_PREFIXES:
                 numerical.append(col)
         self._categorical_whitelist = categorical
         self._numerical_whitelist = numerical
+
+    def _materialize_analytic_rows(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Collapse multi-form submission rows into one analytic row per period.
+
+        This is the real multi-form path used for ODK-loaded data. Legacy tests and
+        fixtures that do not contain form tags or createdAt timestamps skip this step.
+        """
+        if df.empty:
+            return df
+
+        group_keys = ["uid", "period_id"]
+        if "school" in df.columns:
+            group_keys.append("school")
+
+        working = df.copy()
+        if not pd.api.types.is_datetime64_any_dtype(working["createdAt"]):
+            working["createdAt"] = pd.to_datetime(working["createdAt"], utc=True, errors="coerce")
+
+        latest_created = (
+            working.groupby(group_keys, dropna=False)["createdAt"]
+            .max()
+            .reset_index()
+        )
+        result = latest_created
+
+        demographics_fields = [
+            col for col in working.columns
+            if col == "yearGroup"
+            or any(col.startswith(f"{prefix}_") for prefix in settings.DATA_DEMOGRAPHIC_PREFIXES)
+        ]
+
+        if demographics_fields:
+            demo_rows = working[working["__xmlFormId"] == settings.ODK_DEMOGRAPHICS_FORM_ID]
+            if not demo_rows.empty:
+                collapsed_demo = self._collapse_latest_non_null(
+                    demo_rows,
+                    group_keys,
+                    demographics_fields,
+                )
+                result = result.merge(collapsed_demo, on=group_keys, how="left")
+
+        housekeeping = {
+            *group_keys,
+            "createdAt",
+            "updatedAt",
+            "SubmissionDate",
+            "__xmlFormId",
+            "__id",
+            "__system/submissionDate",
+            "meta/instanceID",
+        }
+
+        for form_id in sorted(working["__xmlFormId"].dropna().unique()):
+            form_rows = working[working["__xmlFormId"] == form_id].copy()
+            if form_rows.empty:
+                continue
+
+            if form_id == settings.ODK_DEMOGRAPHICS_FORM_ID:
+                continue
+
+            rename_map: Dict[str, str] = {}
+            namespaced_fields: list[str] = []
+            for col in form_rows.columns:
+                if col in housekeeping or col in demographics_fields:
+                    continue
+                if col.startswith("__"):
+                    continue
+                namespaced = f"{form_id}__{col}"
+                rename_map[col] = namespaced
+                namespaced_fields.append(namespaced)
+
+            if "__version" in form_rows.columns:
+                rename_map["__version"] = f"{form_id}__version"
+                namespaced_fields.append(f"{form_id}__version")
+
+            if not namespaced_fields:
+                continue
+
+            form_rows = form_rows.rename(columns=rename_map)
+            collapsed_form = self._collapse_latest_non_null(
+                form_rows,
+                group_keys,
+                namespaced_fields,
+            )
+            result = result.merge(collapsed_form, on=group_keys, how="left")
+
+        return result
+
+    @staticmethod
+    def _collapse_latest_non_null(
+        df: pd.DataFrame,
+        group_keys: list[str],
+        value_columns: list[str],
+    ) -> pd.DataFrame:
+        """Collapse rows by taking latest non-null value per field within group."""
+        if df.empty:
+            return pd.DataFrame(columns=group_keys + value_columns)
+
+        ordered = df.sort_values("createdAt", ascending=False)
+        rows: list[dict] = []
+        for group_key, group in ordered.groupby(group_keys, dropna=False, sort=False):
+            if not isinstance(group_key, tuple):
+                group_key = (group_key,)
+            collapsed = dict(zip(group_keys, group_key, strict=True))
+            for col in value_columns:
+                if col not in group.columns:
+                    collapsed[col] = None
+                    continue
+                non_null = group[col].dropna()
+                collapsed[col] = non_null.iloc[0] if not non_null.empty else None
+            rows.append(collapsed)
+        return pd.DataFrame(rows)
 
     def _compute_derived_scores(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add derived score columns to the DataFrame.
@@ -146,19 +328,29 @@ class DataStore:
         """
         # Define questionnaires that should have total scores computed and the items that comprise them
         questionnaires_for_totals: Dict[str, List[str]] = {}
-        for prefix in settings.DATA_PREFIXES:
-            pf = f"{prefix}_"
-            cols = [col for col in df.columns if col.startswith(pf)]
-            for c in cols:
-                split = c.split("_")
-                if len(split) < 2:
-                    continue
-                ss = "_".join(split[1:-1])
-                subscale = f"{prefix}_{ss}_total"
-                if subscale in questionnaires_for_totals:
-                    questionnaires_for_totals[subscale].append(c)
-                else:
-                    questionnaires_for_totals[subscale] = [c]
+        for c in df.columns:
+            namespace = ""
+            variable_part = c
+            if "__" in c:
+                namespace, variable_part = c.split("__", 1)
+            split = variable_part.split("_")
+            if len(split) < 2 or split[0] not in settings.DATA_PREFIXES:
+                continue
+            if variable_part == "version":
+                continue
+            if len(split) < 2:
+                continue
+            ss = "_".join(split[1:-1])
+            if not ss:
+                continue
+            if namespace:
+                subscale = f"{namespace}__{split[0]}_{ss}_total"
+            else:
+                subscale = f"{split[0]}_{ss}_total"
+            if subscale in questionnaires_for_totals:
+                questionnaires_for_totals[subscale].append(c)
+            else:
+                questionnaires_for_totals[subscale] = [c]
 
         # Collect all computed subscale scores to avoid DataFrame fragmentation
         computed_scores = {}
@@ -182,7 +374,7 @@ class DataStore:
 
         return df
 
-    def _save_cache(self, df: pd.DataFrame, etag: Optional[str]) -> None:
+    def _save_cache(self, df: pd.DataFrame, etags: dict[str, Optional[str]]) -> None:
         """Save DataFrame and ETAG to cache."""
         if not self._cache_path:
             return
@@ -194,20 +386,18 @@ class DataStore:
             # Save DataFrame
             df.to_parquet(self._cache_path)
             
-            # Save ETAG alongside DataFrame
-            if etag:
-                etag_path = self._cache_path.with_suffix(".etag")
-                etag_path.write_text(etag)
+            etag_path = self._cache_path.with_suffix(".etag")
+            etag_path.write_text(json.dumps(etags))
             
             logger.info("Cached data to %s", self._cache_path)
         except Exception:
             logger.exception("Failed to save cache")
     
-    def _load_cache(self) -> Optional[Tuple[pd.DataFrame, Optional[str]]]:
-        """Load DataFrame and ETAG from cache.
+    def _load_cache(self) -> Optional[Tuple[pd.DataFrame, dict[str, Optional[str]]]]:
+        """Load DataFrame and per-form ETAGs from cache.
         
         Returns:
-            Tuple of (DataFrame, ETAG) or None if cache doesn't exist
+            Tuple of (DataFrame, ETAG map) or None if cache doesn't exist
         """
         if not self._cache_path or not self._cache_path.exists():
             return None
@@ -215,12 +405,12 @@ class DataStore:
         try:
             df = pd.read_parquet(self._cache_path)
             
-            # Load ETAG if it exists
+            # Load ETAG map if it exists
             etag_path = self._cache_path.with_suffix(".etag")
-            etag = etag_path.read_text() if etag_path.exists() else None
+            etags = json.loads(etag_path.read_text()) if etag_path.exists() else {}
             
             logger.info("Loaded cached data from %s", self._cache_path)
-            return df, etag
+            return df, etags
         except Exception:
             logger.exception("Failed to load cache")
             return None
@@ -247,7 +437,7 @@ class DataStore:
                 df=self._df.copy(),
                 categorical_whitelist=self._categorical_whitelist,
                 numerical_whitelist=self._numerical_whitelist,
-                metadata=self._metadata.copy(),
+                metadata=copy.deepcopy(self._metadata),
                 observed_periods=self._observed_periods.copy(),
             )
 
@@ -256,10 +446,10 @@ class DataStore:
         # Try loading from cache first
         cached = self._load_cache()
         if cached:
-            df, etag = cached
+            df, etags = cached
             with self._lock:
                 self._df = df
-                self._etag = etag
+                self._response_etags = etags
             logger.info(
                 "Loaded from cache: %d rows, %d columns", len(df), len(df.columns)
             )
@@ -312,7 +502,6 @@ def _init_singleton():
         username=settings.ODK_API_EMAIL,
         password=settings.ODK_API_PASSWORD,
         project_id=settings.ODK_PROJECT_ID,
-        form_id=settings.ODK_FORM_ID,
         verify_ssl=os.getenv("GLOW_ODK_VERIFY_SSL", "true").lower() != "false",
     )
 

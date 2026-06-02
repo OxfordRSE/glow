@@ -1,0 +1,233 @@
+<?xml version="1.0" ?>
+<h:html xmlns="http://www.w3.org/2002/xforms" xmlns:h="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" xmlns:odk="http://www.opendatakit.org/xforms">
+  <h:head>
+    <h:title>BeWell Questionnaire (v1)</h:title>
+    <model odk:xforms-version="1.0.0">
+      <instance>
+        <data id="bewell_questionnaire" version="1">
+          <uid/>
+          <school/>
+          <bw_migration_1/>
+          <bw_migration_2/>
+          <bw_migration_3/>
+          <bw_arrival_1/>
+          <bw_life_sat_1/>
+          <bw_wbeing_1/>
+          <bw_wbeing_2/>
+          <bw_wbeing_3/>
+          <bw_wbeing_4/>
+          <bw_wbeing_5/>
+          <bw_wbeing_6/>
+          <bw_wbeing_7/>
+          <bw_selfest_1/>
+          <bw_selfest_2/>
+          <bw_selfest_3/>
+          <bw_selfest_4/>
+          <bw_selfest_5/>
+          <bw_emoreg_1/>
+          <bw_emoreg_2/>
+          <bw_emoreg_3/>
+          <bw_appear_1/>
+          <bw_stress_1/>
+          <bw_stress_2/>
+          <bw_coping_1/>
+          <bw_coping_2/>
+          <bw_emodies_1/>
+          <bw_emodies_2/>
+          <bw_emodies_3/>
+          <bw_emodies_4/>
+          <bw_emodies_5/>
+          <bw_emodies_6/>
+          <bw_emodies_7/>
+          <bw_emodies_8/>
+          <bw_emodies_9/>
+          <bw_emodies_10/>
+          <bw_behav_1/>
+          <bw_behav_2/>
+          <bw_behav_3/>
+          <bw_behav_4/>
+          <bw_behav_5/>
+          <bw_behav_6/>
+          <meta>
+            <instanceID/>
+          </meta>
+        </data>
+      </instance>
+      <bind nodeset="/data/uid" type="string" required="false()"/>
+      <bind nodeset="/data/school" type="string" required="false()"/>
+      <bind nodeset="/data/bw_migration_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_migration_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_migration_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_arrival_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_life_sat_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_1" type="int" constraint=". &gt;= 1 and . &lt;= 6" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_2" type="int" constraint=". &gt;= 1 and . &lt;= 6" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_3" type="int" constraint=". &gt;= 1 and . &lt;= 6" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_4" type="int" constraint=". &gt;= 1 and . &lt;= 6" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_5" type="int" constraint=". &gt;= 1 and . &lt;= 6" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_6" type="int" constraint=". &gt;= 1 and . &lt;= 6" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_7" type="int" constraint=". &gt;= 1 and . &lt;= 6" required="false()"/>
+      <bind nodeset="/data/bw_selfest_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_selfest_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_selfest_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_selfest_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_selfest_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emoreg_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emoreg_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emoreg_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_appear_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_stress_1" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/bw_stress_2" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/bw_coping_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_coping_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_6" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_7" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_8" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_9" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_emodies_10" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_1" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_2" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_3" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_4" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_5" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/bw_behav_6" type="int" constraint=". &gt;= 0 and . &lt;= 5" required="false()"/>
+      <bind nodeset="/data/meta/instanceID" type="string" readonly="true()" jr:preload="uid"/>
+    </model>
+  </h:head>
+  <h:body>
+    <input ref="/data/uid">
+      <label>Unique ID</label>
+    </input>
+    <input ref="/data/school">
+      <label>School</label>
+    </input>
+    <input ref="/data/bw_migration_1">
+      <label>Migration background: Birth parent or carer 1 was born outside the UK</label>
+    </input>
+    <input ref="/data/bw_migration_2">
+      <label>Migration background: Birth parent or carer 2 was born outside the UK</label>
+    </input>
+    <input ref="/data/bw_migration_3">
+      <label>Migration background: I was born outside the UK</label>
+    </input>
+    <input ref="/data/bw_arrival_1">
+      <label>Arrival in the UK: How old were you when you first arrived in the UK?</label>
+    </input>
+    <input ref="/data/bw_life_sat_1">
+      <label>Life satisfaction: Overall, how satisfied are you with your life nowadays?</label>
+    </input>
+    <input ref="/data/bw_wbeing_1">
+      <label>Psychological wellbeing: I've been feeling optimistic about the future</label>
+    </input>
+    <input ref="/data/bw_wbeing_2">
+      <label>Psychological wellbeing: I've been feeling useful</label>
+    </input>
+    <input ref="/data/bw_wbeing_3">
+      <label>Psychological wellbeing: I've been feeling relaxed</label>
+    </input>
+    <input ref="/data/bw_wbeing_4">
+      <label>Psychological wellbeing: I've been dealing with problems well</label>
+    </input>
+    <input ref="/data/bw_wbeing_5">
+      <label>Psychological wellbeing: I've been thinking clearly</label>
+    </input>
+    <input ref="/data/bw_wbeing_6">
+      <label>Psychological wellbeing: I've been feeling close to other people</label>
+    </input>
+    <input ref="/data/bw_wbeing_7">
+      <label>Psychological wellbeing: I've been able to make up my own mind about things</label>
+    </input>
+    <input ref="/data/bw_selfest_1">
+      <label>Self-esteem: On the whole, I am satisfied with myself</label>
+    </input>
+    <input ref="/data/bw_selfest_2">
+      <label>Self-esteem: I feel that I have a number of good qualities</label>
+    </input>
+    <input ref="/data/bw_selfest_3">
+      <label>Self-esteem: I am able to do things as well as most other people</label>
+    </input>
+    <input ref="/data/bw_selfest_4">
+      <label>Self-esteem: I am a person of value</label>
+    </input>
+    <input ref="/data/bw_selfest_5">
+      <label>Self-esteem: I feel good about myself</label>
+    </input>
+    <input ref="/data/bw_emoreg_1">
+      <label>Emotion regulation: When I am worried, I keep myself from losing control</label>
+    </input>
+    <input ref="/data/bw_emoreg_2">
+      <label>Emotion regulation: When I am worried, I talk to someone until I feel better</label>
+    </input>
+    <input ref="/data/bw_emoreg_3">
+      <label>Emotion regulation: When I am worried, I try to calmly settle the problem</label>
+    </input>
+    <input ref="/data/bw_appear_1">
+      <label>Appearance happiness: How happy are you with your appearance?</label>
+    </input>
+    <input ref="/data/bw_stress_1">
+      <label>Stress: How often have you felt unable to control important things in your life?</label>
+    </input>
+    <input ref="/data/bw_stress_2">
+      <label>Stress: How often have you felt difficulties piling up so high that you could not overcome them?</label>
+    </input>
+    <input ref="/data/bw_coping_1">
+      <label>Coping: How often have you felt confident about your ability to handle personal problems?</label>
+    </input>
+    <input ref="/data/bw_coping_2">
+      <label>Coping: How often have you felt that things were going your way?</label>
+    </input>
+    <input ref="/data/bw_emodies_1">
+      <label>Emotional difficulties: I feel lonely</label>
+    </input>
+    <input ref="/data/bw_emodies_2">
+      <label>Emotional difficulties: I am unhappy</label>
+    </input>
+    <input ref="/data/bw_emodies_3">
+      <label>Emotional difficulties: Nobody likes me</label>
+    </input>
+    <input ref="/data/bw_emodies_4">
+      <label>Emotional difficulties: I cry a lot</label>
+    </input>
+    <input ref="/data/bw_emodies_5">
+      <label>Emotional difficulties: I worry when at school</label>
+    </input>
+    <input ref="/data/bw_emodies_6">
+      <label>Emotional difficulties: I worry a lot</label>
+    </input>
+    <input ref="/data/bw_emodies_7">
+      <label>Emotional difficulties: I have problems sleeping</label>
+    </input>
+    <input ref="/data/bw_emodies_8">
+      <label>Emotional difficulties: I wake up in the night</label>
+    </input>
+    <input ref="/data/bw_emodies_9">
+      <label>Emotional difficulties: I am shy</label>
+    </input>
+    <input ref="/data/bw_emodies_10">
+      <label>Emotional difficulties: I feel scared</label>
+    </input>
+    <input ref="/data/bw_behav_1">
+      <label>Behavioural difficulties: I get very angry</label>
+    </input>
+    <input ref="/data/bw_behav_2">
+      <label>Behavioural difficulties: I lose my temper</label>
+    </input>
+    <input ref="/data/bw_behav_3">
+      <label>Behavioural difficulties: I hit out when I am angry</label>
+    </input>
+    <input ref="/data/bw_behav_4">
+      <label>Behavioural difficulties: I am calm</label>
+    </input>
+    <input ref="/data/bw_behav_5">
+      <label>Behavioural difficulties: I break things on purpose</label>
+    </input>
+    <input ref="/data/bw_behav_6">
+      <label>Behavioural difficulties: I do things to hurt people</label>
+    </input>
+  </h:body>
+</h:html>

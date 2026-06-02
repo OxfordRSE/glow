@@ -61,21 +61,12 @@ State Local High,3.1,95`,
     await expect(downloadBtn).toBeInTheDocument();
     await expect(downloadBtn).not.toBeDisabled();
     
-    // Test: Verify "Show Table" toggle button exists and works
-    const showTableBtn = canvas.getByRole('button', { name: /show table/i });
-    await expect(showTableBtn).toBeInTheDocument();
-    await expect(showTableBtn).toHaveAttribute('aria-pressed', 'false');
-    await expect(showTableBtn).not.toBeDisabled();
-    
-    // Test button functionality: click to show table
-    await userEvent.click(showTableBtn);
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Verify button text changed
+    // Test: Verify table is open by default and toggle works
     const hideTableBtn = canvas.getByRole('button', { name: /hide table/i });
     await expect(hideTableBtn).toBeInTheDocument();
     await expect(hideTableBtn).toHaveAttribute('aria-pressed', 'true');
-    
+    await expect(hideTableBtn).not.toBeDisabled();
+     
     // Verify table is now visible
     const table = canvas.getByRole('table');
     await expect(table).toBeInTheDocument();
@@ -87,6 +78,11 @@ State Local High,3.1,95`,
     // Verify button reverted
     const showTableBtnAgain = canvas.getByRole('button', { name: /show table/i });
     await expect(showTableBtnAgain).toHaveAttribute('aria-pressed', 'false');
+
+    // Show table again
+    await userEvent.click(showTableBtnAgain);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await expect(canvas.getByRole('button', { name: /hide table/i })).toBeInTheDocument();
   },
 };
 
@@ -159,10 +155,8 @@ State Local High,3,3.3,96`,
     await expect(chartCanvas).toBeInTheDocument();
     
     // Test: Verify data represents multiple waves (3 time points)
-    // We can check this by verifying the table when shown has wave column
-    const showTableBtn = canvas.getByRole('button', { name: /show table/i });
-    await userEvent.click(showTableBtn);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    const hideTableBtn = canvas.getByRole('button', { name: /hide table/i });
+    await expect(hideTableBtn).toBeInTheDocument();
     
     const table = canvas.getByRole('table');
     await expect(table).toBeInTheDocument();
@@ -181,7 +175,7 @@ State Local High,3,3.3,96`,
     await expect(downloadBtn).toBeInTheDocument();
     await expect(downloadBtn).not.toBeDisabled();
     
-    await expect(showTableBtn).not.toBeDisabled();
+    await expect(hideTableBtn).not.toBeDisabled();
   },
 };
 
@@ -250,10 +244,6 @@ State Local High,,3.1,95`,
     await expect(downloadBtn).toBeInTheDocument();
     
     // Test distinguishing feature: Verify aggregation columns are present in the data table
-    const showTableBtn = canvas.getByRole('button', { name: /show table/i });
-    await userEvent.click(showTableBtn);
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
     const table = canvas.getByRole('table');
     await expect(table).toBeInTheDocument();
     
@@ -356,8 +346,8 @@ State Local High,,3,3.3,96`,
     const downloadBtn = canvas.getByRole('button', { name: /CSV/i });
     await expect(downloadBtn).toBeInTheDocument();
     
-    const showTableBtn = canvas.getByRole('button', { name: /show table/i });
-    await expect(showTableBtn).toBeInTheDocument();
+    const hideTableBtn = canvas.getByRole('button', { name: /hide table/i });
+    await expect(hideTableBtn).toBeInTheDocument();
   },
 };
 
@@ -453,8 +443,8 @@ Focus School Academy,3,3.7,128`,
     const downloadBtn = canvas.getByRole('button', { name: /CSV/i });
     await expect(downloadBtn).toBeInTheDocument();
     
-    const showTableBtn = canvas.getByRole('button', { name: /show table/i });
-    await expect(showTableBtn).toBeInTheDocument();
+    const hideTableBtn = canvas.getByRole('button', { name: /hide table/i });
+    await expect(hideTableBtn).toBeInTheDocument();
     
     // Test: Verify "no neighbour data" note appears
     const noNeighborNote = canvas.getByText(/No neighbour data is available/i);
@@ -532,23 +522,18 @@ State Local High,3.1,95`,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     
-    // Test: Verify table toggle functionality (aria-pressed state changes)
-    const showTableBtn = canvas.getByRole('button', { name: /show table/i });
-    await expect(showTableBtn).toBeInTheDocument();
-    await expect(showTableBtn).toHaveAttribute('aria-pressed', 'false');
-    
-    // Click to show table
-    await userEvent.click(showTableBtn);
-    
-    // Wait for state update
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Verify button text changed and table is visible
+    // Test: Verify table is open by default
     const hideTableBtn = canvas.getByRole('button', { name: /hide table/i });
     await expect(hideTableBtn).toHaveAttribute('aria-pressed', 'true');
     
     // Verify table is now present
     const table = canvas.getByRole('table');
     await expect(table).toBeInTheDocument();
+
+    // Hide then show again to verify toggle behaviour
+    await userEvent.click(hideTableBtn);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const showTableBtn = canvas.getByRole('button', { name: /show table/i });
+    await expect(showTableBtn).toHaveAttribute('aria-pressed', 'false');
   },
 };

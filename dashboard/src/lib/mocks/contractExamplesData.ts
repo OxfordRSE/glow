@@ -90,16 +90,24 @@ export const contractExamplesData = [
       "school_id": null,
       "variables": [
         {
-          "key": "bw_wbeing_1"
+          "key": "bewell_questionnaire__bw_wbeing_1",
+          "raw_key": "bw_wbeing_1",
+          "form_id": "bewell_questionnaire"
         },
         {
-          "key": "bw_wbeing_2"
+          "key": "bewell_questionnaire__bw_wbeing_2",
+          "raw_key": "bw_wbeing_2",
+          "form_id": "bewell_questionnaire"
         },
         {
-          "key": "bw_wbeing_3"
+          "key": "phq9_questionnaire__phq9_1",
+          "raw_key": "phq9_1",
+          "form_id": "phq9_questionnaire"
         },
         {
-          "key": "bw_wbeing_total"
+          "key": "bewell_questionnaire__bw_wbeing_total",
+          "raw_key": "bw_wbeing_total",
+          "form_id": "bewell_questionnaire"
         }
       ],
       "dimensions": [
@@ -146,16 +154,24 @@ export const contractExamplesData = [
       "school_id": 1,
       "variables": [
         {
-          "key": "bw_wbeing_1"
+          "key": "bewell_questionnaire__bw_wbeing_1",
+          "raw_key": "bw_wbeing_1",
+          "form_id": "bewell_questionnaire"
         },
         {
-          "key": "bw_wbeing_2"
+          "key": "bewell_questionnaire__bw_wbeing_2",
+          "raw_key": "bw_wbeing_2",
+          "form_id": "bewell_questionnaire"
         },
         {
-          "key": "bw_wbeing_3"
+          "key": "phq9_questionnaire__phq9_1",
+          "raw_key": "phq9_1",
+          "form_id": "phq9_questionnaire"
         },
         {
-          "key": "bw_wbeing_total"
+          "key": "bewell_questionnaire__bw_wbeing_total",
+          "raw_key": "bw_wbeing_total",
+          "form_id": "bewell_questionnaire"
         }
       ],
       "dimensions": [
@@ -251,7 +267,7 @@ export const contractExamplesData = [
   {
     "id": "query.period-based.simple",
     "method": "GET",
-    "path": "/query?v=bw_wbeing_1",
+    "path": "/query?v=bewell_questionnaire__bw_wbeing_1",
     "status": 200,
     "request_model": null,
     "response_model": "NewQueryResponse",
@@ -260,7 +276,7 @@ export const contractExamplesData = [
       "query": {
         "school_id": null,
         "variables": [
-          "bw_wbeing_1"
+          "bewell_questionnaire__bw_wbeing_1"
         ],
         "dimensions": [],
         "variable_prefixes": []
@@ -272,13 +288,20 @@ export const contractExamplesData = [
       ],
       "variables": [
         {
-          "variable": "bw_wbeing_1",
-          "periods": {
-            "2023-2024": {
-              "suppressed": false,
-              "cells": [
-                {
-                  "mean": 3.5,
+        "variable": "bewell_questionnaire__bw_wbeing_1",
+        "periods": {
+          "2023-2024": {
+            "suppressed": false,
+            "notes": [
+              "values-rescaled"
+            ],
+            "question_versions": {
+              "1": 5,
+              "2": 5
+            },
+            "cells": [
+              {
+                "mean": 3.5,
                   "n": 10
                 }
               ]
@@ -300,7 +323,7 @@ export const contractExamplesData = [
   {
     "id": "query.period-based.with-dimensions",
     "method": "GET",
-    "path": "/query?v=bw_wbeing_1&d=d_sex",
+    "path": "/query?v=bewell_questionnaire__bw_wbeing_1&d=d_sex",
     "status": 200,
     "request_model": null,
     "response_model": "NewQueryResponse",
@@ -309,7 +332,7 @@ export const contractExamplesData = [
       "query": {
         "school_id": null,
         "variables": [
-          "bw_wbeing_1"
+          "bewell_questionnaire__bw_wbeing_1"
         ],
         "dimensions": [
           "d_sex"
@@ -324,7 +347,7 @@ export const contractExamplesData = [
       ],
       "variables": [
         {
-          "variable": "bw_wbeing_1",
+          "variable": "bewell_questionnaire__bw_wbeing_1",
           "periods": {
             "2023-2024": {
               "suppressed": false,

@@ -1,16 +1,12 @@
-"""
-ODK Central client for fetching submissions and form metadata.
-
-This module provides for fetching submissions from ODK Central
-with ETAG-based caching and metadata extraction from XLSForms.
-"""
+"""ODK Central client for fetching multi-form submissions and metadata."""
 import logging
 import os
 from datetime import datetime
 from json import JSONDecodeError
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 import re
-from io import BytesIO
+import hashlib
+import xml.etree.ElementTree as ET
 
 import pandas as pd
 import requests
@@ -32,7 +28,6 @@ class ODKClient:
         username: str,
         password: str,
         project_id: int,
-        form_id: str,
         verify_ssl: bool = True,
     ):
         """Initialize ODK client.
@@ -42,14 +37,12 @@ class ODKClient:
             username: ODK Central username/email
             password: ODK Central password
             project_id: Default project ID
-            form_id: Form ID to fetch submissions from
             verify_ssl: Whether to verify SSL certificates (default: True)
         """
         self.base_url = base_url
         self.username = username
         self.password = password
         self.project_id = project_id
-        self.form_id = form_id
         self.verify_ssl = verify_ssl
         
         # For nginx virtual hosting, set Host header to match SSL cert
@@ -90,62 +83,165 @@ class ODKClient:
         request.raise_for_status()
         return request
 
-    def fetch_submissions(self, etag: Optional[str] = None) -> Optional[Tuple[pd.DataFrame, Optional[str]]]:
-        """Fetch submissions from ODK Central.
-        
-        Args:
-            etag: Optional ETAG from previous request for caching
-        
-        Returns:
-            Tuple of (DataFrame with submissions, new ETAG)
-            If ETAG matches (304), returns (empty DataFrame, same ETAG)
-        """
+    def list_forms(self) -> list[dict[str, Any]]:
+        """List forms visible in the configured project."""
+        url = f"{self.base_url}/v1/projects/{self.project_id}/forms"
+        response = self.get(url)
+        return response.json()
+
+    def fetch_form_submission_list(
+        self,
+        form_id: str,
+        etag: Optional[str] = None,
+    ) -> tuple[Optional[list[dict[str, Any]]], Optional[str]]:
+        """Fetch the JSON submission listing for one form."""
+        url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{form_id}/submissions"
+        response = self.get(url, headers={"If-None-Match": etag})
+        if response.status_code == 304:
+            return None, etag
+        return response.json(), response.headers.get("etag")
+
+    def download_submission_xml(self, form_id: str, instance_id: str) -> str:
+        """Download one submission XML payload."""
+        url = (
+            f"{self.base_url}/v1/projects/{self.project_id}/forms/"
+            f"{form_id}/submissions/{instance_id}.xml"
+        )
+        response = self.get(url)
+        return response.text
+
+    def parse_submission_xml(self, xml_content: str) -> dict[str, Any]:
+        """Parse one submission XML into a flat row dict with __version."""
+        root = ET.fromstring(xml_content)
+        row: dict[str, Any] = {
+            "__xmlFormId": root.attrib.get("id", ""),
+            "__version": root.attrib.get("version", ""),
+        }
+
+        for child in root:
+            tag = child.tag.split("}")[-1]
+            if tag == "meta":
+                for meta_child in child:
+                    meta_tag = meta_child.tag.split("}")[-1]
+                    if meta_tag == "instanceID":
+                        row["instanceId"] = meta_child.text or ""
+                continue
+            row[tag] = child.text or ""
+
+        return row
+
+    def build_form_submissions_dataframe(
+        self,
+        form_id: str,
+        submissions: list[dict[str, Any]],
+    ) -> pd.DataFrame:
+        """Build a DataFrame by combining submission listing data with XML payloads."""
+        rows: list[dict[str, Any]] = []
+        for submission in submissions:
+            instance_id = submission["instanceId"]
+            xml_content = self.download_submission_xml(form_id=form_id, instance_id=instance_id)
+            row = self.parse_submission_xml(xml_content)
+            row["instanceId"] = instance_id
+            row["createdAt"] = submission.get("createdAt")
+            row["updatedAt"] = submission.get("updatedAt")
+            row["SubmissionDate"] = submission.get("createdAt")
+            rows.append(row)
+
+        if not rows:
+            return pd.DataFrame(columns=["__xmlFormId", "__version", "instanceId", "createdAt", "updatedAt", "SubmissionDate"])
+        return pd.DataFrame(rows)
+
+    def fetch_form_submissions(
+        self,
+        form_id: str,
+        etag: Optional[str] = None,
+    ) -> tuple[Optional[pd.DataFrame], Optional[str]]:
+        """Fetch submissions for one form, respecting response ETags."""
         logger.info(
             "Fetching submissions for project=%d, form=%s",
             self.project_id,
-            self.form_id,
+            form_id,
         )
-
-        url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{self.form_id}/submissions.csv"
-        response = self.get(url, headers={"etag": etag})
-        if response.status_code == 304:
-            return None
-        new_etag = response.headers.get("etag")
-        csv_data = response.content
-        df = pd.read_csv(BytesIO(csv_data))
+        submissions, new_etag = self.fetch_form_submission_list(form_id=form_id, etag=etag)
+        if submissions is None:
+            return None, new_etag
+        df = self.build_form_submissions_dataframe(form_id=form_id, submissions=submissions)
         return df, new_etag
-    
-    def get_form_metadata(self) -> Dict[str, Dict[str, int]]:
-        """Extract metadata (min/max values) from form definition.
-        
-        Returns:
-            Dict mapping field names to {"min": int, "max": int}
+
+    def fetch_submissions(
+        self,
+        etags: Optional[dict[str, str]] = None,
+    ) -> tuple[dict[str, Optional[pd.DataFrame]], dict[str, Optional[str]]]:
+        """Fetch submissions for all accessible forms.
+
+        Returns a per-form mapping where a `None` frame means the endpoint
+        returned 304 Not Modified for that form.
         """
-        logger.info("Fetching form metadata for form=%s", self.form_id)
-        
+        existing_etags = etags or {}
+        form_frames: dict[str, Optional[pd.DataFrame]] = {}
+        new_etags: dict[str, Optional[str]] = {}
+        for form in self.list_forms():
+            form_id = form["xmlFormId"]
+            frame, new_etag = self.fetch_form_submissions(
+                form_id=form_id,
+                etag=existing_etags.get(form_id),
+            )
+            form_frames[form_id] = frame
+            new_etags[form_id] = new_etag
+        return form_frames, new_etags
+
+    def get_form_versions(self, form_id: str) -> list[dict[str, Any]]:
+        """List published versions for a form."""
+        url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{form_id}/versions"
+        response = self.get(url)
+        return response.json()
+
+    def download_form_xml(self, form_id: str, version: Optional[str] = None) -> str:
+        """Download current or versioned XML form definition."""
+        if version is None:
+            url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{form_id}.xml"
+        else:
+            url = (
+                f"{self.base_url}/v1/projects/{self.project_id}/forms/"
+                f"{form_id}/versions/{version}.xml"
+            )
+        response = self.get(url)
+        return response.text
+
+    def get_form_metadata(self) -> dict[str, Any]:
+        """Build per-form, per-version variable metadata maps."""
+        forms_metadata: dict[str, Any] = {}
+        current_versions: dict[str, str] = {}
+
         try:
-            # Download XML form definition and extract metadata
-            xml_content = self.download_form_xml()
-            metadata = self.extract_metadata_from_xml(xml_content)
-            
-            logger.info("Extracted metadata for %d fields", len(metadata))
-            
-            return metadata
-        
+            for form in self.list_forms():
+                form_id = form["xmlFormId"]
+                current_versions[form_id] = str(form.get("version", ""))
+                forms_metadata[form_id] = {}
+                for version_info in self.get_form_versions(form_id):
+                    version = str(version_info["version"])
+                    xml_content = self.download_form_xml(form_id=form_id, version=version)
+                    variable_metadata = self.extract_metadata_from_xml(xml_content)
+                    forms_metadata[form_id][version] = {
+                        "variables": variable_metadata,
+                    }
+
+            return {
+                "_forms": forms_metadata,
+                "_current_versions": current_versions,
+            }
         except Exception:
             logger.exception("Failed to fetch form metadata")
             raise
-    
-    def download_form_xml(self) -> str:
-        """Download XML form definition for metadata extraction.
-        
-        Returns:
-            XML form definition as string
-        """
-        url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{self.form_id}.xml"
-        response = self.get(url)
-        
-        return response.text
+
+    @staticmethod
+    def dataset_version_from_etags(etags: dict[str, Optional[str]]) -> str:
+        """Derive one stable dataset version string from per-form ETags."""
+        text = "||".join(
+            f"{form_id}:{etags[form_id] or ''}"
+            for form_id in sorted(etags)
+        )
+        return hashlib.sha256(text.encode()).hexdigest()[:16]
     
     def extract_metadata_from_xml(self, xml_content: str) -> Dict[str, Dict[str, int]]:
         """Extract min/max metadata from XML form definition.
