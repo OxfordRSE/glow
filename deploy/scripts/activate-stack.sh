@@ -212,7 +212,7 @@ validate_deployment_version() {
     error "Major version upgrades require manual migration steps."
     error "Please consult the upgrade guide before proceeding."
     error ""
-    error "Upgrade guide: https://github.com/oxrse/glow/blob/main/UPGRADING.md"
+    error "Upgrade guide: https://github.com/OxfordRSE/glow/blob/main/UPGRADING.md"
     error ""
     error "To force upgrade (NOT RECOMMENDED), remove: ${version_file}"
     exit 1
@@ -359,11 +359,12 @@ start_stack() {
   step "Starting docker-compose stack"
   
   # Use sudo until user re-login adds them to docker group
-  sudo docker compose --profile odk --env-file "${RUNTIME_ENV}" pull
-  sudo docker compose --profile odk --env-file "${RUNTIME_ENV}" up -d
+  sudo docker compose --env-file "${RUNTIME_ENV}" pull
+  sudo docker compose --env-file "${RUNTIME_ENV}" build
+  sudo docker compose --env-file "${RUNTIME_ENV}" up -d
   
   info "Waiting for services to start..."
-  sleep 30
+  sleep 60
   
   # Show status
   sudo docker compose --env-file "${RUNTIME_ENV}" ps

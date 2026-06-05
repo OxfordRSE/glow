@@ -41,7 +41,7 @@ data_volume_size_gb = 100
 # ─── Deployment Configuration ─────────────────────────────────────────────────
 
 # Git repository (defaults to official GLOW repo)
-# git_repo_url = "https://github.com/oxrse/glow.git"
+# git_repo_url = "https://github.com/OxfordRSE/glow.git"
 
 # Git reference to deploy (leave empty for latest release)
 # git_ref = "v1.2.3"  # Specific version

@@ -407,7 +407,8 @@ class DataStore:
             
             # Load ETAG map if it exists
             etag_path = self._cache_path.with_suffix(".etag")
-            etags = json.loads(etag_path.read_text()) if etag_path.exists() else {}
+            etag_text = etag_path.read_text() if etag_path.exists() else "{}"
+            etags = json.loads(etag_text)
             
             logger.info("Loaded cached data from %s", self._cache_path)
             return df, etags

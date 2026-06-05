@@ -147,7 +147,7 @@ For deploying to your own VM/server (not AWS):
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/oxrse/glow.git
+git clone https://github.com/OxfordRSE/glow.git
 cd glow
 git checkout v1.2.3  # Use latest release tag
 ```

@@ -49,7 +49,7 @@ resource "aws_lb_target_group" "dashboard" {
   target_type = "instance"
 
   health_check {
-    path                = "/en/login"
+    path                = "/en"
     healthy_threshold   = 2
     unhealthy_threshold = 3
     timeout             = 5

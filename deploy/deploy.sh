@@ -20,12 +20,78 @@ TERRAFORM_DIR="${SCRIPT_DIR}/terraform"
 APP_NAME="glow-core"
 AWS_REGION="${AWS_REGION:-eu-west-2}"
 
+REPLACE=false
+# Terraform address of the EC2 instance to recreate when
+# --recreate-ec2 is specified.
+REPLACE_RESOURCE=""
+DEFAULT_REPLACE_RESOURCE="aws_instance.main"
+
 # ─── Colors ──────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; RESET='\033[0m'
-info()  { echo -e "${GREEN}[INFO]${RESET}  $*"; }
-warn()  { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
+info()  { echo -e "${GREEN}[INFO]${RESET}  $*" >&2; }
+warn()  { echo -e "${YELLOW}[WARN]${RESET}  $*" >&2; }
 error() { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
-step()  { echo -e "\n${BLUE}▶${RESET} $*\n"; }
+step()  { echo -e "\n${BLUE}▶${RESET} $*\n" >&2; }
+
+usage() {
+  cat <<EOF
+Usage:
+  $(basename "$0") [options]
+
+Options:
+  --replace [resource.address]
+      Force Terraform to destroy and recreate a resource during this deployment.
+      If no resource address is provided, defaults to:
+        ${DEFAULT_REPLACE_RESOURCE}
+
+  -h, --help
+      Show this help text.
+
+Examples:
+  ./deploy/deploy.sh
+  ./deploy/deploy.sh --replace
+  ./deploy/deploy.sh --replace aws_instance.main
+  ./deploy/deploy.sh --replace module.compute.aws_instance.main
+
+Notes:
+  This is implemented using Terraform's -replace option on both plan and apply.
+EOF
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --replace)
+        REPLACE=true
+        shift
+        if [[ $# -gt 0 && "${1#-}" == "$1" ]]; then
+          REPLACE_RESOURCE="$1"
+          shift
+        else
+          REPLACE_RESOURCE="${DEFAULT_REPLACE_RESOURCE}"
+        fi
+        ;;
+      --replace=*)
+        REPLACE=true
+        REPLACE_RESOURCE="${1#*=}"
+        if [[ -z "${REPLACE_RESOURCE}" ]]; then
+          REPLACE_RESOURCE="${DEFAULT_REPLACE_RESOURCE}"
+        fi
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        error "Unknown argument: $1"
+        echo ""
+        usage
+        exit 1
+        ;;
+    esac
+  done
+}
 
 # ─── Check tools ─────────────────────────────────────────────────────────────
 check_tools() {
@@ -161,16 +227,24 @@ ensure_backend_bucket() {
 # ─── Terraform init & apply ──────────────────────────────────────────────────
 run_terraform() {
   local bucket="$1"
-  
+  local -a tf_plan_args=()
+  local -a tf_apply_args=(-auto-approve)
+
+  if [[ "${REPLACE}" == "true" ]]; then
+    info "Terraform replace requested for: ${REPLACE_RESOURCE}"
+    tf_plan_args+=("-replace=${REPLACE_RESOURCE}")
+    tf_apply_args+=("-replace=${REPLACE_RESOURCE}")
+  fi
+
   step "Initializing Terraform"
   terraform -chdir="${TERRAFORM_DIR}" init \
     -backend-config="bucket=${bucket}" \
     -backend-config="region=${AWS_REGION}" \
     -reconfigure
-  
+
   step "Running Terraform plan"
-  terraform -chdir="${TERRAFORM_DIR}" plan
-  
+  terraform -chdir="${TERRAFORM_DIR}" plan "${tf_plan_args[@]}"
+
   echo ""
   read -p "Apply these changes? [y/N] " -n 1 -r
   echo ""
@@ -178,9 +252,9 @@ run_terraform() {
     warn "Deployment cancelled"
     exit 0
   fi
-  
+
   step "Applying Terraform configuration"
-  terraform -chdir="${TERRAFORM_DIR}" apply -auto-approve
+  terraform -chdir="${TERRAFORM_DIR}" apply "${tf_apply_args[@]}"
 }
 
 # ─── Detect deployment state ─────────────────────────────────────────────────
@@ -397,7 +471,14 @@ handle_failure() {
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 main() {
+  parse_args "$@"
+
   step "Starting Glow deployment"
+
+  if [[ "${REPLACE}" == "true" ]]; then
+    info "Replace mode enabled"
+    info "Resource address: ${REPLACE_RESOURCE}"
+  fi
   
   check_tools
   

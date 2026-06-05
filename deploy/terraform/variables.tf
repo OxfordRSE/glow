@@ -51,7 +51,7 @@ variable "data_volume_size_gb" {
 variable "git_repo_url" {
   description = "Git repository URL to clone for deployment"
   type        = string
-  default     = "https://github.com/oxrse/glow.git"
+  default     = "https://github.com/OxfordRSE/glow.git"
 }
 
 variable "git_ref" {
