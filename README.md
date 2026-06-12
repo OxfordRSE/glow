@@ -218,28 +218,33 @@ npm run check
 
 ## Deployment (AWS)
 
-See `deploy/terraform/` for infrastructure definitions (EC2 + ALB + Route53).
+See `deploy/aws/` for the AWS deployment package.
 
-See `DEPLOYMENT.md` for the quick start guide using `./deploy/deploy.sh`.
+See `DEPLOYMENT.md` for the quick start guide using `uv run --project deploy/aws deploy/aws/deploy.py`.
 
 The deployment uses:
-- EC2 instance running Docker Compose
-- Application Load Balancer with subdomain routing
-- Route 53 for DNS management
-- ACM for TLS certificates
+- A thin runner AMI built with CodeBuild + Packer
+- EC2 runner instances launched from a Terraform-managed launch template
+- An Application Load Balancer with host-based routing
+- A persistent EBS data volume that is detached from the old instance and reattached to the new one during deployment
+- ACM for TLS certificates, with DNS validation records emitted for the external DNS owner
 - Auto-configured ODK Central integration
 
-### Terraform variables
+### Deployment entrypoint
 
-See `deploy/terraform/variables.tf` for all available variables. Key ones:
+```bash
+uv run --project deploy/aws deploy/aws/deploy.py --domain eu.glow-project.org
+```
 
-| Variable | Description |
-|---|---|
-| `image_tag` | Docker image tag (set by deploy.sh) |
-| `api_secret_key` | JWT secret (set by deploy.sh from env) |
-| `aws_region` | AWS region |
-| `api_min_n` | Minimum N for suppression (default: 5) |
-| `certificate_arn` | ACM certificate ARN for HTTPS (optional) |
+Useful flags:
+
+- `--certificate-arn arn:aws:acm:...`
+- `--git-ref v1.2.3`
+- `--aws-region eu-west-2`
+- `--force-rebuild`
+- `--verbose`
+
+Because DNS is assumed to be managed externally, the deploy command prints the ALB routing records you need to send to the owner of the enclosing DNS zone. If no matching issued ACM certificate exists yet, it also prints the ACM validation records needed before deployment can proceed.
 
 ## Data Collection & Format
 
@@ -257,7 +262,7 @@ The current BeWell questionnaire form is included in this repo at `odk-forms/bew
 - `school` — school identifier carried on each questionnaire form
 - Questionnaire items from the [#BeeWell GM Survey](https://beewellprogramme.org) (e.g. `bw_wbeing_1`–`bw_wbeing_7` for SWEMWBS wellbeing, `bw_emodies_1`–`bw_emodies_10` for emotional difficulties, and ~120 further items)
 
-The form is automatically uploaded to ODK Central during deployment (see `deploy/scripts/activate-stack.sh`).
+The form is automatically uploaded to ODK Central during deployment by `deploy/aws/runtime/activate-stack.sh`.
 
 ### Development/Testing Data Flow
 
@@ -288,7 +293,7 @@ This creates a clean wide base CSV with BeeWell v2, demographics, PHQ-9, and a s
 ### Step 2: Transform Base Data Into Per-Form Seed CSVs
 
 ```bash
-python deploy/scripts/transform_mock_data.py \
+python scripts/odk/transform_mock_data.py \
   --input data/glow_base.csv \
   --output-dir data/mock_seed \
   --forms-dir odk-forms
@@ -301,7 +306,7 @@ This produces deterministic per-form CSVs and a manifest describing school wave 
 Upload the generated data to your local ODK Central instance:
 
 ```bash
-uv run deploy/scripts/seed_odk_test_data.py \
+uv run scripts/odk/seed_odk_test_data.py \
   --seed-dir data/mock_seed \
   --manifest data/mock_seed/manifest.csv \
   --forms-dir odk-forms \
@@ -311,7 +316,7 @@ uv run deploy/scripts/seed_odk_test_data.py \
   --project-id 1
 
 # Or limit each phase for faster testing
-uv run deploy/scripts/seed_odk_test_data.py \
+uv run scripts/odk/seed_odk_test_data.py \
   --seed-dir data/mock_seed \
   --manifest data/mock_seed/manifest.csv \
   --forms-dir odk-forms \
@@ -325,7 +330,7 @@ uv run deploy/scripts/seed_odk_test_data.py \
 #### Step 4: Rewrite Submission Timestamps
 
 ```bash
-python deploy/scripts/rewrite_odk_submission_timestamps.py \
+python scripts/odk/rewrite_odk_submission_timestamps.py \
   --manifest data/mock_seed/manifest.csv
 ```
 

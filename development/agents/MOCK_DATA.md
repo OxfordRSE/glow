@@ -139,7 +139,7 @@ Manifest should include at least:
 Current implementation files:
 
 - canonical base generator config: `../glow-dummies/examples/glow_model.toml`
-- local transformation script: `deploy/scripts/transform_mock_data.py`
+- local transformation script: `scripts/odk/transform_mock_data.py`
 
 Transformation responsibilities:
 
@@ -156,7 +156,7 @@ Transformation responsibilities:
 
 Potential new script names:
 
-- implemented: `deploy/scripts/transform_mock_data.py`
+- implemented: `scripts/odk/transform_mock_data.py`
 
 ### Phase 3: seed ODK in phases
 
@@ -198,7 +198,7 @@ If `updatedAt` or related audit timestamps also need to remain coherent, rewrite
 
 Potential script name:
 
-- `deploy/scripts/rewrite_odk_submission_timestamps.py`
+- `scripts/odk/rewrite_odk_submission_timestamps.py`
 
 This phase should end with exported submission CSVs that we can treat as the ingestion target for API work.
 
@@ -302,7 +302,7 @@ Update bootstrap flows so they can:
 Likely files:
 
 - `dev-init.sh`
-- maybe `deploy/scripts/activate-stack.sh` if demo deployment should also support this flow
+- maybe `deploy/aws/runtime/activate-stack.sh` if demo deployment should also support this flow
 
 ## Dashboard implications
 

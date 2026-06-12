@@ -317,7 +317,7 @@ docker compose exec -T odk-service \
 }
 
 # Source ODK API helper functions
-source ./deploy/scripts/odk-api-helper.sh
+source ./scripts/odk/odk-api-helper.sh
 
 # Override for external access from host (use HTTPS with self-signed cert)
 export ODK_API_BASE="https://localhost:8443/v1"
@@ -354,7 +354,7 @@ MANIFEST_PATH="${SEED_DIR}/manifest.csv"
 if [[ ! -f "${MANIFEST_PATH}" && -f ./data/glow_base.csv ]]; then
   step "Transforming canonical base data"
 
-  python ./deploy/scripts/transform_mock_data.py \
+  python ./scripts/odk/transform_mock_data.py \
     --input ./data/glow_base.csv \
     --output-dir "${SEED_DIR}" \
     --forms-dir ./odk-forms
@@ -373,7 +373,7 @@ if [[ ! -f "${MANIFEST_PATH}" ]]; then
   echo "     --output csv \\"
   echo "     > data/glow_base.csv"
   echo ""
-  echo "   python deploy/scripts/transform_mock_data.py \\"
+  echo "   python scripts/odk/transform_mock_data.py \\"
   echo "     --input data/glow_base.csv \\"
   echo "     --output-dir data/mock_seed \\"
   echo "     --forms-dir odk-forms"
@@ -386,7 +386,7 @@ if [[ ! -f "${MANIFEST_PATH}" ]]; then
 else
   step "Seeding test data${LIMIT:+ (limit: $LIMIT rows)}"
   
-  uv run ./deploy/scripts/seed_odk_test_data.py \
+  uv run ./scripts/odk/seed_odk_test_data.py \
     --seed-dir "${SEED_DIR}" \
     --manifest "${MANIFEST_PATH}" \
     --forms-dir ./odk-forms \
@@ -396,7 +396,7 @@ else
     --project-id "${PROJECT_ID}" \
     ${LIMIT:+--limit $LIMIT}
 
-  python ./deploy/scripts/rewrite_odk_submission_timestamps.py \
+  python ./scripts/odk/rewrite_odk_submission_timestamps.py \
     --manifest "${MANIFEST_PATH}"
   
   SKIP_SEED=false

@@ -118,24 +118,33 @@ Restarting either should not restart the other.
 
 ### AWS Deployment (Recommended)
 
-For production deployments on AWS, see `deploy/terraform/README.md`.
+For production deployments on AWS, see `deploy/aws/README.md` and `DEPLOYMENT.md`.
 
 The AWS deployment provides:
 - Automated infrastructure provisioning
-- Automatic HTTPS certificates via AWS Certificate Manager
+- Runner AMI builds via CodeBuild + Packer
+- EC2 replacement with persistent EBS volume handoff
+- HTTPS certificates via AWS Certificate Manager after external DNS validation
 - Load balancing and health checks
 - Persistent data storage on EBS volumes
 - Automated backups and monitoring
 
 Quick start:
 ```bash
-cd deploy
-./deploy.sh
+uv run --project deploy/aws deploy/aws/deploy.py --domain eu.glow-project.org
 ```
+
+Notes:
+- The deployment assumes DNS is managed outside Route53.
+- A successful deploy requires an already-issued ACM certificate for the requested root, `api.`, and `odk.` hostnames.
+- The deploy command prints the ALB routing records to send to the owner of the enclosing DNS zone.
+- If no issued ACM certificate exists yet, the deploy command prints the ACM validation records needed for certificate issuance and stops before the HTTPS ALB is created.
 
 ### Self-Hosted Deployment (Manual)
 
-For deploying to your own VM/server (not AWS):
+The repository no longer provides a first-class non-AWS deployment orchestrator.
+
+For a manual VM/server deployment, use the checked-in `compose.yml` stack, persistent storage for `docker-mount-data/`, and your own reverse proxy or load balancer.
 
 #### Prerequisites
 - Ubuntu 22.04+ or Debian 11+ server
@@ -152,24 +161,23 @@ cd glow
 git checkout v1.2.3  # Use latest release tag
 ```
 
-2. **Run activation script:**
+2. **Prepare persistent storage:**
 ```bash
-DOMAIN_NAME=glow.example.com bash deploy/scripts/activate-stack.sh
+mkdir -p docker-mount-data
 ```
 
-The script will:
-- Detect your OS and install Docker
-- Create `./docker-mount-data/` directory for persistent data
-- Generate secure secrets
-- Start all services (API, Dashboard, ODK Central)
-- Configure ODK Central with admin user
+3. **Install Docker Engine and Docker Compose plugin.**
 
-3. **Access services:**
+4. **Create the runtime environment and start the stack manually.**
+
+This repository no longer ships a generic host activation script for that workflow, so any manual deployment should be treated as an operator-managed compose installation rather than a supported automated path.
+
+5. **Access services:**
 - Dashboard: `http://glow.example.com` 
 - API: `http://glow.example.com:8000`
 - ODK Central: `http://glow.example.com:8080`
 
-4. **Set up reverse proxy for HTTPS:**
+6. **Set up reverse proxy for HTTPS:**
 
 You'll need to configure a reverse proxy (nginx, Apache, Caddy, etc.) to:
 - Terminate HTTPS with your SSL certificate
@@ -258,14 +266,10 @@ To update to a new version:
 cd /path/to/glow
 git fetch --tags
 git checkout v1.3.0  # New version
-bash deploy/scripts/update-stack.sh
+docker compose --profile odk up -d --build
 ```
 
-The update script will:
-- Validate the version upgrade path (blocks major version jumps)
-- Rebuild containers with new code
-- Restart services
-- Preserve all data in `docker-mount-data/`
+This manual workflow preserves data in `docker-mount-data/`, but version compatibility checks are your responsibility outside the AWS deploy tool.
 
 #### Retrieving Credentials
 

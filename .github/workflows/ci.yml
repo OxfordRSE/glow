@@ -24,7 +24,7 @@ jobs:
         working-directory: dashboard
         run: npx playwright install --with-deps chromium
       - name: Bring up compose stack and run API smoke checks
-        run: bash deploy/scripts/smoke_compose.sh
+        run: bash scripts/smoke_compose.sh
       - name: Run dashboard browser smoke tests
         working-directory: dashboard
         env:

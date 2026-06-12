@@ -6,7 +6,7 @@
 """Seed ODK Central from transformed multi-form mock-data outputs.
 
 This script consumes the deterministic per-form CSVs emitted by
-`deploy/scripts/transform_mock_data.py` and seeds them into ODK Central in the
+`scripts/odk/transform_mock_data.py` and seeds them into ODK Central in the
 correct phase order:
 
 1. upload BeWell v1

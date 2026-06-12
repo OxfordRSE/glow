@@ -252,7 +252,7 @@ The large dev/demo dataset should be generated then transformed, not mostly hand
 
 The transformation step is implemented in:
 
-- `deploy/scripts/transform_mock_data.py`
+- `scripts/odk/transform_mock_data.py`
 
 It takes the canonical wide base CSV and emits:
 
@@ -267,7 +267,7 @@ It takes the canonical wide base CSV and emits:
 Example command:
 
 ```bash
-python deploy/scripts/transform_mock_data.py \
+python scripts/odk/transform_mock_data.py \
   --input data/glow_base.csv \
   --output-dir data/mock_seed \
   --forms-dir odk-forms
