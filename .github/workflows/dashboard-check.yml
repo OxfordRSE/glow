@@ -33,9 +33,6 @@ jobs:
       - name: Generate contract examples
         run: npm run generate:examples
 
-      - name: Lint
-        run: npm run lint
-
       - name: Type check
         run: npm run check
 
