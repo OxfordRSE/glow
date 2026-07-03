@@ -1,4 +1,5 @@
 """ODK Central client for fetching multi-form submissions and metadata."""
+
 import logging
 import os
 from datetime import datetime
@@ -21,7 +22,7 @@ if os.getenv("GLOW_ODK_VERIFY_SSL", "true").lower() == "false":
 
 class ODKClient:
     """Client for interacting with ODK Central."""
-    
+
     def __init__(
         self,
         base_url: str,
@@ -31,7 +32,7 @@ class ODKClient:
         verify_ssl: bool = True,
     ):
         """Initialize ODK client.
-        
+
         Args:
             base_url: ODK Central base URL (e.g., "http://service:8383")
             username: ODK Central username/email
@@ -44,41 +45,45 @@ class ODKClient:
         self.password = password
         self.project_id = project_id
         self.verify_ssl = verify_ssl
-        
+
         # For nginx virtual hosting, set Host header to match SSL cert
         self.default_headers = {}
         if "nginx" in base_url.lower():
             self.default_headers["Host"] = "odk.local"
-        
+
         # Authenticate with ODK Central
         response = requests.post(
             f"{self.base_url}/v1/sessions",
             json={"email": self.username, "password": self.password},
             headers=self.default_headers,
-            verify=self.verify_ssl
+            verify=self.verify_ssl,
         )
         if response.status_code != 200:
             response.raise_for_status()
-            raise ConnectionError(f"Failed to connect to ODK Central: {response.status_code}")
+            raise ConnectionError(
+                f"Failed to connect to ODK Central: {response.status_code}"
+            )
         try:
             data = response.json()
             self.access_token = data["token"]
-            self.token_expires = datetime.fromisoformat(data["expiresAt"].replace("Z", "+00:00"))
+            self.token_expires = datetime.fromisoformat(
+                data["expiresAt"].replace("Z", "+00:00")
+            )
         except (JSONDecodeError, KeyError):
             logger.warning(f"Unexpeted ODK Central response format: {response.content}")
             raise ValueError("ODK Central response did not match expected shape.")
-        
+
     def get(self, *args, **kwargs):
         # Add SSL verification setting if not explicitly provided
-        if 'verify' not in kwargs:
-            kwargs['verify'] = self.verify_ssl
-        
+        if "verify" not in kwargs:
+            kwargs["verify"] = self.verify_ssl
+
         # Merge default headers with provided headers
         headers = dict(self.default_headers)
-        if 'headers' in kwargs:
-            headers.update(kwargs['headers'])
-        kwargs['headers'] = headers
-        
+        if "headers" in kwargs:
+            headers.update(kwargs["headers"])
+        kwargs["headers"] = headers
+
         request = requests.get(*args, auth=(self.username, self.password), **kwargs)
         request.raise_for_status()
         return request
@@ -95,7 +100,9 @@ class ODKClient:
         etag: Optional[str] = None,
     ) -> tuple[Optional[list[dict[str, Any]]], Optional[str]]:
         """Fetch the JSON submission listing for one form."""
-        url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{form_id}/submissions"
+        url = (
+            f"{self.base_url}/v1/projects/{self.project_id}/forms/{form_id}/submissions"
+        )
         response = self.get(url, headers={"If-None-Match": etag})
         if response.status_code == 304:
             return None, etag
@@ -139,7 +146,9 @@ class ODKClient:
         rows: list[dict[str, Any]] = []
         for submission in submissions:
             instance_id = submission["instanceId"]
-            xml_content = self.download_submission_xml(form_id=form_id, instance_id=instance_id)
+            xml_content = self.download_submission_xml(
+                form_id=form_id, instance_id=instance_id
+            )
             row = self.parse_submission_xml(xml_content)
             row["instanceId"] = instance_id
             row["createdAt"] = submission.get("createdAt")
@@ -148,7 +157,16 @@ class ODKClient:
             rows.append(row)
 
         if not rows:
-            return pd.DataFrame(columns=["__xmlFormId", "__version", "instanceId", "createdAt", "updatedAt", "SubmissionDate"])
+            return pd.DataFrame(
+                columns=[
+                    "__xmlFormId",
+                    "__version",
+                    "instanceId",
+                    "createdAt",
+                    "updatedAt",
+                    "SubmissionDate",
+                ]
+            )
         return pd.DataFrame(rows)
 
     def fetch_form_submissions(
@@ -162,10 +180,14 @@ class ODKClient:
             self.project_id,
             form_id,
         )
-        submissions, new_etag = self.fetch_form_submission_list(form_id=form_id, etag=etag)
+        submissions, new_etag = self.fetch_form_submission_list(
+            form_id=form_id, etag=etag
+        )
         if submissions is None:
             return None, new_etag
-        df = self.build_form_submissions_dataframe(form_id=form_id, submissions=submissions)
+        df = self.build_form_submissions_dataframe(
+            form_id=form_id, submissions=submissions
+        )
         return df, new_etag
 
     def fetch_submissions(
@@ -220,7 +242,9 @@ class ODKClient:
                 forms_metadata[form_id] = {}
                 for version_info in self.get_form_versions(form_id):
                     version = str(version_info["version"])
-                    xml_content = self.download_form_xml(form_id=form_id, version=version)
+                    xml_content = self.download_form_xml(
+                        form_id=form_id, version=version
+                    )
                     variable_metadata = self.extract_metadata_from_xml(xml_content)
                     forms_metadata[form_id][version] = {
                         "variables": variable_metadata,
@@ -238,59 +262,59 @@ class ODKClient:
     def dataset_version_from_etags(etags: dict[str, Optional[str]]) -> str:
         """Derive one stable dataset version string from per-form ETags."""
         text = "||".join(
-            f"{form_id}:{etags[form_id] or ''}"
-            for form_id in sorted(etags)
+            f"{form_id}:{etags[form_id] or ''}" for form_id in sorted(etags)
         )
         return hashlib.sha256(text.encode()).hexdigest()[:16]
-    
+
     def extract_metadata_from_xml(self, xml_content: str) -> Dict[str, Dict[str, int]]:
         """Extract min/max metadata from XML form definition.
-        
+
         Args:
             xml_content: XML form definition content
-        
+
         Returns:
             Dict mapping field names to {"min": int, "max": int}
         """
         import xml.etree.ElementTree as ET
-        
+
         metadata = {}
-        
+
         # Parse XML
         root = ET.fromstring(xml_content)
-        
+
         # Find all bind elements (they contain the constraints)
         # XForms uses namespaces, so we need to handle that
         # The bind elements are in the default namespace
         for bind in root.findall(".//{http://www.w3.org/2002/xforms}bind"):
             nodeset = bind.get("nodeset")
             constraint = bind.get("constraint", "")
-            
+
             if not nodeset or not constraint:
                 continue
-            
+
             # Extract field name from nodeset (e.g., "/data/bw_migration_1" -> "bw_migration_1")
             field_name = nodeset.split("/")[-1]
-            
+
             # Parse constraint to extract min/max
             # Constraints in XML are HTML-encoded: ". &gt;= 0 and . &lt;= 5"
             # We need to decode them first
             import html
+
             constraint_decoded = html.unescape(constraint)
-            
+
             min_val = None
             max_val = None
-            
+
             # Extract >= constraints
             ge_match = re.search(r"\.\s*>=\s*(\d+)", constraint_decoded)
             if ge_match:
                 min_val = int(ge_match.group(1))
-            
+
             # Extract <= constraints
             le_match = re.search(r"\.\s*<=\s*(\d+)", constraint_decoded)
             if le_match:
                 max_val = int(le_match.group(1))
-            
+
             if min_val is not None and max_val is not None:
                 metadata[field_name] = {"min": min_val, "max": max_val}
             elif min_val is not None:
@@ -299,5 +323,5 @@ class ODKClient:
             elif max_val is not None:
                 # Only max constraint
                 metadata[field_name] = {"max": max_val}
-        
+
         return metadata

@@ -22,7 +22,7 @@ def get_me(
     db: Session = Depends(get_db),
 ) -> MeResponse:
     """Get current user information or anonymous response.
-    
+
     This endpoint supports both authenticated and anonymous access:
     - No token: returns anonymous response
     - Invalid/expired token: returns 401
@@ -31,7 +31,7 @@ def get_me(
     # No credentials provided - return anonymous
     if credentials is None:
         return MeAnonymous()
-    
+
     # Try to decode token
     try:
         payload = jwt.decode(
@@ -50,7 +50,7 @@ def get_me(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
         )
-    
+
     # Get user from database
     user = get_user_by_username(db, username)
     if user is None or not user.is_active:
@@ -58,13 +58,10 @@ def get_me(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
         )
-    
+
     # Return authenticated response
-    schools = [
-        SchoolSummary(id=school.id, name=school.name)
-        for school in user.schools
-    ]
-    
+    schools = [SchoolSummary(id=school.id, name=school.name) for school in user.schools]
+
     return MeAuthenticated(
         id=user.id,
         username=user.username,

@@ -12,7 +12,7 @@ export default [
       "node_modules/**",
       "**/*.svelte",
       "**/*.ts",
-      "storybook-static/**"
+      "storybook-static/**",
     ],
   },
   {

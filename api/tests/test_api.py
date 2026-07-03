@@ -22,7 +22,7 @@ def test_normalize_query_with_all_params():
         d=["d_sex", "yearGroup", "d_sex"],  # duplicates and unsorted
         variable_prefix=["bw_", "d_", "bw_"],  # duplicates
     )
-    
+
     assert query.school_id == 1
     assert query.variables == ["bw_wbeing_1", "bw_wbeing_2"]  # sorted, deduped
     assert query.dimensions == ["d_sex", "yearGroup"]  # sorted, deduped
@@ -32,7 +32,7 @@ def test_normalize_query_with_all_params():
 def test_normalize_query_defaults_to_empty_lists():
     """Omitted parameters should become empty lists."""
     query = normalize_query(school_id=None)
-    
+
     assert query.school_id is None
     assert query.variables == []
     assert query.dimensions == []
@@ -42,25 +42,22 @@ def test_normalize_query_defaults_to_empty_lists():
 def test_normalize_query_omitted_dimensions():
     """Omitting 'd' should mean no dimensions (empty list)."""
     query = normalize_query(v=["bw_wbeing_1"])
-    
+
     assert query.dimensions == []
 
 
 def test_normalize_query_omitted_variables():
     """Omitting both 'v' and 'variable_prefix' should result in empty lists."""
     query = normalize_query(d=["d_sex"])
-    
+
     assert query.variables == []
     assert query.variable_prefixes == []
 
 
 def test_normalize_query_union_of_v_and_prefix():
     """When both 'v' and 'variable_prefix' are supplied, both lists are kept."""
-    query = normalize_query(
-        v=["bw_wbeing_1"],
-        variable_prefix=["d_"]
-    )
-    
+    query = normalize_query(v=["bw_wbeing_1"], variable_prefix=["d_"])
+
     assert query.variables == ["bw_wbeing_1"]
     assert query.variable_prefixes == ["d_"]
 
@@ -216,15 +213,12 @@ def test_me_authenticated(auth_client, sample_user, sample_schools):
     )
     assert login_response.status_code == status.HTTP_200_OK
     token = login_response.json()["access_token"]
-    
+
     # Now use the token to call /me
-    response = auth_client.get(
-        "/me",
-        headers={"Authorization": f"Bearer {token}"}
-    )
+    response = auth_client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
-    
+
     assert data["kind"] == "authenticated"
     assert data["id"] == sample_user.id
     assert data["username"] == sample_user.username
@@ -243,15 +237,12 @@ def test_me_authenticated_admin(auth_client, admin_user, sample_schools):
     )
     assert login_response.status_code == status.HTTP_200_OK
     token = login_response.json()["access_token"]
-    
+
     # Now use the token to call /me
-    response = auth_client.get(
-        "/me",
-        headers={"Authorization": f"Bearer {token}"}
-    )
+    response = auth_client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
-    
+
     assert data["kind"] == "authenticated"
     assert data["is_admin"] is True
     assert len(data["schools"]) == 2
@@ -262,10 +253,7 @@ def test_me_authenticated_admin(auth_client, admin_user, sample_schools):
 
 def test_me_invalid_token(auth_client):
     """GET /me with invalid token should return 401."""
-    response = auth_client.get(
-        "/me",
-        headers={"Authorization": "Bearer invalid-token"}
-    )
+    response = auth_client.get("/me", headers={"Authorization": "Bearer invalid-token"})
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -276,14 +264,11 @@ def test_query_get_etag_support(auth_client):
     assert response1.status_code == status.HTTP_200_OK
     assert "ETag" in response1.headers
     etag = response1.headers["ETag"]
-    
+
     # Second request with If-None-Match - should get 304
-    response2 = auth_client.get(
-        "/query?v=bw_wbeing_1",
-        headers={"If-None-Match": etag}
-    )
+    response2 = auth_client.get("/query?v=bw_wbeing_1", headers={"If-None-Match": etag})
     assert response2.status_code == status.HTTP_304_NOT_MODIFIED
-    
+
     # Third request with different query - should get new ETag
     response3 = auth_client.get("/query?v=bw_wbeing_2")
     assert response3.status_code == status.HTTP_200_OK
@@ -301,7 +286,7 @@ def test_query_get_etag_support(auth_client):
 def test_dimensions_public_dataset_scope(auth_client):
     """GET /dimensions without school_id should work anonymously."""
     response = auth_client.get("/dimensions")
-    
+
     # After implementation, this should be 200 and return dimensions/variables
     if response.status_code == status.HTTP_200_OK:
         data = response.json()
@@ -319,7 +304,9 @@ def test_dimensions_public_dataset_scope(auth_client):
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-def test_dimensions_exposes_namespaced_variable_metadata(db_session, sample_user, sample_schools):
+def test_dimensions_exposes_namespaced_variable_metadata(
+    db_session, sample_user, sample_schools
+):
     """/dimensions should identify the source form for namespaced variables."""
     from fastapi.testclient import TestClient
     from glow_api.data import get_datastore
@@ -348,7 +335,10 @@ def test_dimensions_exposes_namespaced_variable_metadata(db_session, sample_user
         "bewell_questionnaire__bw_wbeing_1",
         "phq9_questionnaire__phq9_1",
     ]
-    fake_store._observed_periods = {None: ["2023-2024"], "Focus School Academy": ["2023-2024"]}
+    fake_store._observed_periods = {
+        None: ["2023-2024"],
+        "Focus School Academy": ["2023-2024"],
+    }
     fake_store._lock = threading.Lock()
 
     def override_get_db():
@@ -382,7 +372,10 @@ def test_dimensions_exposes_namespaced_variable_metadata(db_session, sample_user
     data = response.json()
     variables = {item["key"]: item for item in data["variables"]}
     assert variables["bewell_questionnaire__bw_wbeing_1"]["raw_key"] == "bw_wbeing_1"
-    assert variables["bewell_questionnaire__bw_wbeing_1"]["form_id"] == "bewell_questionnaire"
+    assert (
+        variables["bewell_questionnaire__bw_wbeing_1"]["form_id"]
+        == "bewell_questionnaire"
+    )
     assert variables["phq9_questionnaire__phq9_1"]["raw_key"] == "phq9_1"
     assert variables["phq9_questionnaire__phq9_1"]["form_id"] == "phq9_questionnaire"
 
@@ -396,13 +389,13 @@ def test_dimensions_school_scope_requires_auth(auth_client, sample_schools):
     )
     assert login_response.status_code == status.HTTP_200_OK
     token = login_response.json()["access_token"]
-    
+
     school_id = sample_schools["Focus School Academy"].id
     response = auth_client.get(
         f"/dimensions?school_id={school_id}",
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
     )
-    
+
     # After implementation, this should be 200
     if response.status_code == status.HTTP_200_OK:
         data = response.json()
@@ -423,14 +416,14 @@ def test_dimensions_school_scope_unauthorized(auth_client, sample_schools):
     )
     assert login_response.status_code == status.HTTP_200_OK
     token = login_response.json()["access_token"]
-    
+
     # Try to access Neighbouring School (which user doesn't have access to)
     school_id = sample_schools["Neighbouring School"].id
     response = auth_client.get(
         f"/dimensions?school_id={school_id}",
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
     )
-    
+
     # After implementation, this should be 403
     if response.status_code == status.HTTP_200_OK:
         # If somehow it returns 200, fail the test
@@ -512,7 +505,11 @@ def test_query_get_repeated_v_params(client):
     response = client.get("/query?v=bw_wbeing_1&v=bw_wbeing_2")
     # For now, expect either 404 (not implemented) or 405 (wrong method)
     # After implementation, check that variables are properly selected
-    assert response.status_code in [status.HTTP_404_NOT_FOUND, status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_200_OK]
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
 
 
 def test_query_get_repeated_d_params(client):
@@ -520,35 +517,55 @@ def test_query_get_repeated_d_params(client):
     # This test will fail until we implement the new GET endpoint
     response = client.get("/query?v=bw_wbeing_1&d=d_sex&d=yearGroup")
     # For now, expect either 404 (not implemented) or 405 (wrong method)
-    assert response.status_code in [status.HTTP_404_NOT_FOUND, status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_200_OK]
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
 
 
 def test_query_get_repeated_variable_prefix_params(client):
     """GET /query should accept repeated 'variable_prefix' params."""
     # This test will fail until we implement the new GET endpoint
     response = client.get("/query?variable_prefix=bw_&variable_prefix=d_")
-    assert response.status_code in [status.HTTP_404_NOT_FOUND, status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_200_OK]
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
 
 
 def test_query_get_union_v_and_prefix(client):
     """GET /query with both 'v' and 'variable_prefix' should union them."""
     # This test will fail until we implement the new GET endpoint
     response = client.get("/query?v=bw_wbeing_1&variable_prefix=d_")
-    assert response.status_code in [status.HTTP_404_NOT_FOUND, status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_200_OK]
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
 
 
 def test_query_get_omit_dimensions_means_no_dimensions(client):
     """GET /query without 'd' should mean no dimensions."""
     # This test will fail until we implement the new GET endpoint
     response = client.get("/query?v=bw_wbeing_1")
-    assert response.status_code in [status.HTTP_404_NOT_FOUND, status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_200_OK]
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
 
 
 def test_query_get_omit_variables_means_all_variables(client):
     """GET /query without 'v' or 'variable_prefix' should mean all variables."""
     # This test will fail until we implement the new GET endpoint
     response = client.get("/query")
-    assert response.status_code in [status.HTTP_404_NOT_FOUND, status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_200_OK]
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
 
 
 def test_query_get_school_scope_requires_auth(auth_client, sample_schools):
@@ -560,11 +577,11 @@ def test_query_get_school_scope_requires_auth(auth_client, sample_schools):
     )
     assert login_response.status_code == status.HTTP_200_OK
     token = login_response.json()["access_token"]
-    
+
     school_id = sample_schools["Focus School Academy"].id
     response = auth_client.get(
         f"/query?school_id={school_id}&v=bw_wbeing_1",
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == status.HTTP_200_OK
 
@@ -578,11 +595,11 @@ def test_query_get_school_scope_unauthorized(auth_client, sample_schools):
     )
     assert login_response.status_code == status.HTTP_200_OK
     token = login_response.json()["access_token"]
-    
+
     # Try to access Neighbouring School (which user doesn't have access to)
     school_id = sample_schools["Neighbouring School"].id
     response = auth_client.get(
         f"/query?school_id={school_id}&v=bw_wbeing_1",
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN

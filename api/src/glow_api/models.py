@@ -137,7 +137,7 @@ class DimensionsResponse(BaseModel):
 
 class CanonicalQuery(BaseModel):
     """Normalized internal form of a query request.
-    
+
     Used for response echoes, deterministic behavior, and ETag generation.
     All lists are sorted and deduped.
     """
@@ -177,7 +177,7 @@ class VariableSlice(BaseModel):
 
 class NewQueryResponse(BaseModel):
     """New period-oriented multi-variable query response.
-    
+
     Replaces the old wave-first, neighbor-oriented QueryResponse.
     """
 

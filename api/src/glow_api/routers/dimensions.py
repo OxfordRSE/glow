@@ -28,17 +28,19 @@ def split_variable_key(variable_key: str) -> tuple[Optional[str], str]:
 
 @router.get("/dimensions", response_model=DimensionsResponse)
 def get_dimensions(
-    school_id: Optional[int] = Query(None, description="Optional school ID for school-scoped discovery"),
+    school_id: Optional[int] = Query(
+        None, description="Optional school ID for school-scoped discovery"
+    ),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
     datastore: DataStore = Depends(get_datastore),
 ) -> DimensionsResponse:
     """Get available variables and dimensions.
-    
+
     This endpoint supports both dataset-scoped and school-scoped discovery:
     - No school_id: returns public dataset-scoped dimensions (anonymous access OK)
     - With school_id: returns school-scoped dimensions (requires authorization)
-    
+
     Returns:
         DimensionsResponse with variables and dimensions available for querying
     """
@@ -50,7 +52,7 @@ def get_dimensions(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication required for school-scoped queries",
             )
-        
+
         # Decode and validate token
         try:
             payload = jwt.decode(
@@ -69,7 +71,7 @@ def get_dimensions(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
             )
-        
+
         # Get user from database
         user = get_user_by_username(db, username)
         if user is None or not user.is_active:
@@ -77,7 +79,7 @@ def get_dimensions(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
             )
-        
+
         # Check if user has access to the requested school
         user_school_ids = [s.id for s in user.schools]
         if not user.is_admin and school_id not in user_school_ids:
@@ -85,7 +87,7 @@ def get_dimensions(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"You do not have access to school {school_id}",
             )
-        
+
         # Verify school exists
         school = get_school_by_id(db, school_id)
         if school is None:
@@ -93,7 +95,7 @@ def get_dimensions(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"School {school_id} not found",
             )
-        
+
         # Get data scoped to this school
         dfwl = datastore.to_frozen()
         df = dfwl.df
@@ -102,7 +104,7 @@ def get_dimensions(
         # Dataset-scoped query - use full dataset
         dfwl = datastore.to_frozen()
         df = dfwl.df
-    
+
     # Build variables list (all numeric measures including derived totals)
     variables = sorted([col for col in dfwl.numerical_whitelist if col in df.columns])
     variable_defs = []
@@ -115,7 +117,7 @@ def get_dimensions(
                 form_id=form_id,
             )
         )
-    
+
     # Build dimensions list (categorical columns, excluding school)
     # Infer type based on whether column is numeric or not
     dimension_defs = []
@@ -127,9 +129,9 @@ def get_dimensions(
                 dim_type = "number"
             else:
                 dim_type = "string"
-            
+
             dimension_defs.append(DimensionDefinition(key=dim, type=dim_type))
-    
+
     return DimensionsResponse(
         school_id=school_id,
         variables=variable_defs,

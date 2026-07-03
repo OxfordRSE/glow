@@ -19,21 +19,26 @@ router = APIRouter(prefix="/query", tags=["query"])
 # Use HTTPBearer with auto_error=False to make auth optional for dataset-scoped queries
 security = HTTPBearer(auto_error=False)
 
+
 @router.get("", response_model=None, include_in_schema=False)
 @router.get("/", response_model=None)
 def query_get(
     response: Response,
     v: list[str] = Query(default=[], description="Variable names (repeatable)"),
     d: list[str] = Query(default=[], description="Dimension names (repeatable)"),
-    variable_prefix: list[str] = Query(default=[], description="Variable prefixes (repeatable)"),
-    school_id: Optional[int] = Query(None, description="Optional school ID for school-scoped query"),
+    variable_prefix: list[str] = Query(
+        default=[], description="Variable prefixes (repeatable)"
+    ),
+    school_id: Optional[int] = Query(
+        None, description="Optional school ID for school-scoped query"
+    ),
     if_none_match: Optional[str] = Header(None, alias="If-None-Match"),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
     datastore: DataStore = Depends(get_datastore),
 ) -> dict:
     """Execute a new period-oriented multi-variable query.
-    
+
     This endpoint supports:
     - Dataset-scoped queries (no school_id, anonymous access OK)
     - School-scoped queries (with school_id, requires authorization)
@@ -41,7 +46,7 @@ def query_get(
     - Dimension selection via repeated 'd' params
     - Period-organized results with independent suppression per period
     - ETag-based caching with If-None-Match support
-    
+
     Returns:
         NewQueryResponse with period-organized multi-variable results
     """
@@ -52,27 +57,27 @@ def query_get(
         d=d,
         variable_prefix=variable_prefix,
     )
-    
+
     # Get dataset version for ETag
     dfwl = datastore.to_frozen()
     dataset_version = dfwl.metadata.get("_etag", "unknown")
-    
+
     # Compute ETag
     etag = compute_query_etag(
         query=canonical,
         dataset_version=dataset_version,
         api_version=__version__,
     )
-    
+
     # Check If-None-Match
     if if_none_match and if_none_match == etag:
         # Data hasn't changed
         response.status_code = status.HTTP_304_NOT_MODIFIED
         return {}
-    
+
     # Set ETag header
     response.headers["ETag"] = etag
-    
+
     # If school_id is provided, check authorization
     if school_id is not None:
         if credentials is None:
@@ -80,7 +85,7 @@ def query_get(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication required for school-scoped queries",
             )
-        
+
         # Decode and validate token
         try:
             payload = jwt.decode(
@@ -99,16 +104,17 @@ def query_get(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
             )
-        
+
         # Get user from database
         from glow_api.database import get_user_by_username
+
         user = get_user_by_username(db, username)
         if user is None or not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
             )
-        
+
         # Check if user has access to the requested school
         user_school_ids = [s.id for s in user.schools]
         if not user.is_admin and school_id not in user_school_ids:
@@ -116,7 +122,7 @@ def query_get(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"You do not have access to school {school_id}",
             )
-        
+
         # Verify school exists
         school = get_school_by_id(db, school_id)
         if school is None:
@@ -124,7 +130,7 @@ def query_get(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"School {school_id} not found",
             )
-        
+
         # Filter data to this school
         df = dfwl.df
         df = df[df["school"] == school.name]
@@ -133,7 +139,7 @@ def query_get(
         # Dataset-scoped query
         df = dfwl.df
         school_name = None
-    
+
     # Data should already be normalized with period_id column from DataStore
     # But verify it exists
     if "period_id" not in df.columns:
@@ -141,14 +147,14 @@ def query_get(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Data normalization error: period_id column missing",
         )
-    
+
     # Get numerical whitelist and observed periods from pre-computed metadata
     numerical_whitelist = dfwl.numerical_whitelist
     observed_periods = dfwl.observed_periods.get(school_name, [])
-    
+
     # Get form metadata for version compatibility
     form_metadata = dfwl.metadata
-    
+
     # Execute query
     result = execute_query(
         df=df,
@@ -158,5 +164,5 @@ def query_get(
         min_n=settings.MIN_N,
         form_metadata=form_metadata,
     )
-    
+
     return result

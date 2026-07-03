@@ -27,18 +27,20 @@ class Settings(BaseSettings):
     DATA_REFRESH_HOURS: int = 1  # Poll ODK Central every hour
     DATA_PREFIXES: List[str] = ["bw", "phq9"]
     DATA_DEMOGRAPHIC_PREFIXES: List[str] = ["d"]
-    
+
     # Period derivation configuration
-    PERIOD_TIMEZONE: str = "Europe/London"  # Deployment timezone for period calculations
+    PERIOD_TIMEZONE: str = (
+        "Europe/London"  # Deployment timezone for period calculations
+    )
     PERIOD_CUTOFF_MONTH: int = 9  # September (academic year starts)
     PERIOD_CUTOFF_DAY: int = 1  # 1st of month
-    
+
     # Security
     MIN_N: int = 5
     SECRET_KEY: str = "change-me-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8  # 8 hours
-    
+
     # Database
     METADATA_DATABASE_URL: str = "sqlite:///./metadata.db"
     CORS_ORIGINS: List[str] = ["*"]

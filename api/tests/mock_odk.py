@@ -9,7 +9,7 @@ import pandas as pd
 
 class MockODKClient:
     """Mock ODK Client that returns predefined test data."""
-    
+
     def __init__(
         self,
         submissions_df: Optional[pd.DataFrame] = None,
@@ -19,7 +19,7 @@ class MockODKClient:
         response_etags: Optional[Dict[str, Optional[str]]] = None,
     ):
         """Initialize mock ODK client.
-        
+
         Args:
             submissions_df: DataFrame to return from fetch_submissions()
             metadata: Metadata dict to return from get_form_metadata()
@@ -30,7 +30,9 @@ class MockODKClient:
                 form_id: frame.copy() for form_id, frame in submissions_by_form.items()
             }
         else:
-            default_df = submissions_df.copy() if submissions_df is not None else pd.DataFrame()
+            default_df = (
+                submissions_df.copy() if submissions_df is not None else pd.DataFrame()
+            )
             if not default_df.empty and "__xmlFormId" not in default_df.columns:
                 default_df["__xmlFormId"] = "bewell_questionnaire"
             self.submissions_by_form = {"bewell_questionnaire": default_df}
@@ -52,14 +54,18 @@ class MockODKClient:
         if response_etags is not None:
             self.response_etags = response_etags.copy()
         else:
-            self.response_etags = {form_id: etag for form_id in self.submissions_by_form}
+            self.response_etags = {
+                form_id: etag for form_id in self.submissions_by_form
+            }
         self.fetch_count = 0
         self.metadata_fetch_count = 0
         self.list_forms_count = 0
 
     @property
     def submissions_df(self) -> pd.DataFrame:
-        return self.submissions_by_form.get("bewell_questionnaire", pd.DataFrame()).copy()
+        return self.submissions_by_form.get(
+            "bewell_questionnaire", pd.DataFrame()
+        ).copy()
 
     @submissions_df.setter
     def submissions_df(self, value: pd.DataFrame) -> None:
@@ -67,7 +73,7 @@ class MockODKClient:
         if not df.empty and "__xmlFormId" not in df.columns:
             df["__xmlFormId"] = "bewell_questionnaire"
         self.submissions_by_form["bewell_questionnaire"] = df
-    
+
     def list_forms(self) -> list[dict[str, Any]]:
         self.list_forms_count += 1
         current_versions = self.metadata.get("_current_versions", {})
@@ -87,7 +93,10 @@ class MockODKClient:
         new_etags: Dict[str, Optional[str]] = {}
         for form_id, df in self.submissions_by_form.items():
             current_etag = self.response_etags.get(form_id)
-            if existing_etags.get(form_id) and existing_etags.get(form_id) == current_etag:
+            if (
+                existing_etags.get(form_id)
+                and existing_etags.get(form_id) == current_etag
+            ):
                 frames[form_id] = None
                 new_etags[form_id] = current_etag
             else:
@@ -106,11 +115,13 @@ class MockODKClient:
     def dataset_version_from_etags(self, etags: Dict[str, Optional[str]]) -> str:
         text = "||".join(f"{form}:{etags[form] or ''}" for form in sorted(etags))
         return hashlib.sha256(text.encode()).hexdigest()[:16]
-    
+
     def download_xlsform(self) -> bytes:
         """Mock download_xlsform (not used in tests)."""
         raise NotImplementedError("Mock download_xlsform not implemented")
-    
-    def extract_metadata_from_xlsform(self, xlsform_bytes: bytes) -> Dict[str, Dict[str, int]]:
+
+    def extract_metadata_from_xlsform(
+        self, xlsform_bytes: bytes
+    ) -> Dict[str, Dict[str, int]]:
         """Mock extract_metadata_from_xlsform (not used in tests)."""
         raise NotImplementedError("Mock extract_metadata_from_xlsform not implemented")

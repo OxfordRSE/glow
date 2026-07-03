@@ -74,15 +74,16 @@ configure_logging()
 async def lifespan(app: FastAPI):
     import os
     import logging
+
     logger = logging.getLogger(__name__)
-    
+
     logger.info("Starting application lifespan...")
     settings.warn_insecure_defaults()
-    
+
     logger.info("Running migrations...")
     run_migrations()
     logger.info("Migrations complete")
-    
+
     # Skip datastore initialization in test mode
     if not os.getenv("GLOW_TESTING"):
         logger.info("Initializing datastore...")

@@ -140,17 +140,17 @@ def tiny_df():
 
 def _make_mock_datastore(df: pd.DataFrame, metadata: dict = None) -> DataStore:
     """Helper to create a mock DataStore with pre-loaded data.
-    
+
     Args:
         df: DataFrame to inject into the DataStore
         metadata: Optional metadata dict
-        
+
     Returns:
         DataStore instance with data already loaded
     """
     if metadata is None:
         metadata = {}
-    
+
     mock_client = MockODKClient(submissions_df=df, metadata=metadata)
     ds = DataStore(odk_client=mock_client, refresh_hours=0)
     ds._df = ds._process_loaded_data(df)

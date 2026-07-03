@@ -277,10 +277,10 @@ class TestDataStore:
             "bw_wbeing_1": {"min": 0, "max": 5},
             "bw_wbeing_2": {"min": 0, "max": 5},
         }
-        
+
         mock_client = MockODKClient(submissions_df=df, metadata=metadata)
         ds = DataStore(odk_client=mock_client, refresh_hours=0)
-        
+
         loaded_df = ds._load()
 
         # Verify data was loaded
@@ -292,7 +292,7 @@ class TestDataStore:
         assert "bw_wbeing_total" in loaded_df.columns
         assert loaded_df.loc[0, "bw_wbeing_total"] == 7  # 3 + 4
         assert loaded_df.loc[1, "bw_wbeing_total"] == 7  # 4 + 3
-        
+
         # Verify metadata was fetched
         assert ds._metadata["bw_wbeing_1"] == metadata["bw_wbeing_1"]
         assert ds._metadata["bw_wbeing_2"] == metadata["bw_wbeing_2"]
@@ -310,18 +310,18 @@ class TestDataStore:
                 "bw_wbeing_2": [4, 3],
             }
         )
-        
+
         mock_client = MockODKClient(submissions_df=df, etag="test-etag-123")
         ds = DataStore(odk_client=mock_client, refresh_hours=0)
-        
+
         # First load
         df1 = ds._load()
         assert len(df1) == 2
         assert ds._response_etags == {"bewell_questionnaire": "test-etag-123"}
-        
+
         # Simulate what refresh() does - store the loaded data
         ds._df = df1
-        
+
         # Second load with same ETAG - should return existing data from self._df
         df2 = ds._load()
         assert len(df2) == 2
@@ -339,7 +339,7 @@ class TestDataStore:
                 "bw_wbeing_2": [4, 3],
             }
         )
-        
+
         mock_client = MockODKClient(submissions_df=df1, metadata={})
         ds = DataStore(odk_client=mock_client, refresh_hours=0)
         ds.refresh()
@@ -370,14 +370,15 @@ class TestDataStore:
 
     def test_refresh_odk_error(self):
         """Test that refresh handles ODK errors gracefully."""
+
         # Create a mock that raises an error
         class ErrorODKClient(MockODKClient):
             def fetch_submissions(self, etags=None):
                 raise RuntimeError("ODK Central connection failed")
-        
+
         mock_client = ErrorODKClient()
         ds = DataStore(odk_client=mock_client, refresh_hours=0)
-        
+
         # Set initial data
         ds._df = pd.DataFrame({"uid": ["S001"]})
 
@@ -421,7 +422,7 @@ class TestDataStore:
                 "bw_wbeing_2": [4, 3],
             }
         )
-        
+
         mock_client = MockODKClient(submissions_df=df, metadata={})
         ds = DataStore(odk_client=mock_client, refresh_hours=0)
         ds.startup()
@@ -449,7 +450,7 @@ class TestDataStore:
         assert len(errors) == 0
         # Verify all reads returned consistent data
         assert all(r == 2 for r in results)
-        
+
         ds.shutdown()
 
     def test_startup_and_shutdown(self):
@@ -461,7 +462,7 @@ class TestDataStore:
                 "bw_wbeing_1": [3],
             }
         )
-        
+
         mock_client = MockODKClient(submissions_df=df, metadata={})
         ds = DataStore(odk_client=mock_client, refresh_hours=1)
 
@@ -486,7 +487,7 @@ class TestDataStore:
                 "bw_wbeing_1": [3],
             }
         )
-        
+
         mock_client = MockODKClient(submissions_df=df, metadata={})
         ds = DataStore(odk_client=mock_client, refresh_hours=0)
         ds.startup()
@@ -496,7 +497,7 @@ class TestDataStore:
 
         # Verify scheduler is not running
         assert not ds._scheduler.running
-    
+
     def test_cache_save_and_load(self):
         """Test that cache is saved and loaded correctly."""
         df = pd.DataFrame(
@@ -507,24 +508,32 @@ class TestDataStore:
                 "bw_wbeing_2": [4, 3],
             }
         )
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache_path = Path(tmpdir) / "cache.parquet"
-            
-            mock_client = MockODKClient(submissions_df=df, metadata={}, etag="test-etag")
-            ds = DataStore(odk_client=mock_client, refresh_hours=0, cache_path=cache_path)
-            
+
+            mock_client = MockODKClient(
+                submissions_df=df, metadata={}, etag="test-etag"
+            )
+            ds = DataStore(
+                odk_client=mock_client, refresh_hours=0, cache_path=cache_path
+            )
+
             # Load data (should save to cache)
             ds._load()
-            
+
             # Verify cache files exist
             assert cache_path.exists()
             assert cache_path.with_suffix(".etag").exists()
-            
+
             # Create new DataStore and verify cache is loaded
-            mock_client2 = MockODKClient(submissions_df=df, metadata={}, etag="test-etag")
-            ds2 = DataStore(odk_client=mock_client2, refresh_hours=0, cache_path=cache_path)
-            
+            mock_client2 = MockODKClient(
+                submissions_df=df, metadata={}, etag="test-etag"
+            )
+            ds2 = DataStore(
+                odk_client=mock_client2, refresh_hours=0, cache_path=cache_path
+            )
+
             cached = ds2._load_cache()
             assert cached is not None
             cached_df, cached_etags = cached
@@ -731,84 +740,88 @@ class TestPeriodDerivation:
         """Test that period_id is derived from createdAt timestamp."""
         from glow_api.normalization import derive_period_id
         from datetime import datetime
-        
+
         # Test with a specific timestamp
         # Assuming UK timezone (Europe/London) and period cutoff at start of academic year
         timestamp = datetime(2023, 10, 15, 10, 30, 0)  # October 15, 2023
-        
+
         period_id = derive_period_id(timestamp)
-        
+
         # Period should be "2023-2024" for October 2023
         assert period_id == "2023-2024"
-    
+
     def test_derive_period_respects_timezone(self):
         """Test that period derivation converts to deployment timezone first."""
         from glow_api.normalization import derive_period_id
         from datetime import datetime, timezone
-        
+
         # Create UTC timestamp that is Aug 31 in UTC but still Aug 31 in UK
         # UK is GMT+1 in summer (BST), so we need to account for that
         timestamp_utc = datetime(2023, 8, 31, 10, 30, 0, tzinfo=timezone.utc)
-        
+
         period_id = derive_period_id(timestamp_utc)
-        
+
         # Should use UK time (Aug 31 11:30 BST), which is before Sept 1
         # August should be in previous academic year
         assert period_id == "2022-2023"
-    
+
     def test_derive_period_with_cutoff_date(self):
         """Test that period cutoff applies correctly at academic year boundary."""
         from glow_api.normalization import derive_period_id
         from datetime import datetime
-        
+
         # Just before cutoff (end of August)
         before_cutoff = datetime(2023, 8, 31, 12, 0, 0)
         period_before = derive_period_id(before_cutoff)
         assert period_before == "2022-2023"
-        
+
         # Just after cutoff (start of September)
         after_cutoff = datetime(2023, 9, 1, 12, 0, 0)
         period_after = derive_period_id(after_cutoff)
         assert period_after == "2023-2024"
-    
+
     def test_normalize_submissions_adds_period_id(self):
         """Test that normalizing submissions adds period_id column."""
         from glow_api.normalization import normalize_submissions
-        
-        df = pd.DataFrame({
-            "uid": ["S001", "S002"],
-            "school": ["School A", "School A"],
-            "createdAt": ["2023-10-15T10:30:00Z", "2024-02-20T14:00:00Z"],
-            "bw_wbeing_1": [3, 4],
-        })
-        
+
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S002"],
+                "school": ["School A", "School A"],
+                "createdAt": ["2023-10-15T10:30:00Z", "2024-02-20T14:00:00Z"],
+                "bw_wbeing_1": [3, 4],
+            }
+        )
+
         normalized = normalize_submissions(df)
-        
+
         assert "period_id" in normalized.columns
         assert normalized.loc[0, "period_id"] == "2023-2024"
         assert normalized.loc[1, "period_id"] == "2023-2024"
-    
+
     def test_normalize_submissions_preserves_original_data(self):
         """Test that normalization preserves all original columns."""
         from glow_api.normalization import normalize_submissions
-        
-        df = pd.DataFrame({
-            "uid": ["S001"],
-            "school": ["School A"],
-            "createdAt": ["2023-10-15T10:30:00Z"],
-            "bw_wbeing_1": [3],
-            "d_sex": ["M"],
-        })
-        
+
+        df = pd.DataFrame(
+            {
+                "uid": ["S001"],
+                "school": ["School A"],
+                "createdAt": ["2023-10-15T10:30:00Z"],
+                "bw_wbeing_1": [3],
+                "d_sex": ["M"],
+            }
+        )
+
         normalized = normalize_submissions(df)
-        
+
         # All original columns should still exist
         assert "uid" in normalized.columns
         assert "school" in normalized.columns
         assert "createdAt" in normalized.columns
         assert "bw_wbeing_1" in normalized.columns
         assert "d_sex" in normalized.columns
-        
+
         # Original values should be unchanged
         assert normalized.loc[0, "uid"] == "S001"
         assert normalized.loc[0, "bw_wbeing_1"] == 3
@@ -820,46 +833,52 @@ class TestObservedPeriods:
     def test_get_observed_periods_from_data(self):
         """Test extracting observed periods from normalized data."""
         from glow_api.normalization import get_observed_periods
-        
-        df = pd.DataFrame({
-            "uid": ["S001", "S002", "S003", "S004"],
-            "period_id": ["2022-2023", "2023-2024", "2023-2024", "2024-2025"],
-            "school": ["School A", "School A", "School B", "School A"],
-        })
-        
+
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S002", "S003", "S004"],
+                "period_id": ["2022-2023", "2023-2024", "2023-2024", "2024-2025"],
+                "school": ["School A", "School A", "School B", "School A"],
+            }
+        )
+
         observed = get_observed_periods(df)
-        
+
         # Should return chronologically ordered list of unique periods
         assert observed == ["2022-2023", "2023-2024", "2024-2025"]
-    
+
     def test_get_observed_periods_school_scoped(self):
         """Test observed periods scoped to a specific school."""
         from glow_api.normalization import get_observed_periods
-        
-        df = pd.DataFrame({
-            "uid": ["S001", "S002", "S003", "S004"],
-            "period_id": ["2022-2023", "2023-2024", "2023-2024", "2024-2025"],
-            "school": ["School A", "School A", "School B", "School B"],
-        })
-        
+
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S002", "S003", "S004"],
+                "period_id": ["2022-2023", "2023-2024", "2023-2024", "2024-2025"],
+                "school": ["School A", "School A", "School B", "School B"],
+            }
+        )
+
         # School A should only have two periods
         observed_a = get_observed_periods(df, school_name="School A")
         assert observed_a == ["2022-2023", "2023-2024"]
-        
+
         # School B should only have two different periods
         observed_b = get_observed_periods(df, school_name="School B")
         assert observed_b == ["2023-2024", "2024-2025"]
-    
+
     def test_observed_periods_empty_data(self):
         """Test observed periods with empty DataFrame."""
         from glow_api.normalization import get_observed_periods
-        
-        df = pd.DataFrame({
-            "uid": [],
-            "period_id": [],
-            "school": [],
-        })
-        
+
+        df = pd.DataFrame(
+            {
+                "uid": [],
+                "period_id": [],
+                "school": [],
+            }
+        )
+
         observed = get_observed_periods(df)
         assert observed == []
 
@@ -870,18 +889,26 @@ class TestEditedSubmissionPeriodAnchor:
     def test_edited_submission_keeps_original_period(self):
         """Test that updating a submission doesn't change its period."""
         from glow_api.normalization import normalize_submissions
-        
+
         # Simulate an edited submission - same uid but different timestamps
-        df = pd.DataFrame({
-            "uid": ["S001", "S001"],
-            "school": ["School A", "School A"],
-            "createdAt": ["2023-10-15T10:30:00Z", "2023-10-15T10:30:00Z"],  # Original creation time preserved
-            "updatedAt": ["2023-10-15T10:30:00Z", "2024-01-20T14:00:00Z"],  # Later edit
-            "bw_wbeing_1": [3, 4],  # Value changed
-        })
-        
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S001"],
+                "school": ["School A", "School A"],
+                "createdAt": [
+                    "2023-10-15T10:30:00Z",
+                    "2023-10-15T10:30:00Z",
+                ],  # Original creation time preserved
+                "updatedAt": [
+                    "2023-10-15T10:30:00Z",
+                    "2024-01-20T14:00:00Z",
+                ],  # Later edit
+                "bw_wbeing_1": [3, 4],  # Value changed
+            }
+        )
+
         normalized = normalize_submissions(df)
-        
+
         # Both rows should have same period_id based on createdAt
         assert normalized.loc[0, "period_id"] == "2023-2024"
         assert normalized.loc[1, "period_id"] == "2023-2024"
@@ -893,39 +920,43 @@ class TestSubmissionMetadataPreservation:
     def test_normalize_preserves_version_metadata(self):
         """Test that form version info is preserved."""
         from glow_api.normalization import normalize_submissions
-        
-        df = pd.DataFrame({
-            "uid": ["S001", "S002"],
-            "school": ["School A", "School A"],
-            "createdAt": ["2023-10-15T10:30:00Z", "2024-02-20T14:00:00Z"],
-            "__version": ["v1", "v2"],  # ODK form version
-            "bw_wbeing_1": [3, 4],
-        })
-        
+
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S002"],
+                "school": ["School A", "School A"],
+                "createdAt": ["2023-10-15T10:30:00Z", "2024-02-20T14:00:00Z"],
+                "__version": ["v1", "v2"],  # ODK form version
+                "bw_wbeing_1": [3, 4],
+            }
+        )
+
         normalized = normalize_submissions(df)
-        
+
         # Version metadata should be preserved
         assert "__version" in normalized.columns
         assert normalized.loc[0, "__version"] == "v1"
         assert normalized.loc[1, "__version"] == "v2"
-    
+
     def test_normalize_preserves_all_system_fields(self):
         """Test that ODK system fields are preserved."""
         from glow_api.normalization import normalize_submissions
-        
-        df = pd.DataFrame({
-            "uid": ["S001"],
-            "school": ["School A"],
-            "createdAt": ["2023-10-15T10:30:00Z"],
-            "updatedAt": ["2023-10-15T10:30:00Z"],
-            "__id": ["uuid-123"],
-            "__version": ["v1"],
-            "__system/submissionDate": ["2023-10-15T10:30:00Z"],
-            "bw_wbeing_1": [3],
-        })
-        
+
+        df = pd.DataFrame(
+            {
+                "uid": ["S001"],
+                "school": ["School A"],
+                "createdAt": ["2023-10-15T10:30:00Z"],
+                "updatedAt": ["2023-10-15T10:30:00Z"],
+                "__id": ["uuid-123"],
+                "__version": ["v1"],
+                "__system/submissionDate": ["2023-10-15T10:30:00Z"],
+                "bw_wbeing_1": [3],
+            }
+        )
+
         normalized = normalize_submissions(df)
-        
+
         # All system fields should be preserved
         assert "__id" in normalized.columns
         assert "__version" in normalized.columns
@@ -938,96 +969,98 @@ class TestFormVersionCompatibility:
     def test_compatible_unchanged_limits(self):
         """Test that identical form versions are compatible."""
         from glow_api.version_compatibility import check_version_compatibility
-        
+
         v1_metadata = {"bw_wbeing_1": {"min": 0, "max": 5}}
         v2_metadata = {"bw_wbeing_1": {"min": 0, "max": 5}}
-        
+
         result = check_version_compatibility("bw_wbeing_1", v1_metadata, v2_metadata)
-        
+
         assert result["compatible"] is True
         assert result["rescale_needed"] is False
-    
+
     def test_compatible_narrower_to_wider(self):
         """Test that narrower range expanding to wider is compatible with rescaling."""
         from glow_api.version_compatibility import check_version_compatibility
-        
+
         v1_metadata = {"bw_wbeing_1": {"min": 0, "max": 3}}
         v2_metadata = {"bw_wbeing_1": {"min": 0, "max": 5}}
-        
+
         result = check_version_compatibility("bw_wbeing_1", v1_metadata, v2_metadata)
-        
+
         assert result["compatible"] is True
         assert result["rescale_needed"] is True
         assert result["rescale_from"] == (0, 3)
         assert result["rescale_to"] == (0, 5)
-    
+
     def test_compatible_limit_shift(self):
         """Test that shifted limits (e.g., 0-indexed to 1-indexed) are compatible."""
         from glow_api.version_compatibility import check_version_compatibility
-        
+
         v1_metadata = {"bw_wbeing_1": {"min": 0, "max": 5}}
         v2_metadata = {"bw_wbeing_1": {"min": 1, "max": 6}}
-        
+
         result = check_version_compatibility("bw_wbeing_1", v1_metadata, v2_metadata)
-        
+
         # Shifted ranges are compatible with rescaling
         assert result["compatible"] is True
         assert result["rescale_needed"] is True
-    
+
     def test_incompatible_different_scales(self):
         """Test that incompatible scales (can't be linearly mapped) are flagged."""
         from glow_api.version_compatibility import check_version_compatibility
-        
+
         # Very different scales that can't be safely rescaled
         v1_metadata = {"bw_wbeing_1": {"min": 0, "max": 5}}
         v2_metadata = {"bw_wbeing_1": {"min": 0, "max": 10}}
-        
+
         result = check_version_compatibility("bw_wbeing_1", v1_metadata, v2_metadata)
-        
+
         # For now, allow this as rescalable
         # In future, might want stricter rules
         assert result["compatible"] is True
         assert result["rescale_needed"] is True
-    
+
     def test_incompatible_missing_in_new_version(self):
         """Test that variable removed in new version is incompatible."""
         from glow_api.version_compatibility import check_version_compatibility
-        
+
         v1_metadata = {"bw_wbeing_1": {"min": 0, "max": 5}}
         v2_metadata = {}  # Variable removed
-        
+
         result = check_version_compatibility("bw_wbeing_1", v1_metadata, v2_metadata)
-        
+
         assert result["compatible"] is False
         assert result["reason"] == "variable-not-in-new-version"
-    
+
     def test_rescale_values(self):
         """Test linear rescaling of values."""
         from glow_api.version_compatibility import rescale_value
-        
+
         # Rescale from 0-3 to 0-5
         assert rescale_value(0, from_range=(0, 3), to_range=(0, 5)) == 0.0
         assert rescale_value(3, from_range=(0, 3), to_range=(0, 5)) == 5.0
         assert rescale_value(1.5, from_range=(0, 3), to_range=(0, 5)) == 2.5
-    
+
     def test_apply_rescaling_to_period(self):
         """Test applying rescaling to all values in a period."""
         from glow_api.version_compatibility import apply_rescaling
         import pandas as pd
-        
-        df = pd.DataFrame({
-            "uid": ["S001", "S002", "S003"],
-            "bw_wbeing_1": [0, 1.5, 3],
-            "__version": ["v1", "v1", "v1"],
-        })
-        
+
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S002", "S003"],
+                "bw_wbeing_1": [0, 1.5, 3],
+                "__version": ["v1", "v1", "v1"],
+            }
+        )
+
         rescaled = apply_rescaling(
             df,
             variable="bw_wbeing_1",
             from_range=(0, 3),
             to_range=(0, 5),
         )
-        
+
         # Values should be rescaled
         assert rescaled.loc[0, "bw_wbeing_1"] == 0.0
         assert rescaled.loc[1, "bw_wbeing_1"] == 2.5

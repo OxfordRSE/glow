@@ -96,8 +96,8 @@ addEventListener("fetch", function (event) {
   // Opening the DevTools triggers the "only-if-cached" request
   // that cannot be handled by the worker. Bypass such requests.
   if (
-      event.request.cache === "only-if-cached" &&
-      event.request.mode !== "same-origin"
+    event.request.cache === "only-if-cached" &&
+    event.request.mode !== "same-origin"
   ) {
     return;
   }
@@ -222,7 +222,7 @@ async function getResponse(event, client, requestId, requestInterceptedAt) {
     if (acceptHeader) {
       const values = acceptHeader.split(",").map((value) => value.trim());
       const filteredValues = values.filter(
-          (value) => value !== "msw/passthrough",
+        (value) => value !== "msw/passthrough",
       );
 
       if (filteredValues.length > 0) {
@@ -232,7 +232,7 @@ async function getResponse(event, client, requestId, requestInterceptedAt) {
       }
     }
 
-    return fetch(requestClone, {headers});
+    return fetch(requestClone, { headers });
   }
 
   // Bypass mocking when the client is not active.

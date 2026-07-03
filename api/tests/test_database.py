@@ -29,9 +29,7 @@ def test_create_metadata_engine_omits_sqlite_only_options_for_postgres(monkeypat
 
     monkeypatch.setattr(database, "create_engine", fake_create_engine)
 
-    database.create_metadata_engine(
-        "postgresql+psycopg://glow:secret@api-db:5432/glow"
-    )
+    database.create_metadata_engine("postgresql+psycopg://glow:secret@api-db:5432/glow")
 
     assert captured == {
         "url": "postgresql+psycopg://glow:secret@api-db:5432/glow",
