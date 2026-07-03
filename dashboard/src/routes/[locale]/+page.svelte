@@ -42,7 +42,7 @@
   onMount(async () => {
     try {
       // Get user identity (works for both anonymous and authenticated)
-      const token = $authStore.token;
+      const token = $authStore.token ?? undefined;
       meResponse = await me(token);
       
       // Extract schools from authenticated response
@@ -51,7 +51,7 @@
         
         // Pre-select user's first school if available
         if ($currentSchools && $currentSchools.length > 0) {
-          selectedSchoolId = $currentSchools[0];
+          selectedSchoolId = Number($currentSchools[0]);
         } else if (schools.length > 0) {
           selectedSchoolId = schools[0].id;
         }
@@ -78,7 +78,7 @@
   $effect(() => {
     if (!loading && meResponse?.kind === "authenticated") {
       const school_id = selectedSchoolId ?? undefined;
-      const token = $authStore.token;
+      const token = $authStore.token ?? undefined;
       
       // Refetch dimensions for the new school scope
       getDimensions({ school_id, token })
@@ -132,7 +132,7 @@
     queryResult = null;
 
     try {
-      const token = $authStore.token;
+      const token = $authStore.token ?? undefined;
       const school_id = selectedSchoolId ?? undefined;
       
       queryResult = await queryPeriodBased({
@@ -302,7 +302,7 @@
           </div>
 
           <!-- Check if all periods are suppressed for all variables -->
-          {#if queryResult.variables.every(v => queryResult.periods.every(p => v.periods[p]?.suppressed))}
+          {#if queryResult?.variables.every(v => queryResult?.periods.every(p => v.periods[p]?.suppressed))}
             <div class="card bg-yellow-50 border border-yellow-200">
               <p class="text-yellow-800 font-medium text-center">
                 {i18n.t('explore.allDataSuppressed')}

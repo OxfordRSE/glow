@@ -10,5 +10,8 @@
     "sourceMap": true,
     "strict": true,
     "moduleResolution": "bundler"
-  }
+  },
+  "exclude": [
+    "**/*.stories.ts"
+  ]
 }
