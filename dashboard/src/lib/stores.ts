@@ -12,11 +12,13 @@ function createAuthStore() {
     typeof localStorage !== "undefined" ? localStorage.getItem("auth") : null;
   let initial: AuthState;
   try {
-    initial = stored ? (JSON.parse(stored) as AuthState) : { 
-      token: null, 
-      user: null,
-      identity: null
-    };
+    initial = stored
+      ? (JSON.parse(stored) as AuthState)
+      : {
+          token: null,
+          user: null,
+          identity: null,
+        };
   } catch {
     // If localStorage contains invalid JSON, clear it and start fresh
     initial = { token: null, user: null, identity: null };
@@ -35,11 +37,11 @@ function createAuthStore() {
       localStorage.setItem("auth", JSON.stringify(state));
     },
     setIdentity(identity: MeResponse, token?: string) {
-      update(state => {
-        const newState = { 
-          ...state, 
+      update((state) => {
+        const newState = {
+          ...state,
           identity,
-          token: token ?? state.token
+          token: token ?? state.token,
         };
         localStorage.setItem("auth", JSON.stringify(newState));
         return newState;
@@ -57,22 +59,20 @@ export const authStore = createAuthStore();
 
 export const isAuthenticated = derived(
   authStore,
-  ($auth) => $auth.identity?.kind === "authenticated"
+  ($auth) => $auth.identity?.kind === "authenticated",
 );
 
 export const isAdmin = derived(
   authStore,
-  ($auth) => $auth.identity?.kind === "authenticated" && $auth.identity.is_admin
+  ($auth) =>
+    $auth.identity?.kind === "authenticated" && $auth.identity.is_admin,
 );
 
-export const currentSchools = derived(
-  authStore,
-  ($auth): SchoolSummary[] => {
-    if ($auth.identity?.kind === "authenticated") {
-      return $auth.identity.schools;
-    }
-    return [];
+export const currentSchools = derived(authStore, ($auth): SchoolSummary[] => {
+  if ($auth.identity?.kind === "authenticated") {
+    return $auth.identity.schools;
   }
-);
+  return [];
+});
 
 export const columnsStore = writable<string[]>([]);

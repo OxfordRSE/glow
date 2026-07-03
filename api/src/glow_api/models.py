@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import Dict, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
-from pydantic import BaseModel, Field, RootModel, model_validator
+from pydantic import BaseModel, Field, RootModel
 
 
 class SuppressionCode(str, Enum):

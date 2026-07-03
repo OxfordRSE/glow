@@ -3,20 +3,25 @@ import storybook from "eslint-plugin-storybook";
 
 import globals from "globals";
 
-export default [{
-  ignores: [
-    ".svelte-kit/**",
-    "build/**",
-    "dist/**",
-    "node_modules/**",
-    "**/*.svelte",
-    "**/*.ts",
-  ],
-}, {
-  files: ["**/*.{js,mjs,cjs}"],
-  languageOptions: {
-    globals: globals.browser,
-    ecmaVersion: "latest",
-    sourceType: "module",
+export default [
+  {
+    ignores: [
+      ".svelte-kit/**",
+      "build/**",
+      "dist/**",
+      "node_modules/**",
+      "**/*.svelte",
+      "**/*.ts",
+      "storybook-static/**"
+    ],
   },
-}, ...storybook.configs["flat/recommended"]];
+  {
+    files: ["**/*.{js,mjs,cjs}"],
+    languageOptions: {
+      globals: globals.browser,
+      ecmaVersion: "latest",
+      sourceType: "module",
+    },
+  },
+  ...storybook.configs["flat/recommended"],
+];

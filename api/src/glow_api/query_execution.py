@@ -12,7 +12,6 @@ import pandas as pd
 
 from glow_api.canonical_query import CanonicalQuery, canonical_query_to_etag_key
 from glow_api.normalization import get_observed_periods
-from glow_api.settings import settings
 
 logger = logging.getLogger(__name__)
 

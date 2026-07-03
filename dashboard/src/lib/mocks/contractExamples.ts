@@ -1,42 +1,42 @@
 /**
  * Contract examples registry - loads examples from API directory.
- * 
+ *
  * Examples are the single source of truth for API contracts, owned by the API package.
  * Dashboard MSW handlers consume these examples to ensure consistency.
  */
 
-import { contractExamplesData } from './contractExamplesData'
+import { contractExamplesData } from "./contractExamplesData";
 
 export interface ContractExample {
-  id: string
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
-  path: string
-  status: number
-  request_model: string | null
-  response_model: string | null
-  request: any
-  response: any
+  id: string;
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+  path: string;
+  status: number;
+  request_model: string | null;
+  response_model: string | null;
+  request: any;
+  response: any;
 }
 
 // Build example registry indexed by ID
-const exampleRegistry = new Map<string, ContractExample>()
+const exampleRegistry = new Map<string, ContractExample>();
 
 for (const example of contractExamplesData as unknown as ContractExample[]) {
-  exampleRegistry.set(example.id, example)
+  exampleRegistry.set(example.id, example);
 }
 
 /**
  * Get a contract example by ID.
  */
 export function getExample(id: string): ContractExample | undefined {
-  return exampleRegistry.get(id)
+  return exampleRegistry.get(id);
 }
 
 /**
  * Get all contract examples.
  */
 export function getAllExamples(): ContractExample[] {
-  return Array.from(exampleRegistry.values())
+  return Array.from(exampleRegistry.values());
 }
 
 /**
@@ -44,11 +44,11 @@ export function getAllExamples(): ContractExample[] {
  */
 export function getExamplesForEndpoint(
   method: string,
-  path: string
+  path: string,
 ): ContractExample[] {
   return getAllExamples().filter(
-    ex => ex.method === method && ex.path === path
-  )
+    (ex) => ex.method === method && ex.path === path,
+  );
 }
 
 /**
@@ -57,13 +57,13 @@ export function getExamplesForEndpoint(
  */
 export function matchQueryExample(
   requestBody: any,
-  exampleId?: string
+  exampleId?: string,
 ): ContractExample | undefined {
   // If specific example ID provided, use it
   if (exampleId) {
-    return getExample(exampleId)
+    return getExample(exampleId);
   }
-  
+
   // Otherwise, use default query example
-  return getExample('query.default')
+  return getExample("query.default");
 }

@@ -5,7 +5,7 @@ can be safely compared, and provides rescaling when needed.
 """
 
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 import pandas as pd
 

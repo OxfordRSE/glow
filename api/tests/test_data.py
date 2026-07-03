@@ -1,6 +1,5 @@
 """Tests for the DataStore class and derived score computation."""
 
-import io
 import tempfile
 import threading
 from pathlib import Path

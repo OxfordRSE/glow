@@ -37,10 +37,7 @@ export function setLocale(nextLocale: string | Locale) {
   }
 }
 
-function lookupText(
-  dictionary: Messages,
-  key: string,
-): string | undefined {
+function lookupText(dictionary: Messages, key: string): string | undefined {
   let current: unknown = dictionary;
 
   for (const segment of key.split(".")) {
@@ -85,9 +82,10 @@ function formatColumnLabel(column: string, dictionary: Messages): string {
     return "";
   }
 
-   if (trimmed.includes("__")) {
+  if (trimmed.includes("__")) {
     const [formId, rawColumn] = trimmed.split("__", 2);
-    const formLabels = (dictionary as unknown as Record<string, unknown>).forms as Record<string, string> | undefined;
+    const formLabels = (dictionary as unknown as Record<string, unknown>)
+      .forms as Record<string, string> | undefined;
     const formLabel = formLabels?.[formId] ?? humanizeIdentifier(formId);
     return `${formLabel}: ${formatColumnLabel(rawColumn, dictionary)}`;
   }
@@ -100,7 +98,8 @@ function formatColumnLabel(column: string, dictionary: Messages): string {
   const prefixed = PHASE_PREFIX_RE.exec(trimmed);
   if (prefixed) {
     const [, phase, baseColumn] = prefixed;
-    const phaseLabels = (dictionary as unknown as Record<string, unknown>).phases as Record<string, string> | undefined;
+    const phaseLabels = (dictionary as unknown as Record<string, unknown>)
+      .phases as Record<string, string> | undefined;
     return `${phaseLabels?.[phase] ?? humanizeIdentifier(phase)}: ${formatColumnLabel(baseColumn, dictionary)}`;
   }
 

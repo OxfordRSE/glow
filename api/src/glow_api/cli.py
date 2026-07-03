@@ -15,7 +15,7 @@ import json
 import sys
 
 import click
-from sqlalchemy import select, insert
+from sqlalchemy import select
 
 from glow_api.auth import get_password_hash
 from glow_api.database import (

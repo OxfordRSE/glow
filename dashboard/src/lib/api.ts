@@ -4,7 +4,11 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE ?? "/api";
 // Target backend version - update this when making breaking changes to API surface
 export const TARGET_BACKEND_VERSION = "0.1.0";
 
-export type VersionCompatibility = "compatible" | "minor-mismatch" | "major-mismatch" | "unknown";
+export type VersionCompatibility =
+  | "compatible"
+  | "minor-mismatch"
+  | "major-mismatch"
+  | "unknown";
 
 /**
  * Compare semantic versions and determine compatibility status.
@@ -54,32 +58,32 @@ function getFriendlyErrorMessage(status: number, detail?: string): string {
   if (status >= 500) {
     return "The server encountered an error. Please try again later or contact support if the problem persists.";
   }
-  
+
   if (status === 400) {
-    return detail 
+    return detail
       ? `Your request could not be processed: ${detail}`
       : "Your request could not be processed. Please check your input and try again.";
   }
-  
+
   if (status === 401) {
     return "You are not authenticated. Please log in and try again.";
   }
-  
+
   if (status === 403) {
-    return detail 
+    return detail
       ? `Access denied: ${detail}`
       : "You do not have permission to access this resource.";
   }
-  
+
   if (status === 404) {
     return "The requested resource was not found.";
   }
-  
+
   // For other client errors (4xx)
   if (status >= 400 && status < 500) {
     return detail || "There was a problem with your request. Please try again.";
   }
-  
+
   return detail || "An unexpected error occurred. Please try again.";
 }
 
@@ -88,12 +92,12 @@ async function apiFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, options);
-  
+
   if (!res.ok) {
     // Try to parse JSON error details
     let errorDetail: string | undefined;
     let rawBody: string | undefined;
-    
+
     try {
       const contentType = res.headers.get("content-type");
       if (contentType?.includes("application/json")) {
@@ -111,14 +115,15 @@ async function apiFetch<T>(
         status: res.status,
         statusText: res.statusText,
         rawBody,
-        parseError: parseError instanceof Error ? parseError.message : String(parseError),
+        parseError:
+          parseError instanceof Error ? parseError.message : String(parseError),
       });
-      
+
       errorDetail = "The server returned an invalid response.";
     }
-    
+
     const friendlyMessage = getFriendlyErrorMessage(res.status, errorDetail);
-    
+
     // Log detailed error information for debugging
     console.error(`API Error [${res.status}] ${path}:`, {
       status: res.status,
@@ -126,10 +131,10 @@ async function apiFetch<T>(
       detail: errorDetail,
       friendlyMessage,
     });
-    
+
     throw new ApiError(res.status, friendlyMessage, errorDetail);
   }
-  
+
   // Parse successful response
   try {
     const data = await res.json();
@@ -137,11 +142,14 @@ async function apiFetch<T>(
   } catch (parseError) {
     console.error(`Failed to parse successful response from ${path}:`, {
       status: res.status,
-      parseError: parseError instanceof Error ? parseError.message : String(parseError),
+      parseError:
+        parseError instanceof Error ? parseError.message : String(parseError),
     });
-    
+
     // Throw a user-friendly error that matches the server error pattern
-    throw new Error("The server encountered an error processing your request. The response format was invalid.");
+    throw new Error(
+      "The server encountered an error processing your request. The response format was invalid.",
+    );
   }
 }
 
@@ -264,7 +272,10 @@ export async function me(token?: string): Promise<MeResponse> {
     return await apiFetch<MeResponse>("/me", options);
   } catch (error) {
     // If authentication fails, return anonymous
-    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+    if (
+      error instanceof ApiError &&
+      (error.status === 401 || error.status === 403)
+    ) {
       return { kind: "anonymous" };
     }
     throw error;
@@ -302,7 +313,7 @@ export async function getDimensions(params: {
   const { school_id, token } = params;
   const queryParams = school_id ? `?school_id=${school_id}` : "";
   const options: RequestInit = token ? { headers: authHeaders(token) } : {};
-  
+
   return apiFetch<DimensionsResponse>(`/dimensions${queryParams}`, options);
 }
 
@@ -501,7 +512,7 @@ export interface PeriodSliceCell {
 export interface PeriodSlice {
   suppressed: boolean;
   suppression_reason?: "small-n" | "incompatible-version";
-  notes?: ("values-rescaled")[];
+  notes?: "values-rescaled"[];
   question_versions?: Record<string, number>;
   cells?: PeriodSliceCell[];
 }
@@ -528,7 +539,7 @@ export interface QueryParams {
 
 /**
  * Execute a new period-oriented multi-variable query.
- * 
+ *
  * This endpoint supports:
  * - Dataset-scoped queries (no school_id, anonymous access OK)
  * - School-scoped queries (with school_id, requires authorization)
@@ -537,20 +548,26 @@ export interface QueryParams {
  * - Period-organized results with independent suppression per period
  * - ETag-based caching with If-None-Match support
  */
-export async function queryPeriodBased(params: QueryParams): Promise<NewQueryResponse> {
+export async function queryPeriodBased(
+  params: QueryParams,
+): Promise<NewQueryResponse> {
   const { v = [], d = [], variable_prefix = [], school_id, token } = params;
-  
+
   // Build query string with repeated parameters
   const queryParts: string[] = [];
-  v.forEach(variable => queryParts.push(`v=${encodeURIComponent(variable)}`));
-  d.forEach(dimension => queryParts.push(`d=${encodeURIComponent(dimension)}`));
-  variable_prefix.forEach(prefix => queryParts.push(`variable_prefix=${encodeURIComponent(prefix)}`));
+  v.forEach((variable) => queryParts.push(`v=${encodeURIComponent(variable)}`));
+  d.forEach((dimension) =>
+    queryParts.push(`d=${encodeURIComponent(dimension)}`),
+  );
+  variable_prefix.forEach((prefix) =>
+    queryParts.push(`variable_prefix=${encodeURIComponent(prefix)}`),
+  );
   if (school_id !== undefined) {
     queryParts.push(`school_id=${school_id}`);
   }
-  
+
   const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
   const options: RequestInit = token ? { headers: authHeaders(token) } : {};
-  
+
   return apiFetch<NewQueryResponse>(`/query${queryString}`, options);
 }

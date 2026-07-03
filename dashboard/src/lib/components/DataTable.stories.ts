@@ -1,13 +1,13 @@
-import type { Meta, StoryObj } from '@storybook/svelte';
-import { expect, within, userEvent } from 'storybook/test';
-import DataTable from './DataTable.svelte';
+import type { Meta, StoryObj } from "@storybook/svelte";
+import { expect, within, userEvent } from "storybook/test";
+import DataTable from "./DataTable.svelte";
 
 const meta = {
-  title: 'Components/DataTable',
+  title: "Components/DataTable",
   component: DataTable,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   parameters: {
-    layout: 'padded',
+    layout: "padded",
   },
 } satisfies Meta<DataTable>;
 
@@ -43,36 +43,34 @@ export const Simple: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    
+
     // Test: Verify basic table rendering with proper semantic structure
-    const table = canvas.getByRole('table');
+    const table = canvas.getByRole("table");
     await expect(table).toBeInTheDocument();
-    
+
     // Test: Verify correct number of columns (4: school, yearGroup, mean, student_n)
-    const columnHeaders = canvas.getAllByRole('columnheader');
+    const columnHeaders = canvas.getAllByRole("columnheader");
     await expect(columnHeaders.length).toBe(4);
-    
+
     // Test: Verify column ordering is correct
     await expect(columnHeaders[0]).toHaveTextContent(/School/i);
     await expect(columnHeaders[1]).toHaveTextContent(/Year group/i);
     await expect(columnHeaders[2]).toHaveTextContent(/Mean/i);
     await expect(columnHeaders[3]).toHaveTextContent(/Student count|N/i);
-    
+
     // Test: Verify correct number of rows (5 year groups)
-    const rows = canvas.getAllByRole('row');
+    const rows = canvas.getAllByRole("row");
     await expect(rows.length).toBe(6); // 1 header row + 5 data rows
-    
+
     // Test: Verify sortable column headers are present (clickable)
-    const columnHeader = canvas.getByRole('columnheader', { name: /School/i });
+    const columnHeader = canvas.getByRole("columnheader", { name: /School/i });
     await expect(columnHeader).toBeInTheDocument();
-    
+
     // Test: Verify specific data is rendered correctly
-    const allCells = canvas.getAllByRole('cell');
+    const allCells = canvas.getAllByRole("cell");
     await expect(allCells.length).toBe(20); // 5 rows × 4 columns
   },
 };
-
-
 
 export const LargeTable: Story = {
   args: {
@@ -80,15 +78,15 @@ export const LargeTable: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    
+
     // Test: Verify table handles many columns correctly
-    const table = canvas.getByRole('table');
+    const table = canvas.getByRole("table");
     await expect(table).toBeInTheDocument();
-    
+
     // Test: Verify correct number of columns (7: school, yearGroup, d_sex, d_ethnicity, wave, mean, student_n)
-    const columnHeaders = canvas.getAllByRole('columnheader');
+    const columnHeaders = canvas.getAllByRole("columnheader");
     await expect(columnHeaders.length).toBe(7);
-    
+
     // Test: Verify column ordering
     await expect(columnHeaders[0]).toHaveTextContent(/School/i);
     await expect(columnHeaders[1]).toHaveTextContent(/Year group/i);
@@ -97,26 +95,30 @@ export const LargeTable: Story = {
     await expect(columnHeaders[4]).toHaveTextContent(/Wave/i);
     await expect(columnHeaders[5]).toHaveTextContent(/Mean/i);
     await expect(columnHeaders[6]).toHaveTextContent(/Student count|N/i);
-    
+
     // Test: Verify correct number of rows (12 data rows from CSV)
-    const rows = canvas.getAllByRole('row');
+    const rows = canvas.getAllByRole("row");
     await expect(rows.length).toBe(13); // 1 header + 12 data rows
-    
+
     // Verify multiple demographic columns are present
-    const sexHeader = canvas.getByRole('columnheader', { name: /Sex/i });
+    const sexHeader = canvas.getByRole("columnheader", { name: /Sex/i });
     await expect(sexHeader).toBeInTheDocument();
-    
-    const ethnicityHeader = canvas.getByRole('columnheader', { name: /Ethnicity/i });
+
+    const ethnicityHeader = canvas.getByRole("columnheader", {
+      name: /Ethnicity/i,
+    });
     await expect(ethnicityHeader).toBeInTheDocument();
-    
-    const waveHeader = canvas.getByRole('columnheader', { name: /Wave/i });
+
+    const waveHeader = canvas.getByRole("columnheader", { name: /Wave/i });
     await expect(waveHeader).toBeInTheDocument();
-    
-    const yearGroupHeader = canvas.getByRole('columnheader', { name: /Year group/i });
+
+    const yearGroupHeader = canvas.getByRole("columnheader", {
+      name: /Year group/i,
+    });
     await expect(yearGroupHeader).toBeInTheDocument();
-    
+
     // Verify table has multiple rows of data
-    const allCells = canvas.getAllByRole('cell');
+    const allCells = canvas.getAllByRole("cell");
     await expect(allCells.length).toBe(84); // 12 rows × 7 columns
   },
 };
@@ -127,13 +129,13 @@ export const Empty: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    
+
     // Test: Verify empty state message displays when no data
-    const noDataText = canvas.getByText('No data available.');
+    const noDataText = canvas.getByText("No data available.");
     await expect(noDataText).toBeInTheDocument();
-    
+
     // Verify no table is rendered when empty
-    const table = canvas.queryByRole('table');
+    const table = canvas.queryByRole("table");
     await expect(table).not.toBeInTheDocument();
   },
 };
@@ -145,13 +147,13 @@ Focus School Academy,3.5,125`,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    
+
     // Test: Verify table with minimal data (single row)
-    const table = canvas.getByRole('table');
+    const table = canvas.getByRole("table");
     await expect(table).toBeInTheDocument();
-    
+
     // Verify the single row data is accessible
-    const cells = canvas.getAllByRole('cell');
+    const cells = canvas.getAllByRole("cell");
     await expect(cells.length).toBeGreaterThan(0);
   },
 };
@@ -164,20 +166,20 @@ Focus School Academy,7,F,Asian,11,1,7B,3.5,3.6,3.4,3.5,7`,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    
+
     // Test: Verify sorting functionality by clicking column header
-    const table = canvas.getByRole('table');
+    const table = canvas.getByRole("table");
     await expect(table).toBeInTheDocument();
-    
+
     // Find and click a sortable column header
-    const classHeader = canvas.getByRole('columnheader', { name: /Class/i });
+    const classHeader = canvas.getByRole("columnheader", { name: /Class/i });
     await expect(classHeader).toBeInTheDocument();
-    
+
     // Click to sort
     await userEvent.click(classHeader);
-    
+
     // Verify sort indicator appears (↑ or ↓)
-    const sortedHeader = canvas.getByText(/Class/i).closest('th');
+    const sortedHeader = canvas.getByText(/Class/i).closest("th");
     await expect(sortedHeader?.textContent).toMatch(/[↑↓]/);
   },
 };
