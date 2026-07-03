@@ -1,7 +1,6 @@
 """Pytest fixtures for glow-api tests."""
 
 import io
-import json
 import os
 import threading
 
@@ -15,9 +14,8 @@ from sqlalchemy.pool import StaticPool
 from glow_api.auth import get_current_user, get_password_hash
 from glow_api.data import DataStore
 from glow_api.database import create_user, create_school, get_db
-from glow_api.metadata_models import Base, User, School
+from glow_api.metadata_models import Base
 from glow_api.main import app
-from glow_api.settings import settings
 from tests.mock_odk import MockODKClient
 
 # Set testing flag to skip datastore initialization in lifespan
@@ -142,17 +140,17 @@ def tiny_df():
 
 def _make_mock_datastore(df: pd.DataFrame, metadata: dict = None) -> DataStore:
     """Helper to create a mock DataStore with pre-loaded data.
-    
+
     Args:
         df: DataFrame to inject into the DataStore
         metadata: Optional metadata dict
-        
+
     Returns:
         DataStore instance with data already loaded
     """
     if metadata is None:
         metadata = {}
-    
+
     mock_client = MockODKClient(submissions_df=df, metadata=metadata)
     ds = DataStore(odk_client=mock_client, refresh_hours=0)
     ds._df = ds._process_loaded_data(df)

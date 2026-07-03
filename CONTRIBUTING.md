@@ -50,24 +50,25 @@ terraform fmt -recursive
 
 **Validation:**
 ```bash
-cd deploy/terraform
-terraform init -backend=false
-terraform validate
+terraform -chdir=deploy/aws/terraform init -backend=false
+terraform -chdir=deploy/aws/terraform validate
+
+terraform -chdir=deploy/aws/terraform_bootstrap init -backend=false
+terraform -chdir=deploy/aws/terraform_bootstrap validate
 ```
 
 **Linting:**
 ```bash
-cd deploy/terraform
-tflint --init
-tflint
+tflint --init --chdir=deploy/aws/terraform
+tflint --chdir=deploy/aws/terraform
+
+tflint --init --chdir=deploy/aws/terraform_bootstrap
+tflint --chdir=deploy/aws/terraform_bootstrap
 ```
 
 **Plan (requires AWS credentials):**
 ```bash
-cd deploy/terraform
-# Create terraform.tfvars first (see terraform.tfvars.example)
-terraform init -backend=false
-terraform plan -var-file=terraform.tfvars
+uv run --project deploy/aws deploy/aws/deploy.py --domain eu.glow-project.org --dry-run
 ```
 
 #### Installing TFLint

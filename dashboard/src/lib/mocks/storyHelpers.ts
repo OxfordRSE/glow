@@ -1,15 +1,19 @@
 /**
  * Storybook MSW integration helpers for contract examples.
- * 
+ *
  * Provides utilities to easily configure stories with contract examples.
  */
 
-import { http, HttpResponse, delay } from 'msw'
-import { createHandlersFromExamples, type ApiResponseConfig, behaviorHandlers } from './handlersFromExamples'
+import { http, HttpResponse, delay } from "msw";
+import {
+  createHandlersFromExamples,
+  type ApiResponseConfig,
+  behaviorHandlers,
+} from "./handlersFromExamples";
 
 /**
  * Create MSW parameter configuration for a story using contract examples.
- * 
+ *
  * @example
  * ```ts
  * export const MyStory: Story = {
@@ -25,7 +29,7 @@ import { createHandlersFromExamples, type ApiResponseConfig, behaviorHandlers } 
 export function withApiResponses(config: ApiResponseConfig) {
   return {
     handlers: createHandlersFromExamples(config),
-  }
+  };
 }
 
 /**
@@ -33,11 +37,8 @@ export function withApiResponses(config: ApiResponseConfig) {
  */
 export function withLoadingState() {
   return {
-    handlers: [
-      behaviorHandlers.loading,
-      ...createHandlersFromExamples(),
-    ],
-  }
+    handlers: [behaviorHandlers.loading, ...createHandlersFromExamples()],
+  };
 }
 
 /**
@@ -45,9 +46,6 @@ export function withLoadingState() {
  */
 export function withMalformedJson() {
   return {
-    handlers: [
-      behaviorHandlers.malformedJson,
-      ...createHandlersFromExamples(),
-    ],
-  }
+    handlers: [behaviorHandlers.malformedJson, ...createHandlersFromExamples()],
+  };
 }

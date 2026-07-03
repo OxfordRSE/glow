@@ -1,0 +1,17 @@
+[project]
+name = "glow-aws-deploy"
+version = "0.1.0"
+description = "AWS deployment orchestration for Glow"
+requires-python = ">=3.12"
+dependencies = [
+  "boto3>=1.35.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.3.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

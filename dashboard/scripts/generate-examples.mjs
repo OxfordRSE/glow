@@ -1,37 +1,37 @@
 #!/usr/bin/env node
 /**
  * Generate TypeScript module from contract examples.
- * 
+ *
  * This script reads all JSON contract examples from the API directory
  * and generates a TypeScript module that the dashboard can import.
  */
 
-import { readdir, readFile, writeFile } from 'fs/promises';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readdir, readFile, writeFile } from "fs/promises";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const API_EXAMPLES_DIR = join(__dirname, '../../api/examples/contracts');
-const OUTPUT_FILE = join(__dirname, '../src/lib/mocks/contractExamplesData.ts');
+const API_EXAMPLES_DIR = join(__dirname, "../../api/examples/contracts");
+const OUTPUT_FILE = join(__dirname, "../src/lib/mocks/contractExamplesData.ts");
 
 async function generateExamplesModule() {
-  console.log('Reading examples from:', API_EXAMPLES_DIR);
-  
+  console.log("Reading examples from:", API_EXAMPLES_DIR);
+
   const files = await readdir(API_EXAMPLES_DIR);
-  const jsonFiles = files.filter(f => f.endsWith('.json'));
-  
+  const jsonFiles = files.filter((f) => f.endsWith(".json"));
+
   const examples = [];
-  
+
   for (const file of jsonFiles) {
     const filePath = join(API_EXAMPLES_DIR, file);
-    const content = await readFile(filePath, 'utf-8');
+    const content = await readFile(filePath, "utf-8");
     const example = JSON.parse(content);
     examples.push(example);
   }
-  
+
   console.log(`Loaded ${examples.length} examples`);
-  
+
   const output = `/**
  * Contract examples data (auto-generated).
  * 
@@ -42,9 +42,9 @@ async function generateExamplesModule() {
 
 export const contractExamplesData = ${JSON.stringify(examples, null, 2)} as const;
 `;
-  
-  await writeFile(OUTPUT_FILE, output, 'utf-8');
-  console.log('Generated:', OUTPUT_FILE);
+
+  await writeFile(OUTPUT_FILE, output, "utf-8");
+  console.log("Generated:", OUTPUT_FILE);
 }
 
 generateExamplesModule().catch(console.error);

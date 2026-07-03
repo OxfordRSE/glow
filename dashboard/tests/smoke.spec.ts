@@ -8,7 +8,8 @@ const adminUser = process.env.PLAYWRIGHT_ADMIN_USER ?? "admin";
 const adminPassword = process.env.PLAYWRIGHT_ADMIN_PASSWORD ?? "admin";
 const scopedUser = process.env.PLAYWRIGHT_SCOPED_USER ?? "alpha-user";
 const scopedPassword = process.env.PLAYWRIGHT_SCOPED_PASSWORD ?? "alpha-user";
-const scopedSchool = process.env.PLAYWRIGHT_SCOPED_SCHOOL ?? "Focus School Academy";
+const scopedSchool =
+  process.env.PLAYWRIGHT_SCOPED_SCHOOL ?? "Focus School Academy";
 
 async function login(page: Page, username: string, password: string) {
   await page.goto("/login");
@@ -29,7 +30,9 @@ test("admin can log in, run a query, and use the admin screen", async ({
   await page.getByRole("button", { name: "Run Query" }).click();
 
   // Wait for query results to appear
-  await expect(page.locator(".chart-container")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator(".chart-container")).toBeVisible({
+    timeout: 10000,
+  });
 
   // Test admin screen
   await page.goto("/admin");
@@ -44,17 +47,17 @@ test("admin can log in, run a query, and use the admin screen", async ({
   ).toBeVisible();
 });
 
-test("scoped user can log in and run queries", async ({
-  page,
-}) => {
+test("scoped user can log in and run queries", async ({ page }) => {
   await login(page, scopedUser, scopedPassword);
 
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-  
+
   // Test dashboard query functionality
   await expect(page.getByRole("button", { name: "Run Query" })).toBeVisible();
   await page.getByRole("button", { name: "Run Query" }).click();
 
   // Wait for query results to appear
-  await expect(page.locator(".chart-container")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator(".chart-container")).toBeVisible({
+    timeout: 10000,
+  });
 });

@@ -11,14 +11,14 @@ Place form files in this directory:
 
 ## Deployment Behavior
 
-When `activate-stack.sh` runs:
+When `deploy/aws/runtime/activate-stack.sh` runs on a deployed runner:
 
 1. Scans this directory for form files
 2. Converts XLSForms to XML using the pyxform service
 3. Extracts the `xmlFormId` from each form
 4. Checks if the form content has changed (SHA256 hash comparison)
 5. Uploads new or changed forms to the default ODK project ("GLOW Data Collection")
-6. Tracks form state in `deploy/.deploy/share/odk-forms-state.json`
+6. Tracks form state in `docker-mount-data/.deploy/share/odk-forms-state.json`
 
 ## Form Versioning
 

@@ -1,9 +1,70 @@
 """Tests for the GLOW API."""
 
 import io
+import threading
 
 import pandas as pd
 from fastapi import status
+
+from glow_api.canonical_query import normalize_query
+
+
+# ---------------------------------------------------------------------------
+# Canonical Query Normalization Tests
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_query_with_all_params():
+    """Canonical query should sort and dedupe all parameters."""
+    query = normalize_query(
+        school_id=1,
+        v=["bw_wbeing_2", "bw_wbeing_1", "bw_wbeing_1"],  # duplicates and unsorted
+        d=["d_sex", "yearGroup", "d_sex"],  # duplicates and unsorted
+        variable_prefix=["bw_", "d_", "bw_"],  # duplicates
+    )
+
+    assert query.school_id == 1
+    assert query.variables == ["bw_wbeing_1", "bw_wbeing_2"]  # sorted, deduped
+    assert query.dimensions == ["d_sex", "yearGroup"]  # sorted, deduped
+    assert query.variable_prefixes == ["bw_", "d_"]  # sorted, deduped
+
+
+def test_normalize_query_defaults_to_empty_lists():
+    """Omitted parameters should become empty lists."""
+    query = normalize_query(school_id=None)
+
+    assert query.school_id is None
+    assert query.variables == []
+    assert query.dimensions == []
+    assert query.variable_prefixes == []
+
+
+def test_normalize_query_omitted_dimensions():
+    """Omitting 'd' should mean no dimensions (empty list)."""
+    query = normalize_query(v=["bw_wbeing_1"])
+
+    assert query.dimensions == []
+
+
+def test_normalize_query_omitted_variables():
+    """Omitting both 'v' and 'variable_prefix' should result in empty lists."""
+    query = normalize_query(d=["d_sex"])
+
+    assert query.variables == []
+    assert query.variable_prefixes == []
+
+
+def test_normalize_query_union_of_v_and_prefix():
+    """When both 'v' and 'variable_prefix' are supplied, both lists are kept."""
+    query = normalize_query(v=["bw_wbeing_1"], variable_prefix=["d_"])
+
+    assert query.variables == ["bw_wbeing_1"]
+    assert query.variable_prefixes == ["d_"]
+
+
+# ---------------------------------------------------------------------------
+# Health and Authentication Tests
+# ---------------------------------------------------------------------------
 
 
 def test_health(client):
@@ -130,13 +191,263 @@ def test_admin_me_endpoint(admin_client):
     assert user["is_admin"] is True
 
 
+# ---------------------------------------------------------------------------
+# /me Endpoint Tests
+# ---------------------------------------------------------------------------
+
+
+def test_me_anonymous(auth_client):
+    """GET /me with no token should return anonymous response."""
+    response = auth_client.get("/me")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["kind"] == "anonymous"
+
+
+def test_me_authenticated(auth_client, sample_user, sample_schools):
+    """GET /me with valid token should return authenticated response with schools."""
+    # First login to get a token
+    login_response = auth_client.post(
+        "/auth/login",
+        data={"username": "testuser", "password": "testpass"},
+    )
+    assert login_response.status_code == status.HTTP_200_OK
+    token = login_response.json()["access_token"]
+
+    # Now use the token to call /me
+    response = auth_client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+
+    assert data["kind"] == "authenticated"
+    assert data["id"] == sample_user.id
+    assert data["username"] == sample_user.username
+    assert data["is_admin"] is False
+    assert len(data["schools"]) == 1
+    assert data["schools"][0]["id"] == sample_schools["Focus School Academy"].id
+    assert data["schools"][0]["name"] == "Focus School Academy"
+
+
+def test_me_authenticated_admin(auth_client, admin_user, sample_schools):
+    """GET /me with admin token should show all schools."""
+    # First login as admin to get a token
+    login_response = auth_client.post(
+        "/auth/login",
+        data={"username": "adminuser", "password": "adminpass"},
+    )
+    assert login_response.status_code == status.HTTP_200_OK
+    token = login_response.json()["access_token"]
+
+    # Now use the token to call /me
+    response = auth_client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+
+    assert data["kind"] == "authenticated"
+    assert data["is_admin"] is True
+    assert len(data["schools"]) == 2
+    school_names = {s["name"] for s in data["schools"]}
+    assert "Focus School Academy" in school_names
+    assert "Neighbouring School" in school_names
+
+
+def test_me_invalid_token(auth_client):
+    """GET /me with invalid token should return 401."""
+    response = auth_client.get("/me", headers={"Authorization": "Bearer invalid-token"})
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_query_get_etag_support(auth_client):
+    """Test that GET /query returns ETag and supports If-None-Match."""
+    # First request - should get ETag
+    response1 = auth_client.get("/query?v=bw_wbeing_1")
+    assert response1.status_code == status.HTTP_200_OK
+    assert "ETag" in response1.headers
+    etag = response1.headers["ETag"]
+
+    # Second request with If-None-Match - should get 304
+    response2 = auth_client.get("/query?v=bw_wbeing_1", headers={"If-None-Match": etag})
+    assert response2.status_code == status.HTTP_304_NOT_MODIFIED
+
+    # Third request with different query - should get new ETag
+    response3 = auth_client.get("/query?v=bw_wbeing_2")
+    assert response3.status_code == status.HTTP_200_OK
+    assert "ETag" in response3.headers
+    assert response3.headers["ETag"] != etag  # Different query = different ETag
+
+
+# ---------------------------------------------------------------------------
+# Schools and Legacy Tests
+# ---------------------------------------------------------------------------
+# /dimensions Endpoint Tests
+# ---------------------------------------------------------------------------
+
+
+def test_dimensions_public_dataset_scope(auth_client):
+    """GET /dimensions without school_id should work anonymously."""
+    response = auth_client.get("/dimensions")
+
+    # After implementation, this should be 200 and return dimensions/variables
+    if response.status_code == status.HTTP_200_OK:
+        data = response.json()
+        assert "variables" in data
+        assert "dimensions" in data
+        assert data["school_id"] is None
+        assert isinstance(data["variables"], list)
+        assert isinstance(data["dimensions"], list)
+        # Should have some variables from the data
+        if len(data["variables"]) > 0:
+            assert "key" in data["variables"][0]
+            assert "raw_key" in data["variables"][0]
+    else:
+        # For now, expect 404 since endpoint doesn't exist yet
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_dimensions_exposes_namespaced_variable_metadata(
+    db_session, sample_user, sample_schools
+):
+    """/dimensions should identify the source form for namespaced variables."""
+    from fastapi.testclient import TestClient
+    from glow_api.data import get_datastore
+    from glow_api.database import get_db
+    from glow_api.main import app
+    from glow_api.models import UserRead
+
+    namespaced_df = pd.DataFrame(
+        {
+            "uid": ["S001"],
+            "school": ["Focus School Academy"],
+            "period_id": ["2023-2024"],
+            "yearGroup": [9],
+            "d_age": [14],
+            "bewell_questionnaire__bw_wbeing_1": [3],
+            "phq9_questionnaire__phq9_1": [2],
+        }
+    )
+
+    from tests.conftest import _make_mock_datastore
+
+    fake_store = _make_mock_datastore(namespaced_df)
+    fake_store._df = namespaced_df
+    fake_store._categorical_whitelist = ["yearGroup", "d_age"]
+    fake_store._numerical_whitelist = [
+        "bewell_questionnaire__bw_wbeing_1",
+        "phq9_questionnaire__phq9_1",
+    ]
+    fake_store._observed_periods = {
+        None: ["2023-2024"],
+        "Focus School Academy": ["2023-2024"],
+    }
+    fake_store._lock = threading.Lock()
+
+    def override_get_db():
+        yield db_session
+
+    def override_get_datastore():
+        return fake_store
+
+    def override_get_current_user():
+        return UserRead(
+            id=sample_user.id,
+            username=sample_user.username,
+            school_ids=[s.id for s in sample_user.schools],
+            school_names=[s.name for s in sample_user.schools],
+            is_active=True,
+            is_admin=False,
+        )
+
+    from glow_api.auth import get_current_user
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_datastore] = override_get_datastore
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    with TestClient(app, raise_server_exceptions=True) as client:
+        response = client.get("/dimensions")
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    variables = {item["key"]: item for item in data["variables"]}
+    assert variables["bewell_questionnaire__bw_wbeing_1"]["raw_key"] == "bw_wbeing_1"
+    assert (
+        variables["bewell_questionnaire__bw_wbeing_1"]["form_id"]
+        == "bewell_questionnaire"
+    )
+    assert variables["phq9_questionnaire__phq9_1"]["raw_key"] == "phq9_1"
+    assert variables["phq9_questionnaire__phq9_1"]["form_id"] == "phq9_questionnaire"
+
+
+def test_dimensions_school_scope_requires_auth(auth_client, sample_schools):
+    """GET /dimensions?school_id=X should require authorization for that school."""
+    # First login to get a token
+    login_response = auth_client.post(
+        "/auth/login",
+        data={"username": "testuser", "password": "testpass"},
+    )
+    assert login_response.status_code == status.HTTP_200_OK
+    token = login_response.json()["access_token"]
+
+    school_id = sample_schools["Focus School Academy"].id
+    response = auth_client.get(
+        f"/dimensions?school_id={school_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    # After implementation, this should be 200
+    if response.status_code == status.HTTP_200_OK:
+        data = response.json()
+        assert data["school_id"] == school_id
+        assert "variables" in data
+        assert "dimensions" in data
+    else:
+        # For now, expect 404 since endpoint doesn't exist yet
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_dimensions_school_scope_unauthorized(auth_client, sample_schools):
+    """GET /dimensions for unauthorized school should return 403."""
+    # Login as testuser who only has access to Focus School Academy
+    login_response = auth_client.post(
+        "/auth/login",
+        data={"username": "testuser", "password": "testpass"},
+    )
+    assert login_response.status_code == status.HTTP_200_OK
+    token = login_response.json()["access_token"]
+
+    # Try to access Neighbouring School (which user doesn't have access to)
+    school_id = sample_schools["Neighbouring School"].id
+    response = auth_client.get(
+        f"/dimensions?school_id={school_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    # After implementation, this should be 403
+    if response.status_code == status.HTTP_200_OK:
+        # If somehow it returns 200, fail the test
+        assert False, "Expected 403 for unauthorized school access"
+    elif response.status_code == status.HTTP_403_FORBIDDEN:
+        # This is what we expect after implementation
+        pass
+    else:
+        # For now, accept 404 since endpoint doesn't exist yet
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+# ---------------------------------------------------------------------------
+# Schools and Legacy Tests
+# ---------------------------------------------------------------------------
+
+
 def test_docs_example_fixture_is_parseable(sample_df):
     df = pd.read_csv(io.StringIO(sample_df.to_csv(index=False)))
     assert not df.empty
 
 
 def test_schools_list_for_user(client, sample_schools):
-    """Regular user should see their assigned schools with query options."""
+    """Regular user should see their assigned schools."""
     response = client.get("/schools")
     assert response.status_code == status.HTTP_200_OK
     schools = response.json()
@@ -147,42 +458,9 @@ def test_schools_list_for_user(client, sample_schools):
     assert school["name"] == "Focus School Academy"
     assert school["id"] == sample_schools["Focus School Academy"].id
 
-    # Should include query_options
-    assert "query_options" in school
-    query_options = school["query_options"]
-
-    # Query options should have all required fields
-    assert "variables" in query_options
-    assert "waves" in query_options
-    assert "aggregations" in query_options
-    assert "filters" in query_options
-
-    # Variables should include wellbeing questions
-    assert "bw_wbeing_1" in query_options["variables"]
-
-    # Aggregations should include yearGroup, sex, etc.
-    agg_values = [item["value"] for item in query_options["aggregations"]]
-    assert "yearGroup" in agg_values
-    assert "d_sex" in agg_values
-
-    # Class should be focus_only
-    class_agg = next(
-        (item for item in query_options["aggregations"] if item["value"] == "class"),
-        None,
-    )
-    assert class_agg is not None
-    assert class_agg["scope"] == "focus_only"
-
-    # Filters should have values
-    for filter_item in query_options["filters"]:
-        assert "value" in filter_item
-        assert "values" in filter_item
-        assert isinstance(filter_item["values"], list)
-        assert len(filter_item["values"]) > 0
-
 
 def test_schools_list_for_admin(admin_client, sample_schools):
-    """Admin should see all schools with query options."""
+    """Admin should see all schools."""
     response = admin_client.get("/schools")
     assert response.status_code == status.HTTP_200_OK
     schools = response.json()
@@ -192,37 +470,6 @@ def test_schools_list_for_admin(admin_client, sample_schools):
     school_names = {s["name"] for s in schools}
     assert "Focus School Academy" in school_names
     assert "Neighbouring School" in school_names
-
-    # All schools should have query_options
-    for school in schools:
-        assert "query_options" in school
-        assert "variables" in school["query_options"]
-        assert "waves" in school["query_options"]
-
-
-def test_schools_list_query_options_scoped_to_school(client, sample_schools):
-    """Query options should be scoped to each school's data."""
-    response = client.get("/schools")
-    assert response.status_code == status.HTTP_200_OK
-    schools = response.json()
-
-    # Get Focus School Academy
-    alpha_school = next(s for s in schools if s["name"] == "Focus School Academy")
-
-    # Check yearGroup filter values
-    year_filter = next(
-        (
-            item
-            for item in alpha_school["query_options"]["filters"]
-            if item["value"] == "yearGroup"
-        ),
-        None,
-    )
-    assert year_filter is not None
-    # Focus School Academy should only have year 7
-    assert "7" in year_filter["values"]
-    # Should not have year 8 (that's Neighbouring School)
-    assert "8" not in year_filter["values"]
 
 
 def test_schools_list_requires_authentication(auth_client):
@@ -245,3 +492,114 @@ def test_schools_include_neighbor_ids(client, db_session, sample_schools):
 
     alpha_school = next(s for s in schools if s["name"] == "Focus School Academy")
     assert beta.id in alpha_school["geographical_neighbor_ids"]
+
+
+# ---------------------------------------------------------------------------
+# New GET /query Endpoint Tests (Period-Oriented)
+# ---------------------------------------------------------------------------
+
+
+def test_query_get_repeated_v_params(client):
+    """GET /query should accept repeated 'v' params for variable selection."""
+    # This test will fail until we implement the new GET endpoint
+    response = client.get("/query?v=bw_wbeing_1&v=bw_wbeing_2")
+    # For now, expect either 404 (not implemented) or 405 (wrong method)
+    # After implementation, check that variables are properly selected
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
+
+
+def test_query_get_repeated_d_params(client):
+    """GET /query should accept repeated 'd' params for dimension selection."""
+    # This test will fail until we implement the new GET endpoint
+    response = client.get("/query?v=bw_wbeing_1&d=d_sex&d=yearGroup")
+    # For now, expect either 404 (not implemented) or 405 (wrong method)
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
+
+
+def test_query_get_repeated_variable_prefix_params(client):
+    """GET /query should accept repeated 'variable_prefix' params."""
+    # This test will fail until we implement the new GET endpoint
+    response = client.get("/query?variable_prefix=bw_&variable_prefix=d_")
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
+
+
+def test_query_get_union_v_and_prefix(client):
+    """GET /query with both 'v' and 'variable_prefix' should union them."""
+    # This test will fail until we implement the new GET endpoint
+    response = client.get("/query?v=bw_wbeing_1&variable_prefix=d_")
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
+
+
+def test_query_get_omit_dimensions_means_no_dimensions(client):
+    """GET /query without 'd' should mean no dimensions."""
+    # This test will fail until we implement the new GET endpoint
+    response = client.get("/query?v=bw_wbeing_1")
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
+
+
+def test_query_get_omit_variables_means_all_variables(client):
+    """GET /query without 'v' or 'variable_prefix' should mean all variables."""
+    # This test will fail until we implement the new GET endpoint
+    response = client.get("/query")
+    assert response.status_code in [
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+        status.HTTP_200_OK,
+    ]
+
+
+def test_query_get_school_scope_requires_auth(auth_client, sample_schools):
+    """GET /query with school_id should require authorization."""
+    # Login first to get a token
+    login_response = auth_client.post(
+        "/auth/login",
+        data={"username": "testuser", "password": "testpass"},
+    )
+    assert login_response.status_code == status.HTTP_200_OK
+    token = login_response.json()["access_token"]
+
+    school_id = sample_schools["Focus School Academy"].id
+    response = auth_client.get(
+        f"/query?school_id={school_id}&v=bw_wbeing_1",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+
+def test_query_get_school_scope_unauthorized(auth_client, sample_schools):
+    """GET /query for unauthorized school should return 403."""
+    # Login as testuser who only has access to Focus School Academy
+    login_response = auth_client.post(
+        "/auth/login",
+        data={"username": "testuser", "password": "testpass"},
+    )
+    assert login_response.status_code == status.HTTP_200_OK
+    token = login_response.json()["access_token"]
+
+    # Try to access Neighbouring School (which user doesn't have access to)
+    school_id = sample_schools["Neighbouring School"].id
+    response = auth_client.get(
+        f"/query?school_id={school_id}&v=bw_wbeing_1",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN

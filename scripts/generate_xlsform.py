@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Generate BeWell XLSForm from i18n strings and data.csv structure.
+Generate BeWell XLSForm from i18n strings and the current v2 structure.
 
 Usage:
-    python scripts/generate_xlsform.py -o odk-forms/bewell_questionnaire.xlsx
+    python scripts/generate_xlsform.py -o odk-forms/bewell_questionnaire_v2.xlsx
 """
 import argparse
 import pandas as pd
@@ -372,14 +372,7 @@ def generate_xlsform(output_path: Path):
     # Survey sheet
     survey_rows = []
     
-    # Metadata fields
-    survey_rows.append({
-        "type": "text",
-        "name": "wave",
-        "label": "Wave",
-        "constraint": "",
-        "required": "no",
-    })
+    # Shared metadata fields
     survey_rows.append({
         "type": "text",
         "name": "uid",
@@ -389,73 +382,8 @@ def generate_xlsform(output_path: Path):
     })
     survey_rows.append({
         "type": "text",
-        "name": "name",
-        "label": "Name",
-        "constraint": "",
-        "required": "no",
-    })
-    survey_rows.append({
-        "type": "text",
         "name": "school",
         "label": "School",
-        "constraint": "",
-        "required": "no",
-    })
-    survey_rows.append({
-        "type": "integer",
-        "name": "yearGroup",
-        "label": "Year Group",
-        "constraint": "",
-        "required": "no",
-    })
-    survey_rows.append({
-        "type": "integer",
-        "name": "schoolYear",
-        "label": "School Year",
-        "constraint": "",
-        "required": "no",
-    })
-    survey_rows.append({
-        "type": "text",
-        "name": "class",
-        "label": "Class",
-        "constraint": "",
-        "required": "no",
-    })
-    
-    # Demographics
-    survey_rows.append({
-        "type": "integer",
-        "name": "d_age",
-        "label": "Age",
-        "constraint": ". >= 0",
-        "required": "no",
-    })
-    survey_rows.append({
-        "type": "select_one sex",
-        "name": "d_sex",
-        "label": "Sex",
-        "constraint": "",
-        "required": "no",
-    })
-    survey_rows.append({
-        "type": "select_one ethnicity",
-        "name": "d_ethnicity",
-        "label": "Ethnicity",
-        "constraint": "",
-        "required": "no",
-    })
-    survey_rows.append({
-        "type": "select_one sexual_orientation",
-        "name": "d_sexualOrientation",
-        "label": "Sexual Orientation",
-        "constraint": "",
-        "required": "no",
-    })
-    survey_rows.append({
-        "type": "select_one gender_identity",
-        "name": "d_genderIdentity",
-        "label": "Gender Identity",
         "constraint": "",
         "required": "no",
     })
@@ -489,10 +417,10 @@ def generate_xlsform(output_path: Path):
     choices_df = pd.DataFrame(choices_rows)
     
     # Settings sheet
-    settings_df = pd.DataFrame([{
+        settings_df = pd.DataFrame([{
         "form_id": "bewell_questionnaire",
-        "version": "1",
-        "form_title": "BeWell Questionnaire",
+        "version": "2",
+        "form_title": "BeWell Questionnaire (v2)",
     }])
     
     # Write to Excel
@@ -512,8 +440,8 @@ def main():
     parser.add_argument(
         "-o", "--output",
         type=Path,
-        default=Path("odk-forms/bewell_questionnaire.xlsx"),
-        help="Output XLSForm path (default: odk-forms/bewell_questionnaire.xlsx)",
+        default=Path("odk-forms/bewell_questionnaire_v2.xlsx"),
+        help="Output XLSForm path (default: odk-forms/bewell_questionnaire_v2.xlsx)",
     )
     
     args = parser.parse_args()

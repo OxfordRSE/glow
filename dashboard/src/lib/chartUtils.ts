@@ -1,4 +1,4 @@
-import type { QueryResult } from "./api";
+import type { QueryResult, NewQueryResponse } from "./api";
 import { parseCSV } from "./csvUtils";
 
 const PALETTE = [
@@ -34,7 +34,7 @@ export interface ChartJsData {
 export interface ChartOutput {
   data: ChartJsData;
   options: Record<string, unknown>;
-  type?: 'bar' | 'line' | 'horizontalBar';
+  type?: "bar" | "line" | "horizontalBar";
 }
 
 export interface ChartLabelOptions {
@@ -50,7 +50,7 @@ export interface ChartLabelOptions {
  * vs multi-wave data (should use line chart).
  */
 function isSingleWave(groupBy: string[]): boolean {
-  return !groupBy.includes('wave');
+  return !groupBy.includes("wave");
 }
 
 function resolveChartLabels(options: ChartLabelOptions = {}) {
@@ -61,12 +61,17 @@ function resolveChartLabels(options: ChartLabelOptions = {}) {
   };
 }
 
-function baseOptions(yLabel = "Count", horizontal = false, min?: number, max?: number): Record<string, unknown> {
+function baseOptions(
+  yLabel = "Count",
+  horizontal = false,
+  min?: number,
+  max?: number,
+): Record<string, unknown> {
   const scaleConfig: Record<string, unknown> = {
     beginAtZero: true,
     title: { display: true, text: yLabel },
   };
-  
+
   // Add min/max if provided
   if (min !== undefined) {
     scaleConfig.min = min;
@@ -74,20 +79,22 @@ function baseOptions(yLabel = "Count", horizontal = false, min?: number, max?: n
   if (max !== undefined) {
     scaleConfig.max = max;
   }
-  
+
   return {
     responsive: true,
     maintainAspectRatio: false,
-    indexAxis: horizontal ? 'y' : 'x',
+    indexAxis: horizontal ? "y" : "x",
     plugins: {
       legend: { position: "top" as const },
       tooltip: { mode: "index" as const, intersect: false },
     },
-    scales: horizontal ? {
-      x: scaleConfig,
-    } : {
-      y: scaleConfig,
-    },
+    scales: horizontal
+      ? {
+          x: scaleConfig,
+        }
+      : {
+          y: scaleConfig,
+        },
   };
 }
 
@@ -105,12 +112,17 @@ export function frequencyToChartData(
   const chartLabels = resolveChartLabels(labelOptions);
   const { headers, rows } = parseCSV(result.csv);
   const horizontal = isSingleWave(groupBy);
-  
+
   if (headers.length === 0 || rows.length === 0) {
     return {
       data: { labels: [], datasets: [] },
-      options: baseOptions(chartLabels.countLabel, horizontal, labelOptions.min, labelOptions.max),
-      type: horizontal ? 'horizontalBar' : 'bar',
+      options: baseOptions(
+        chartLabels.countLabel,
+        horizontal,
+        labelOptions.min,
+        labelOptions.max,
+      ),
+      type: horizontal ? "horizontalBar" : "bar",
     };
   }
 
@@ -147,7 +159,7 @@ export function frequencyToChartData(
         labelOptions.min,
         labelOptions.max,
       ),
-      type: horizontal ? 'horizontalBar' : 'bar',
+      type: horizontal ? "horizontalBar" : "bar",
     };
   }
 
@@ -186,21 +198,26 @@ export function frequencyToChartData(
 
   return {
     data: { labels: xLabels, datasets },
-    options: baseOptions(chartLabels.countLabel, horizontal, labelOptions.min, labelOptions.max),
-    type: horizontal ? 'horizontalBar' : 'bar',
+    options: baseOptions(
+      chartLabels.countLabel,
+      horizontal,
+      labelOptions.min,
+      labelOptions.max,
+    ),
+    type: horizontal ? "horizontalBar" : "bar",
   };
 }
 
 /**
  * Convert a FrequencyResult to a line-chart dataset (for trend/wave data).
  * xCol = the column to use as the x-axis (e.g. "wave").
- * 
+ *
  * Multi-wave line chart styling:
  * - Wave on horizontal axis
  * - Non-focus school data in grey with alpha
  * - Focus school data in color with full opacity
  * - Focus school data split into different colored lines if required by aggregator
- * 
+ *
  * Options:
  * - focusSchoolName: If provided, this school's data will be rendered in color with full opacity
  * - All other schools will be rendered in grey with alpha
@@ -214,12 +231,12 @@ export function frequencyToLineData(
 ): ChartOutput {
   const chartLabels = resolveChartLabels(labelOptions);
   const { headers, rows } = parseCSV(result.csv);
-  
+
   if (headers.length === 0 || rows.length === 0) {
     const yScaleConfig: Record<string, unknown> = { beginAtZero: true };
     if (labelOptions.min !== undefined) yScaleConfig.min = labelOptions.min;
     if (labelOptions.max !== undefined) yScaleConfig.max = labelOptions.max;
-    
+
     return {
       data: { labels: [], datasets: [] },
       options: {
@@ -233,75 +250,90 @@ export function frequencyToLineData(
           y: yScaleConfig,
         },
       },
-      type: 'line',
+      type: "line",
     };
   }
 
   // If we have 'school' in groupBy, we need to separate focus school from neighbors
-  const hasSchool = headers.includes('school');
-  const schoolIdx = hasSchool ? headers.indexOf('school') : -1;
-  
+  const hasSchool = headers.includes("school");
+  const schoolIdx = hasSchool ? headers.indexOf("school") : -1;
+
   // Get all unique x-axis values (e.g., waves)
   const xIdx = headers.indexOf(xCol);
   const xLabels = [...new Set(rows.map((r) => String(r[xIdx] ?? "")))].sort();
-  
+
   // Determine other grouping columns (exclude xCol and school)
-  const otherGroupCols = groupBy.filter(col => col !== xCol && col !== 'school');
-  
+  const otherGroupCols = groupBy.filter(
+    (col) => col !== xCol && col !== "school",
+  );
+
   if (hasSchool && focusSchoolName) {
     // Multi-school line chart with focus school styling
     const schools = [...new Set(rows.map((r) => String(r[schoolIdx] ?? "")))];
-    
+
     // If there are other aggregations, split focus school data by them
     if (otherGroupCols.length > 0) {
       const datasets: ChartDataset[] = [];
-      
+
       for (const school of schools) {
         const isFocus = school === focusSchoolName;
-        const schoolRows = rows.filter(r => String(r[schoolIdx]) === school);
-        
+        const schoolRows = rows.filter((r) => String(r[schoolIdx]) === school);
+
         // Get unique values for other group columns
-        const otherGroups = [...new Set(schoolRows.map(r => 
-          otherGroupCols.map(col => String(r[headers.indexOf(col)] ?? "")).join(" / ")
-        ))];
-        
+        const otherGroups = [
+          ...new Set(
+            schoolRows.map((r) =>
+              otherGroupCols
+                .map((col) => String(r[headers.indexOf(col)] ?? ""))
+                .join(" / "),
+            ),
+          ),
+        ];
+
         otherGroups.forEach((groupLabel, groupIdx) => {
           const data = xLabels.map((xLabel) => {
             const row = schoolRows.find((r) => {
               const xMatch = String(r[xIdx]) === xLabel;
-              const groupMatch = otherGroupCols.map(col => 
-                String(r[headers.indexOf(col)] ?? "")
-              ).join(" / ") === groupLabel;
+              const groupMatch =
+                otherGroupCols
+                  .map((col) => String(r[headers.indexOf(col)] ?? ""))
+                  .join(" / ") === groupLabel;
               return xMatch && groupMatch;
             });
             if (!row) return null;
             const v = row[headers.length - 1]; // Last column is the value
             return v === "" || v === undefined ? null : Number(v);
           });
-          
-          const label = isFocus 
-            ? (otherGroupCols.length > 0 ? groupLabel : school)
+
+          const label = isFocus
+            ? otherGroupCols.length > 0
+              ? groupLabel
+              : school
             : school;
-          
+
           datasets.push({
             label,
             data,
             tension: 0.3,
             fill: false,
-            backgroundColor: isFocus ? PALETTE[groupIdx % PALETTE.length] : GREY,
-            borderColor: isFocus ? PALETTE[groupIdx % PALETTE.length] : GREY + "80",
+            backgroundColor: isFocus
+              ? PALETTE[groupIdx % PALETTE.length]
+              : GREY,
+            borderColor: isFocus
+              ? PALETTE[groupIdx % PALETTE.length]
+              : GREY + "80",
             borderWidth: 2,
           });
         });
       }
-      
-      const yScaleConfig: Record<string, unknown> = { 
-        beginAtZero: true, 
-        title: { display: true, text: chartLabels.meanLabel } 
+
+      const yScaleConfig: Record<string, unknown> = {
+        beginAtZero: true,
+        title: { display: true, text: chartLabels.meanLabel },
       };
       if (labelOptions.min !== undefined) yScaleConfig.min = labelOptions.min;
       if (labelOptions.max !== undefined) yScaleConfig.max = labelOptions.max;
-      
+
       return {
         data: { labels: xLabels, datasets },
         options: {
@@ -311,11 +343,13 @@ export function frequencyToLineData(
             legend: { position: "top" as const },
           },
           scales: {
-            x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
+            x: {
+              title: { display: true, text: chartLabels.columnLabel(xCol) },
+            },
             y: yScaleConfig,
           },
         },
-        type: 'line',
+        type: "line",
       };
     } else {
       // Just school + wave, no other aggregations
@@ -323,13 +357,14 @@ export function frequencyToLineData(
         const isFocus = school === focusSchoolName;
         const data = xLabels.map((xLabel) => {
           const row = rows.find(
-            (r) => String(r[schoolIdx]) === school && String(r[xIdx]) === xLabel,
+            (r) =>
+              String(r[schoolIdx]) === school && String(r[xIdx]) === xLabel,
           );
           if (!row) return null;
           const v = row[headers.length - 1];
           return v === "" || v === undefined ? null : Number(v);
         });
-        
+
         return {
           label: school,
           data,
@@ -340,14 +375,14 @@ export function frequencyToLineData(
           borderWidth: 2,
         };
       });
-      
-      const yScaleConfig: Record<string, unknown> = { 
-        beginAtZero: true, 
-        title: { display: true, text: chartLabels.meanLabel } 
+
+      const yScaleConfig: Record<string, unknown> = {
+        beginAtZero: true,
+        title: { display: true, text: chartLabels.meanLabel },
       };
       if (labelOptions.min !== undefined) yScaleConfig.min = labelOptions.min;
       if (labelOptions.max !== undefined) yScaleConfig.max = labelOptions.max;
-      
+
       return {
         data: { labels: xLabels, datasets },
         options: {
@@ -357,11 +392,13 @@ export function frequencyToLineData(
             legend: { position: "top" as const },
           },
           scales: {
-            x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
+            x: {
+              title: { display: true, text: chartLabels.columnLabel(xCol) },
+            },
             y: yScaleConfig,
           },
         },
-        type: 'line',
+        type: "line",
       };
     }
   } else {
@@ -383,7 +420,7 @@ export function frequencyToLineData(
         x: { title: { display: true, text: chartLabels.columnLabel(xCol) } },
       },
     };
-    return { data: { ...base.data, datasets }, options, type: 'line' };
+    return { data: { ...base.data, datasets }, options, type: "line" };
   }
 }
 
@@ -399,12 +436,17 @@ export function meansToChartData(
   const chartLabels = resolveChartLabels(labelOptions);
   const { headers, rows } = parseCSV(result.csv);
   const horizontal = isSingleWave(groupBy);
-  
+
   if (headers.length === 0 || rows.length === 0) {
     return {
       data: { labels: [], datasets: [] },
-      options: baseOptions(chartLabels.meanLabel, horizontal, labelOptions.min, labelOptions.max),
-      type: horizontal ? 'horizontalBar' : 'bar',
+      options: baseOptions(
+        chartLabels.meanLabel,
+        horizontal,
+        labelOptions.min,
+        labelOptions.max,
+      ),
+      type: horizontal ? "horizontalBar" : "bar",
     };
   }
 
@@ -431,13 +473,18 @@ export function meansToChartData(
 
   return {
     data: { labels: rowLabels, datasets },
-    options: baseOptions(chartLabels.meanLabel, horizontal, labelOptions.min, labelOptions.max),
-    type: horizontal ? 'horizontalBar' : 'bar',
+    options: baseOptions(
+      chartLabels.meanLabel,
+      horizontal,
+      labelOptions.min,
+      labelOptions.max,
+    ),
+    type: horizontal ? "horizontalBar" : "bar",
   };
 }
 
 export function queryToChartData(
-  result: QueryResult,
+  result: { csv: string },
   groupBy: string[],
   labelOptions: ChartLabelOptions = {},
 ): ChartOutput {
@@ -452,22 +499,28 @@ export function queryToChartData(
  * - Focus school data split into different colored lines if required by aggregator
  */
 export function queryToWaveChart(
-  focusSchool: { school_name: string; results: Record<string, unknown>[] | null },
-  neighbors: { school_name: string; results: Record<string, unknown>[] | null }[],
+  focusSchool: {
+    school_name: string;
+    results: Record<string, unknown>[] | null;
+  },
+  neighbors: {
+    school_name: string;
+    results: Record<string, unknown>[] | null;
+  }[],
   aggregations: string[],
   labelOptions: ChartLabelOptions = {},
 ): ChartOutput {
   const chartLabels = resolveChartLabels(labelOptions);
-  
+
   // Combine all data into CSV format for processing
   if (!focusSchool.results || focusSchool.results.length === 0) {
-    const yScaleConfig: Record<string, unknown> = { 
-      beginAtZero: true, 
-      title: { display: true, text: chartLabels.meanLabel } 
+    const yScaleConfig: Record<string, unknown> = {
+      beginAtZero: true,
+      title: { display: true, text: chartLabels.meanLabel },
     };
     if (labelOptions.min !== undefined) yScaleConfig.min = labelOptions.min;
     if (labelOptions.max !== undefined) yScaleConfig.max = labelOptions.max;
-    
+
     return {
       data: { labels: [], datasets: [] },
       options: {
@@ -475,37 +528,261 @@ export function queryToWaveChart(
         maintainAspectRatio: false,
         plugins: { legend: { position: "top" as const } },
         scales: {
-          x: { title: { display: true, text: chartLabels.columnLabel('wave') } },
+          x: {
+            title: { display: true, text: chartLabels.columnLabel("wave") },
+          },
           y: yScaleConfig,
         },
       },
-      type: 'line',
+      type: "line",
     };
   }
-  
-  const allResults = [
-    ...focusSchool.results.map(r => ({ ...r, school: focusSchool.school_name, _isFocus: true })),
-    ...neighbors.flatMap(n => 
-      (n.results || []).map(r => ({ ...r, school: n.school_name, _isFocus: false }))
+
+  const allResults: Array<
+    Record<string, unknown> & { school: string; _isFocus: boolean }
+  > = [
+    ...focusSchool.results.map((r) => ({
+      ...r,
+      school: focusSchool.school_name,
+      _isFocus: true,
+    })),
+    ...neighbors.flatMap((n) =>
+      (n.results || []).map((r) => ({
+        ...r,
+        school: n.school_name,
+        _isFocus: false,
+      })),
     ),
   ];
-  
+
   // Convert to CSV
-  const headers = ['school', ...aggregations, 'mean', 'student_n'];
-  const csvRows = allResults.map(r => {
-    return headers.map(h => {
-      if (h === 'school') return String(r.school);
-      return String(r[h] ?? '');
-    }).join(',');
+  const headers = ["school", ...aggregations, "mean", "student_n"];
+  const csvRows = allResults.map((r) => {
+    return headers
+      .map((h) => {
+        if (h === "school") return String(r.school);
+        return String(r[h] ?? "");
+      })
+      .join(",");
   });
-  const csv = headers.join(',') + '\n' + csvRows.join('\n');
-  
+  const csv = headers.join(",") + "\n" + csvRows.join("\n");
+
   // Use frequencyToLineData with focus school name
   return frequencyToLineData(
     { csv },
-    ['school', ...aggregations],
-    'wave',
+    ["school", ...aggregations],
+    "wave",
     labelOptions,
     focusSchool.school_name,
   );
+}
+
+/**
+ * Convert NewQueryResponse (period-based multi-variable) to ChartJsData
+ *
+ * For single variable:
+ * - Multiple periods: line chart with periods on x-axis
+ * - Single period: bar chart with dimension values on x-axis
+ *
+ * For multiple variables:
+ * - Multiple periods: line chart with one line per variable
+ * - Single period: bar chart with one bar per variable
+ *
+ * Handles suppression and rescaling notes appropriately
+ */
+export function newQueryToChartData(
+  response: NewQueryResponse,
+  labelOptions: ChartLabelOptions = {},
+): ChartOutput {
+  const chartLabels = resolveChartLabels(labelOptions);
+  const { variables, periods, dimensions } = response;
+
+  if (variables.length === 0 || periods.length === 0) {
+    return {
+      data: { labels: [], datasets: [] },
+      options: baseOptions(
+        chartLabels.meanLabel,
+        false,
+        labelOptions.min,
+        labelOptions.max,
+      ),
+      type: "bar",
+    };
+  }
+
+  // Multi-period: line chart
+  if (periods.length > 1) {
+    const datasets: ChartDataset[] = [];
+
+    variables.forEach((variableSlice, varIdx) => {
+      // For each variable, create a line across periods
+      const data: (number | null)[] = periods.map((periodId) => {
+        const periodSlice = variableSlice.periods[periodId];
+        if (
+          !periodSlice ||
+          periodSlice.suppressed ||
+          !periodSlice.cells ||
+          periodSlice.cells.length === 0
+        ) {
+          return null;
+        }
+        // If no dimensions, take the single cell's mean
+        // If dimensions exist, we'd need to aggregate - for now, take first cell
+        const mean = periodSlice.cells[0].mean;
+        return mean !== undefined ? mean : null;
+      });
+
+      datasets.push({
+        label: chartLabels.columnLabel(variableSlice.variable),
+        data,
+        tension: 0.3,
+        fill: false,
+        backgroundColor: PALETTE[varIdx % PALETTE.length],
+        borderColor: PALETTE[varIdx % PALETTE.length],
+        borderWidth: 2,
+      });
+    });
+
+    const yScaleConfig: Record<string, unknown> = {
+      beginAtZero: true,
+      title: { display: true, text: chartLabels.meanLabel },
+    };
+    if (labelOptions.min !== undefined) yScaleConfig.min = labelOptions.min;
+    if (labelOptions.max !== undefined) yScaleConfig.max = labelOptions.max;
+
+    return {
+      data: { labels: periods, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "top" as const },
+        },
+        scales: {
+          x: { title: { display: true, text: "Period" } },
+          y: yScaleConfig,
+        },
+      },
+      type: "line",
+    };
+  } else {
+    // Single period: horizontal bar chart
+    const periodId = periods[0];
+    const labels: string[] = [];
+    const data: (number | null)[] = [];
+
+    variables.forEach((variableSlice) => {
+      const periodSlice = variableSlice.periods[periodId];
+      if (
+        !periodSlice ||
+        periodSlice.suppressed ||
+        !periodSlice.cells ||
+        periodSlice.cells.length === 0
+      ) {
+        labels.push(chartLabels.columnLabel(variableSlice.variable));
+        data.push(null);
+      } else {
+        // If no dimensions, single value per variable
+        if (dimensions.length === 0) {
+          labels.push(chartLabels.columnLabel(variableSlice.variable));
+          const mean = periodSlice.cells[0].mean;
+          data.push(mean !== undefined ? mean : null);
+        } else {
+          // With dimensions, each cell represents a coordinate
+          // For simplicity, show variable + first dimension value
+          periodSlice.cells.forEach((cell) => {
+            const dimLabel = dimensions
+              .map((d) => `${d}=${cell[d]}`)
+              .join(", ");
+            labels.push(
+              `${chartLabels.columnLabel(variableSlice.variable)} (${dimLabel})`,
+            );
+            const mean = cell.mean;
+            data.push(mean !== undefined ? mean : null);
+          });
+        }
+      }
+    });
+
+    return {
+      data: {
+        labels,
+        datasets: [
+          {
+            label: chartLabels.meanLabel,
+            data,
+            backgroundColor: PALETTE[0] + "CC",
+            borderColor: PALETTE[0],
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: baseOptions(
+        chartLabels.meanLabel,
+        true,
+        labelOptions.min,
+        labelOptions.max,
+      ),
+      type: "horizontalBar",
+    };
+  }
+}
+
+/**
+ * Convert NewQueryResponse to CSV format
+ *
+ * CSV structure:
+ * Variable, Period, [Dimension1, Dimension2, ...], Mean, N
+ */
+export function newQueryToCSV(response: NewQueryResponse): string {
+  return newQueryToCSVWithLabels(response);
+}
+
+export function newQueryToCSVWithLabels(
+  response: NewQueryResponse,
+  labelOptions: ChartLabelOptions = {},
+): string {
+  const chartLabels = resolveChartLabels(labelOptions);
+  const { variables, periods, dimensions } = response;
+
+  // Build header
+  const headers = ["Variable", "Period", ...dimensions, "Mean", "N"];
+  const rows = [headers.join(",")];
+
+  // Add data rows
+  variables.forEach((variableSlice) => {
+    periods.forEach((periodId) => {
+      const periodSlice = variableSlice.periods[periodId];
+
+      if (!periodSlice || periodSlice.suppressed || !periodSlice.cells) {
+        // Suppressed period - add a row with empty values
+        const csvRow = [
+          chartLabels.columnLabel(variableSlice.variable),
+          periodId,
+          ...dimensions.map(() => ""),
+          "SUPPRESSED",
+          "0",
+        ];
+        rows.push(csvRow.join(","));
+      } else {
+        // Add row for each cell
+        periodSlice.cells.forEach((cell) => {
+          const dimValues = dimensions.map((d) => String(cell[d] ?? ""));
+          const mean = cell.mean !== undefined ? cell.mean.toFixed(2) : "";
+          const n = String(cell.n);
+
+          const csvRow = [
+            chartLabels.columnLabel(variableSlice.variable),
+            periodId,
+            ...dimValues,
+            mean,
+            n,
+          ];
+          rows.push(csvRow.join(","));
+        });
+      }
+    });
+  });
+
+  return rows.join("\n");
 }

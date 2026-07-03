@@ -344,15 +344,15 @@ const beWellQuestionGroups: Record<string, QuestionGroup> = {
 };
 
 function buildBeeWellColumnLabels(
-    groups: Record<string, QuestionGroup>,
+  groups: Record<string, QuestionGroup>,
 ): Record<string, string> {
   return Object.fromEntries(
-      Object.entries(groups).flatMap(([prefix, group]) =>
-          group.items.map((item, index) => [
-            `${prefix}_${index + 1}`,
-            `${group.label}: ${item}`,
-          ]),
-      ),
+    Object.entries(groups).flatMap(([prefix, group]) =>
+      group.items.map((item, index) => [
+        `${prefix}_${index + 1}`,
+        `${group.label}: ${item}`,
+      ]),
+    ),
   );
 }
 
@@ -378,10 +378,10 @@ export const en = {
     downloadCsv: "Download CSV",
     noData: "No data to display",
     suppressionNotice:
-        "Some values are suppressed to protect student privacy because the cell counts are small.",
+      "Some values are suppressed to protect student privacy because the cell counts are small.",
     count: "Count",
     mean: "Mean",
-    neighbour: "Neighbour"
+    neighbour: "Neighbour",
   },
   table: {
     noData: "No data available.",
@@ -391,48 +391,65 @@ export const en = {
     title: "Dashboard",
     subtitle: "Overview of GLOW longitudinal questionnaire data.",
     loadErrorHelp:
-        "If no data is loaded on the server, charts will be unavailable. Contact an administrator to ensure the dataset is configured correctly.",
+      "If no data is loaded on the server, charts will be unavailable. Contact an administrator to ensure the dataset is configured correctly.",
     participantCountBySchool: "Participant Count by School",
     participantCountBySex: "Participant Count by Sex",
     participantsPerWave: "Participants per Wave (Trend)",
     noDataTitle: "No data available yet.",
     noDataHint:
-        "The server may not have a dataset loaded. Check API configuration.",
+      "The server may not have a dataset loaded. Check API configuration.",
     gettingStarted: "Getting Started",
     gettingStartedExplore:
-        "Use the Explore page to query wellbeing data with privacy-safe blanket suppression.",
+      "Use the Explore page to query wellbeing data with privacy-safe blanket suppression.",
     gettingStartedQuery:
-        "Use the Query Builder to create custom suppression-query plans.",
+      "Use the Query Builder to create custom suppression-query plans.",
     gettingStartedTable:
-        "Charts support Show Table for a tabular view and CSV download for raw results.",
+      "Charts support Show Table for a tabular view and CSV download for raw results.",
     gettingStartedSuppression:
-        "Suppressed cells show a hidden value placeholder to protect privacy.",
+      "Suppressed cells show a hidden value placeholder to protect privacy.",
     gettingStartedAdmin:
-        "As an admin, you can manage users and their pre-filters.",
+      "As an admin, you can manage users and their pre-filters.",
   },
   explore: {
     title: "Explore Data",
-    subtitle: "Query wellbeing data with blanket suppression for privacy protection",
+    subtitle:
+      "Query wellbeing data with blanket suppression for privacy protection",
     queryParameters: "Query Parameters",
     school: "School",
     variable: "Variable",
+    variables: "Variables",
     groupBy: "Group By",
     waves: "Waves",
+    periods: "Periods",
+    periodsObserved: "Periods observed",
+    variablesSelected: "Variables selected",
     filters: "Filters",
     neighborType: "Neighbor Type",
     includeNeighborSchools: "Include Neighbor Schools",
     geographical: "Geographical",
     statistical: "Statistical",
-    classAggregationNote: "Note: Class aggregation is only available for your school. It will be excluded when comparing with neighbors.",
+    classAggregationNote:
+      "Note: Class aggregation is only available for your school. It will be excluded when comparing with neighbors.",
     runQuery: "Run Query",
     querying: "Querying...",
-    tryAdjustingFilters: "Try adjusting your filters or reducing the number of aggregation dimensions.",
-    showingComparison: "Showing comparison with {count} neighbor school{plural}.",
+    tryAdjustingFilters:
+      "Try adjusting your filters or reducing the number of aggregation dimensions.",
+    showingComparison:
+      "Showing comparison with {count} neighbor school{plural}.",
     data: "Data",
     mean: "Mean",
     n: "N",
-    selectQueryParams: "Select your query parameters and click \"Run Query\" to explore the data.",
-    privacyProtection: "Privacy protection is automatically applied through blanket suppression.",
+    selectQueryParams:
+      'Select your query parameters and click "Run Query" to explore the data.',
+    selectAtLeastOneVariable: "Please select at least one variable to query.",
+    privacyProtection:
+      "Privacy protection is automatically applied through blanket suppression.",
+    allDataSuppressed:
+      "All data is suppressed due to small group sizes or incompatible versions.",
+    multipleCompatibleVersionsNote:
+      "Data come from multiple compatible versions of the same questionnaire.",
+    rescaledValuesNote:
+      "Some values have been rescaled to allow comparison between form versions.",
     lifeSatisfaction: "Life Satisfaction",
     happiness: "Happiness",
     feelingPositive: "Feeling Positive",
@@ -481,7 +498,8 @@ export const en = {
     create: "Create",
     save: "Save",
     deleteUserTitle: "Delete User",
-    deleteUserConfirm: "Are you sure you want to delete {username}? This cannot be undone.",
+    deleteUserConfirm:
+      "Are you sure you want to delete {username}? This cannot be undone.",
     deleting: "Deleting…",
     invalidScopeJson: "Invalid scope JSON.",
   },
@@ -559,6 +577,22 @@ export const en = {
     bw_bullying_total: "Bullying total",
     bw_mhcontact_total: "Mental health contact total",
     ...buildBeeWellColumnLabels(beWellQuestionGroups),
+    phq9_1: "PHQ-9: Little interest or pleasure in doing things",
+    phq9_2: "PHQ-9: Feeling down, depressed, or hopeless",
+    phq9_3: "PHQ-9: Trouble falling or staying asleep, or sleeping too much",
+    phq9_4: "PHQ-9: Feeling tired or having little energy",
+    phq9_5: "PHQ-9: Poor appetite or overeating",
+    phq9_6: "PHQ-9: Feeling bad about yourself or that you are a failure",
+    phq9_7: "PHQ-9: Trouble concentrating on things",
+    phq9_8: "PHQ-9: Moving or speaking slowly or being fidgety or restless",
+    phq9_9:
+      "PHQ-9: Thoughts that you would be better off dead or of hurting yourself",
+    phq9_total: "PHQ-9 total",
+  },
+  forms: {
+    bewell_questionnaire: "BeWell questionnaire",
+    phq9_questionnaire: "PHQ-9 questionnaire",
+    demographics_questionnaire: "Demographics questionnaire",
   },
 } as const;
 

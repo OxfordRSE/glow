@@ -218,28 +218,33 @@ npm run check
 
 ## Deployment (AWS)
 
-See `deploy/terraform/` for infrastructure definitions (EC2 + ALB + Route53).
+See `deploy/aws/` for the AWS deployment package.
 
-See `DEPLOYMENT.md` for the quick start guide using `./deploy/deploy.sh`.
+See `DEPLOYMENT.md` for the quick start guide using `uv run --project deploy/aws deploy/aws/deploy.py`.
 
 The deployment uses:
-- EC2 instance running Docker Compose
-- Application Load Balancer with subdomain routing
-- Route 53 for DNS management
-- ACM for TLS certificates
+- A thin runner AMI built with CodeBuild + Packer
+- EC2 runner instances launched from a Terraform-managed launch template
+- An Application Load Balancer with host-based routing
+- A persistent EBS data volume that is detached from the old instance and reattached to the new one during deployment
+- ACM for TLS certificates, with DNS validation records emitted for the external DNS owner
 - Auto-configured ODK Central integration
 
-### Terraform variables
+### Deployment entrypoint
 
-See `deploy/terraform/variables.tf` for all available variables. Key ones:
+```bash
+uv run --project deploy/aws deploy/aws/deploy.py --domain eu.glow-project.org
+```
 
-| Variable | Description |
-|---|---|
-| `image_tag` | Docker image tag (set by deploy.sh) |
-| `api_secret_key` | JWT secret (set by deploy.sh from env) |
-| `aws_region` | AWS region |
-| `api_min_n` | Minimum N for suppression (default: 5) |
-| `certificate_arn` | ACM certificate ARN for HTTPS (optional) |
+Useful flags:
+
+- `--certificate-arn arn:aws:acm:...`
+- `--git-ref v1.2.3`
+- `--aws-region eu-west-2`
+- `--force-rebuild`
+- `--verbose`
+
+Because DNS is assumed to be managed externally, the deploy command prints the ALB routing records you need to send to the owner of the enclosing DNS zone. If no matching issued ACM certificate exists yet, it also prints the ACM validation records needed before deployment can proceed.
 
 ## Data Collection & Format
 
@@ -251,73 +256,88 @@ In production, data is collected via [ODK Central](https://docs.getodk.org/centr
 Real users → ODK Collect app → ODK Central → Glow API → Dashboard
 ```
 
-The BeWell questionnaire form is already included in this repo at `odk-forms/bewell_questionnaire.xml`. The form includes:
+The current BeWell questionnaire form is included in this repo at `odk-forms/bewell_questionnaire_v2.xml`. The historical v1 form, PHQ-9 form, and demographics form also live under `odk-forms/`.
 
 - `uid` — student identifier (used for N counting in suppression)
-- `wave` — survey wave number
-- `school`, `yearGroup`, `class` — school structure
-- `sex`, `ethnicity` — demographics
-- `d_age`, `d_city`, `d_country` — derived/custom fields
+- `school` — school identifier carried on each questionnaire form
 - Questionnaire items from the [#BeeWell GM Survey](https://beewellprogramme.org) (e.g. `bw_wbeing_1`–`bw_wbeing_7` for SWEMWBS wellbeing, `bw_emodies_1`–`bw_emodies_10` for emotional difficulties, and ~120 further items)
 
-The form is automatically uploaded to ODK Central during deployment (see `deploy/scripts/activate-stack.sh`).
+The form is automatically uploaded to ODK Central during deployment by `deploy/aws/runtime/activate-stack.sh`.
 
 ### Development/Testing Data Flow
 
 For local development and testing, synthetic data is generated and seeded into ODK Central:
 
 ```
-glow-dummies → data/data.csv → seed_odk_test_data.py → ODK Central → Glow API → Dashboard
+glow-dummies → glow_base.csv → transform_mock_data.py → mock_seed/*.csv + manifest.csv → seed_odk_test_data.py → rewrite_odk_submission_timestamps.py → ODK Central → Glow API → Dashboard
 ```
 
 #### Step 1: Generate Synthetic Data
 
-Use [glow-dummies](https://github.com/OxfordRSE/glow-dummies) to generate realistic test data:
+Use [glow-dummies](https://github.com/OxfordRSE/glow-dummies) to generate realistic base test data:
 
 ```bash
 # Install glow-dummies
 pip install glow-dummies
 
-# Generate synthetic BeWell data
+# Generate canonical base data
 glow_dummies \
-  --config https://raw.githubusercontent.com/OxfordRSE/glow-dummies/main/examples/beewell_model.toml \
+  --config https://raw.githubusercontent.com/OxfordRSE/glow-dummies/main/examples/glow_model.toml \
   --seed 42 \
   --output csv \
-  > data/data.csv
+  > data/glow_base.csv
 ```
 
-This creates a CSV with the same structure as production data (student×wave long format with ~140 columns).
+This creates a clean wide base CSV with BeeWell v2, demographics, PHQ-9, and a synthetic overlap-control item.
 
-#### Step 2: Seed ODK Central
+### Step 2: Transform Base Data Into Per-Form Seed CSVs
+
+```bash
+python scripts/odk/transform_mock_data.py \
+  --input data/glow_base.csv \
+  --output-dir data/mock_seed \
+  --forms-dir odk-forms
+```
+
+This produces deterministic per-form CSVs and a manifest describing school wave patterns, BeeWell version usage, missingness, and intended submission timestamps.
+
+#### Step 3: Seed ODK Central
 
 Upload the generated data to your local ODK Central instance:
 
 ```bash
-cd deploy/scripts
-pip install -r requirements.txt
-
-# Seed all rows from data.csv
-python seed_odk_test_data.py \
-  --csv ../../data/data.csv \
-  --odk-url http://localhost:8080 \
+uv run scripts/odk/seed_odk_test_data.py \
+  --seed-dir data/mock_seed \
+  --manifest data/mock_seed/manifest.csv \
+  --forms-dir odk-forms \
+  --odk-url https://localhost:8443 \
   --email admin@example.com \
   --password your-odk-password \
-  --project-id 1 \
-  --form-id bewell_questionnaire
+  --project-id 1
 
-# Or seed just the first 100 rows for faster testing
-python seed_odk_test_data.py \
-  --csv ../../data/data.csv \
-  --odk-url http://localhost:8080 \
+# Or limit each phase for faster testing
+uv run scripts/odk/seed_odk_test_data.py \
+  --seed-dir data/mock_seed \
+  --manifest data/mock_seed/manifest.csv \
+  --forms-dir odk-forms \
+  --odk-url https://localhost:8443 \
   --email admin@example.com \
   --password your-odk-password \
   --project-id 1 \
   --limit 100
 ```
 
-The seeding script is **idempotent** — it uses the `uid` field as the instance ID, so running it multiple times won't create duplicates.
+#### Step 4: Rewrite Submission Timestamps
 
-#### Step 3: Verify Data Ingestion
+```bash
+python scripts/odk/rewrite_odk_submission_timestamps.py \
+  --manifest data/mock_seed/manifest.csv
+```
+
+The seeding workflow is idempotent at the submission level and uses the
+generated `instance_id` values from the transformed per-form CSVs.
+
+#### Step 5: Verify Data Ingestion
 
 The Glow API polls ODK Central hourly (configurable via `GLOW_DATA_REFRESH_HOURS`). To force an immediate refresh during development:
 
@@ -333,13 +353,6 @@ You should see logs showing data being fetched from ODK Central and cached.
 
 ### Minimal Demo Data
 
-For quick testing with minimal data (21 rows, 2 waves, 2 schools), use the included demo dataset:
-
-```bash
-python deploy/scripts/seed_odk_test_data.py \
-  --csv testdata/demo_data.csv \
-  --odk-url http://localhost:8080 \
-  --email admin@example.com \
-  --password your-odk-password \
-  --project-id 1
-```
+For quick smoke testing, the checked-in demo dataset still exists, but the main
+development/demo workflow now uses the canonical base-data plus transform flow
+described above.

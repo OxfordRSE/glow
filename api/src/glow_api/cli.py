@@ -15,7 +15,7 @@ import json
 import sys
 
 import click
-from sqlalchemy import select, insert
+from sqlalchemy import select
 
 from glow_api.auth import get_password_hash
 from glow_api.database import (
@@ -280,8 +280,12 @@ def schools_create(name: str, size: str | None, category: str | None) -> None:
     default=2,
     help="Minimum number of statistical neighbors per school (default: 2)",
 )
-@click.option("--no-create-users", is_flag=True, help="Create new users for each school.")
-def schools_sync(min_geographical: int, min_statistical: int, no_create_users: bool = True) -> None:
+@click.option(
+    "--no-create-users", is_flag=True, help="Create new users for each school."
+)
+def schools_sync(
+    min_geographical: int, min_statistical: int, no_create_users: bool = True
+) -> None:
     """Extract schools from loaded data, create neighbor relationships, and grant admin access.
 
     This command:
@@ -419,7 +423,9 @@ def schools_sync(min_geographical: int, min_statistical: int, no_create_users: b
             click.echo("   Creating users for schools...")
             for school in schools:
                 username = "".join(c for c in school.name if c.isupper())
-                user = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+                user = db.execute(
+                    select(User).where(User.username == username)
+                ).scalar_one_or_none()
                 if user is None:
                     create_user(
                         db=db,
@@ -427,7 +433,7 @@ def schools_sync(min_geographical: int, min_statistical: int, no_create_users: b
                         hashed_password=get_password_hash(username),
                         is_active=True,
                         is_admin=False,
-                        school_ids=[school.id]
+                        school_ids=[school.id],
                     )
                     click.echo(f"      {school.name} -> {username}:{username}")
 

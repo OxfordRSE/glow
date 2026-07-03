@@ -1,165 +1,168 @@
-import re
+"""Period-oriented multi-variable query endpoint."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, Response, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
-from glow_api.auth import get_current_user
-from glow_api.blanket_suppression import execute_query_with_neighbors
-from glow_api.dashboard_query_options import build_query_options, validate_query_request
+from glow_api import __version__
+from glow_api.canonical_query import normalize_query
+from glow_api.query_execution import execute_query, compute_query_etag
 from glow_api.data import DataStore, get_datastore
 from glow_api.database import get_db, get_school_by_id
-from glow_api.models import (
-    QueryRequest,
-    QueryResponse,
-    QueryResult,
-    QueryResultForWave,
-    UserRead,
-)
 from glow_api.settings import settings
 
 router = APIRouter(prefix="/query", tags=["query"])
 
-
-def sort_key(value: str) -> str:
-    """
-    Replace trailing _<digits> with zero-padded 10-digit version
-    so alphabetical sorting behaves numerically.
-    """
-    return re.sub(
-        r"_(\d+)$",
-        lambda m: f"_{int(m.group(1)):010d}",
-        value,
-    )
+# Use HTTPBearer with auto_error=False to make auth optional for dataset-scoped queries
+security = HTTPBearer(auto_error=False)
 
 
-@router.post("", response_model=QueryResponse, include_in_schema=False)
-@router.post("/", response_model=QueryResponse)
-def query(
-    request: QueryRequest,
-    current_user: UserRead = Depends(get_current_user),
+@router.get("", response_model=None, include_in_schema=False)
+@router.get("/", response_model=None)
+def query_get(
+    response: Response,
+    v: list[str] = Query(default=[], description="Variable names (repeatable)"),
+    d: list[str] = Query(default=[], description="Dimension names (repeatable)"),
+    variable_prefix: list[str] = Query(
+        default=[], description="Variable prefixes (repeatable)"
+    ),
+    school_id: Optional[int] = Query(
+        None, description="Optional school ID for school-scoped query"
+    ),
+    if_none_match: Optional[str] = Header(None, alias="If-None-Match"),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
     datastore: DataStore = Depends(get_datastore),
-) -> QueryResponse:
-    """Execute a query with blanket suppression.
+) -> dict:
+    """Execute a new period-oriented multi-variable query.
 
-    This endpoint:
-    - Validates that the user has access to the requested school
-    - Validates that the variable, waves, and aggregations are allowed
-    - Applies blanket suppression to protect small cohorts
-    - Returns wave-indexed results for focus school and optionally neighbors
+    This endpoint supports:
+    - Dataset-scoped queries (no school_id, anonymous access OK)
+    - School-scoped queries (with school_id, requires authorization)
+    - Variable selection via repeated 'v' params or 'variable_prefix' params
+    - Dimension selection via repeated 'd' params
+    - Period-organized results with independent suppression per period
+    - ETag-based caching with If-None-Match support
+
+    Returns:
+        NewQueryResponse with period-organized multi-variable results
     """
-    # Authorization: user must have access to requested school or be admin
-    if not current_user.is_admin and request.school_id not in current_user.school_ids:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You do not have access to school {request.school_id}",
-        )
+    # Normalize query parameters
+    canonical = normalize_query(
+        school_id=school_id,
+        v=v,
+        d=d,
+        variable_prefix=variable_prefix,
+    )
 
-    # Get school and neighbors
-    focus_school = get_school_by_id(db, request.school_id)
-    if focus_school is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"School {request.school_id} not found",
-        )
-
-    # Build query options for validation (scoped to focus school)
+    # Get dataset version for ETag
     dfwl = datastore.to_frozen()
-    query_options = build_query_options(dfwl, focus_school.name)
+    dataset_version = dfwl.metadata.get("_etag", "unknown")
 
-    # Validate request using query options
-    valid, error_message = validate_query_request(
-        variable=request.variable,
-        waves=request.waves,
-        aggregations=request.aggregations,
-        filters=request.filters,
-        query_options=query_options,
-        include_neighbors=request.include_neighbors,
+    # Compute ETag
+    etag = compute_query_etag(
+        query=canonical,
+        dataset_version=dataset_version,
+        api_version=__version__,
     )
 
-    if not valid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_message,
-        )
+    # Check If-None-Match
+    if if_none_match and if_none_match == etag:
+        # Data hasn't changed
+        response.status_code = status.HTTP_304_NOT_MODIFIED
+        return {}
 
-    # Get neighbor schools
-    neighbor_schools = []
-    if request.include_neighbors:
-        if request.neighbor_type == "geographical":
-            neighbor_schools = focus_school.geographical_neighbors
-        else:
-            neighbor_schools = focus_school.statistical_neighbors
+    # Set ETag header
+    response.headers["ETag"] = etag
 
-    # Get data and check if variable exists
-    df = dfwl.df
-    if request.variable not in df.columns:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Variable '{request.variable}' not found in data",
-        )
-
-    # Execute query with blanket suppression (wave-indexed)
-    query_params = {
-        "school": focus_school.name,
-        "variable": request.variable,
-        "waves": request.waves,
-        "group_by": request.aggregations,
-        "filters": request.filters,
-        "neighbors": [n.name for n in neighbor_schools],
-    }
-
-    result = execute_query_with_neighbors(
-        df=df,
-        query_params=query_params,
-        min_n=settings.MIN_N,
-    )
-
-    # Format focus school result (wave-indexed)
-    focus_wave_results = {}
-    for wave, wave_data in result["focus"].items():
-        focus_wave_results[wave] = QueryResultForWave(
-            suppressed=wave_data["suppressed"],
-            suppression_message=wave_data.get("message"),
-            results=wave_data.get("data"),
-        )
-
-    focus_result = QueryResult(
-        school_id=focus_school.id,
-        school_name=focus_school.name,
-        results=focus_wave_results,
-    )
-
-    # Format neighbor results (wave-indexed, only schools with some non-suppressed data)
-    neighbor_results = []
-    for neighbor_data in result["neighbors"]:
-        # Find the school object for this neighbor
-        neighbor_school = next(
-            (n for n in neighbor_schools if n.name == neighbor_data["school"]), None
-        )
-        if neighbor_school:
-            neighbor_wave_results = {}
-            for wave, wave_data in neighbor_data["results"].items():
-                neighbor_wave_results[wave] = QueryResultForWave(
-                    suppressed=wave_data["suppressed"],
-                    suppression_message=wave_data.get("message"),
-                    results=wave_data.get("data"),
-                )
-
-            neighbor_results.append(
-                QueryResult(
-                    school_id=neighbor_school.id,
-                    school_name=neighbor_school.name,
-                    results=neighbor_wave_results,
-                )
+    # If school_id is provided, check authorization
+    if school_id is not None:
+        if credentials is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required for school-scoped queries",
             )
 
-    return QueryResponse(
-        focus_school=focus_result,
-        neighbors=neighbor_results,
-        variable=request.variable,
-        waves=request.waves,
-        aggregations=request.aggregations,
-        filters=request.filters,
-        metadata=query_options.metadata,
+        # Decode and validate token
+        try:
+            payload = jwt.decode(
+                credentials.credentials,
+                settings.SECRET_KEY,
+                algorithms=[settings.ALGORITHM],
+            )
+            username: str | None = payload.get("sub")
+            if username is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Could not validate credentials",
+                )
+        except JWTError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+            )
+
+        # Get user from database
+        from glow_api.database import get_user_by_username
+
+        user = get_user_by_username(db, username)
+        if user is None or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+            )
+
+        # Check if user has access to the requested school
+        user_school_ids = [s.id for s in user.schools]
+        if not user.is_admin and school_id not in user_school_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You do not have access to school {school_id}",
+            )
+
+        # Verify school exists
+        school = get_school_by_id(db, school_id)
+        if school is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"School {school_id} not found",
+            )
+
+        # Filter data to this school
+        df = dfwl.df
+        df = df[df["school"] == school.name]
+        school_name = school.name
+    else:
+        # Dataset-scoped query
+        df = dfwl.df
+        school_name = None
+
+    # Data should already be normalized with period_id column from DataStore
+    # But verify it exists
+    if "period_id" not in df.columns:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Data normalization error: period_id column missing",
+        )
+
+    # Get numerical whitelist and observed periods from pre-computed metadata
+    numerical_whitelist = dfwl.numerical_whitelist
+    observed_periods = dfwl.observed_periods.get(school_name, [])
+
+    # Get form metadata for version compatibility
+    form_metadata = dfwl.metadata
+
+    # Execute query
+    result = execute_query(
+        df=df,
+        query=canonical,
+        numerical_whitelist=numerical_whitelist,
+        observed_periods=observed_periods,
+        min_n=settings.MIN_N,
+        form_metadata=form_metadata,
     )
+
+    return result

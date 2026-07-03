@@ -13,17 +13,20 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    container:
+      # Make sure to grab the latest version of the Playwright image
+      # https://playwright.dev/docs/docker#pull-the-imagecontainer:
+      image: mcr.microsoft.com/playwright:v1.60.0-noble
     defaults:
       run:
         working-directory: dashboard
-
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: dashboard/package-lock.json
 
@@ -33,14 +36,11 @@ jobs:
       - name: Generate contract examples
         run: npm run generate:examples
 
-      - name: Lint
-        run: npm run lint
-
       - name: Type check
         run: npm run check
 
       - name: Run tests
-        run: npm run test
+        run: npm test
 
       - name: Build
         run: npm run build

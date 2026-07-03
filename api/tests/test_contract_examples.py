@@ -12,9 +12,11 @@ MODEL_MAP = {
     "TokenResponse": models.Token,
     "UserRead": models.UserRead,
     "SchoolListResponse": models.SchoolListResponse,
-    "QueryRequest": models.QueryRequest,
-    "QueryResponse": models.QueryResponse,
     "ErrorDetailResponse": models.ErrorDetailResponse,
+    "MeAnonymous": models.MeAnonymous,
+    "MeAuthenticated": models.MeAuthenticated,
+    "DimensionsResponse": models.DimensionsResponse,
+    "NewQueryResponse": models.NewQueryResponse,
 }
 
 

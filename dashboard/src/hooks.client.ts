@@ -1,6 +1,11 @@
 import type { HandleClientError } from "@sveltejs/kit";
 
-export const handleError: HandleClientError = ({ error, event, status, message }) => {
+export const handleError: HandleClientError = ({
+  error,
+  event,
+  status,
+  message,
+}) => {
   // Log errors to console for debugging
   console.error("Unhandled client error:", {
     error,

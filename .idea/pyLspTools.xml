@@ -4,4 +4,17 @@
     <option name="enabled" value="true" />
     <option name="sdkName" value="uv (glow)" />
   </component>
+  <component name="RuffModuleSettingsStorage">
+    <option name="moduleSettings">
+      <map>
+        <entry key="glow-api">
+          <value>
+            <RuffModuleSettingsData>
+              <option name="enabled" value="true" />
+            </RuffModuleSettingsData>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
 </project>

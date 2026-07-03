@@ -4,7 +4,11 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE ?? "/api";
 // Target backend version - update this when making breaking changes to API surface
 export const TARGET_BACKEND_VERSION = "0.1.0";
 
-export type VersionCompatibility = "compatible" | "minor-mismatch" | "major-mismatch" | "unknown";
+export type VersionCompatibility =
+  | "compatible"
+  | "minor-mismatch"
+  | "major-mismatch"
+  | "unknown";
 
 /**
  * Compare semantic versions and determine compatibility status.
@@ -54,32 +58,32 @@ function getFriendlyErrorMessage(status: number, detail?: string): string {
   if (status >= 500) {
     return "The server encountered an error. Please try again later or contact support if the problem persists.";
   }
-  
+
   if (status === 400) {
-    return detail 
+    return detail
       ? `Your request could not be processed: ${detail}`
       : "Your request could not be processed. Please check your input and try again.";
   }
-  
+
   if (status === 401) {
     return "You are not authenticated. Please log in and try again.";
   }
-  
+
   if (status === 403) {
-    return detail 
+    return detail
       ? `Access denied: ${detail}`
       : "You do not have permission to access this resource.";
   }
-  
+
   if (status === 404) {
     return "The requested resource was not found.";
   }
-  
+
   // For other client errors (4xx)
   if (status >= 400 && status < 500) {
     return detail || "There was a problem with your request. Please try again.";
   }
-  
+
   return detail || "An unexpected error occurred. Please try again.";
 }
 
@@ -88,12 +92,12 @@ async function apiFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, options);
-  
+
   if (!res.ok) {
     // Try to parse JSON error details
     let errorDetail: string | undefined;
     let rawBody: string | undefined;
-    
+
     try {
       const contentType = res.headers.get("content-type");
       if (contentType?.includes("application/json")) {
@@ -111,14 +115,15 @@ async function apiFetch<T>(
         status: res.status,
         statusText: res.statusText,
         rawBody,
-        parseError: parseError instanceof Error ? parseError.message : String(parseError),
+        parseError:
+          parseError instanceof Error ? parseError.message : String(parseError),
       });
-      
+
       errorDetail = "The server returned an invalid response.";
     }
-    
+
     const friendlyMessage = getFriendlyErrorMessage(res.status, errorDetail);
-    
+
     // Log detailed error information for debugging
     console.error(`API Error [${res.status}] ${path}:`, {
       status: res.status,
@@ -126,10 +131,10 @@ async function apiFetch<T>(
       detail: errorDetail,
       friendlyMessage,
     });
-    
+
     throw new ApiError(res.status, friendlyMessage, errorDetail);
   }
-  
+
   // Parse successful response
   try {
     const data = await res.json();
@@ -137,11 +142,14 @@ async function apiFetch<T>(
   } catch (parseError) {
     console.error(`Failed to parse successful response from ${path}:`, {
       status: res.status,
-      parseError: parseError instanceof Error ? parseError.message : String(parseError),
+      parseError:
+        parseError instanceof Error ? parseError.message : String(parseError),
     });
-    
+
     // Throw a user-friendly error that matches the server error pattern
-    throw new Error("The server encountered an error processing your request. The response format was invalid.");
+    throw new Error(
+      "The server encountered an error processing your request. The response format was invalid.",
+    );
   }
 }
 
@@ -231,6 +239,82 @@ export async function login(
 
 export async function getMe(token: string): Promise<User> {
   return apiFetch<User>("/admin/me", { headers: authHeaders(token) });
+}
+
+// ─── New /me Endpoint ────────────────────────────────────────────────────────
+
+export interface SchoolSummary {
+  id: number;
+  name: string;
+}
+
+export interface MeAnonymous {
+  kind: "anonymous";
+}
+
+export interface MeAuthenticated {
+  kind: "authenticated";
+  id: number;
+  username: string;
+  is_admin: boolean;
+  schools: SchoolSummary[];
+}
+
+export type MeResponse = MeAnonymous | MeAuthenticated;
+
+/**
+ * Get current user identity (works for both anonymous and authenticated users).
+ * Returns anonymous response if no token provided or token is invalid.
+ */
+export async function me(token?: string): Promise<MeResponse> {
+  const options: RequestInit = token ? { headers: authHeaders(token) } : {};
+  try {
+    return await apiFetch<MeResponse>("/me", options);
+  } catch (error) {
+    // If authentication fails, return anonymous
+    if (
+      error instanceof ApiError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      return { kind: "anonymous" };
+    }
+    throw error;
+  }
+}
+
+// ─── New /dimensions Endpoint ────────────────────────────────────────────────
+
+export interface DimensionDefinition {
+  key: string;
+  type: "string" | "number";
+}
+
+export interface VariableDefinition {
+  key: string;
+  raw_key?: string | null;
+  form_id?: string | null;
+}
+
+export interface DimensionsResponse {
+  school_id?: number;
+  variables: VariableDefinition[];
+  dimensions: DimensionDefinition[];
+}
+
+/**
+ * Get available variables and dimensions for querying.
+ * - No school_id: returns dataset-level dimensions (public, no auth required)
+ * - With school_id: returns school-specific dimensions (requires auth for that school)
+ */
+export async function getDimensions(params: {
+  school_id?: number;
+  token?: string;
+}): Promise<DimensionsResponse> {
+  const { school_id, token } = params;
+  const queryParams = school_id ? `?school_id=${school_id}` : "";
+  const options: RequestInit = token ? { headers: authHeaders(token) } : {};
+
+  return apiFetch<DimensionsResponse>(`/dimensions${queryParams}`, options);
 }
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -408,4 +492,82 @@ export async function query(
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(request),
   });
+}
+
+// ─── New Period-Based GET /query Endpoint ────────────────────────────────────
+
+export interface CanonicalQuery {
+  school_id?: number;
+  variables: string[];
+  dimensions: string[];
+  variable_prefixes: string[];
+}
+
+export interface PeriodSliceCell {
+  mean?: number;
+  n: number;
+  [key: string]: unknown; // Dynamic coordinate fields
+}
+
+export interface PeriodSlice {
+  suppressed: boolean;
+  suppression_reason?: "small-n" | "incompatible-version";
+  notes?: "values-rescaled"[];
+  question_versions?: Record<string, number>;
+  cells?: PeriodSliceCell[];
+}
+
+export interface VariableSlice {
+  variable: string;
+  periods: Record<string, PeriodSlice>; // period_id -> PeriodSlice
+}
+
+export interface NewQueryResponse {
+  query: CanonicalQuery;
+  dimensions: string[];
+  periods: string[]; // Observed period IDs in chronological order
+  variables: VariableSlice[];
+}
+
+export interface QueryParams {
+  v?: string[]; // Variable names (repeatable)
+  d?: string[]; // Dimension names (repeatable)
+  variable_prefix?: string[]; // Variable prefixes (repeatable)
+  school_id?: number; // Optional school ID for school-scoped query
+  token?: string; // Optional token (required for school-scoped queries)
+}
+
+/**
+ * Execute a new period-oriented multi-variable query.
+ *
+ * This endpoint supports:
+ * - Dataset-scoped queries (no school_id, anonymous access OK)
+ * - School-scoped queries (with school_id, requires authorization)
+ * - Variable selection via 'v' params or 'variable_prefix' params
+ * - Dimension selection via 'd' params
+ * - Period-organized results with independent suppression per period
+ * - ETag-based caching with If-None-Match support
+ */
+export async function queryPeriodBased(
+  params: QueryParams,
+): Promise<NewQueryResponse> {
+  const { v = [], d = [], variable_prefix = [], school_id, token } = params;
+
+  // Build query string with repeated parameters
+  const queryParts: string[] = [];
+  v.forEach((variable) => queryParts.push(`v=${encodeURIComponent(variable)}`));
+  d.forEach((dimension) =>
+    queryParts.push(`d=${encodeURIComponent(dimension)}`),
+  );
+  variable_prefix.forEach((prefix) =>
+    queryParts.push(`variable_prefix=${encodeURIComponent(prefix)}`),
+  );
+  if (school_id !== undefined) {
+    queryParts.push(`school_id=${school_id}`);
+  }
+
+  const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+  const options: RequestInit = token ? { headers: authHeaders(token) } : {};
+
+  return apiFetch<NewQueryResponse>(`/query${queryString}`, options);
 }

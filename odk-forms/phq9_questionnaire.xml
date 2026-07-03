@@ -1,0 +1,78 @@
+<?xml version="1.0" ?>
+<h:html xmlns="http://www.w3.org/2002/xforms" xmlns:h="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" xmlns:odk="http://www.opendatakit.org/xforms">
+  <h:head>
+    <h:title>PHQ-9 Questionnaire</h:title>
+    <model odk:xforms-version="1.0.0">
+      <instance>
+        <data id="phq9_questionnaire" version="1">
+          <uid/>
+          <school/>
+          <phq9_1/>
+          <phq9_2/>
+          <phq9_3/>
+          <phq9_4/>
+          <phq9_5/>
+          <phq9_6/>
+          <phq9_7/>
+          <phq9_8/>
+          <phq9_9/>
+          <bw_wbeing_1/>
+          <meta>
+            <instanceID/>
+          </meta>
+        </data>
+      </instance>
+      <bind nodeset="/data/uid" type="string" required="false()"/>
+      <bind nodeset="/data/school" type="string" required="false()"/>
+      <bind nodeset="/data/phq9_1" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/phq9_2" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/phq9_3" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/phq9_4" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/phq9_5" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/phq9_6" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/phq9_7" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/phq9_8" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/phq9_9" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/bw_wbeing_1" type="int" constraint=". &gt;= 0 and . &lt;= 3" required="false()"/>
+      <bind nodeset="/data/meta/instanceID" type="string" readonly="true()" jr:preload="uid"/>
+    </model>
+  </h:head>
+  <h:body>
+    <input ref="/data/uid">
+      <label>Unique ID</label>
+    </input>
+    <input ref="/data/school">
+      <label>School</label>
+    </input>
+    <input ref="/data/phq9_1">
+      <label>PHQ-9: Little interest or pleasure in doing things</label>
+    </input>
+    <input ref="/data/phq9_2">
+      <label>PHQ-9: Feeling down, depressed, or hopeless</label>
+    </input>
+    <input ref="/data/phq9_3">
+      <label>PHQ-9: Trouble falling or staying asleep, or sleeping too much</label>
+    </input>
+    <input ref="/data/phq9_4">
+      <label>PHQ-9: Feeling tired or having little energy</label>
+    </input>
+    <input ref="/data/phq9_5">
+      <label>PHQ-9: Poor appetite or overeating</label>
+    </input>
+    <input ref="/data/phq9_6">
+      <label>PHQ-9: Feeling bad about yourself or that you are a failure</label>
+    </input>
+    <input ref="/data/phq9_7">
+      <label>PHQ-9: Trouble concentrating on things</label>
+    </input>
+    <input ref="/data/phq9_8">
+      <label>PHQ-9: Moving or speaking slowly or being fidgety or restless</label>
+    </input>
+    <input ref="/data/phq9_9">
+      <label>PHQ-9: Thoughts that you would be better off dead or of hurting yourself</label>
+    </input>
+    <input ref="/data/bw_wbeing_1">
+      <label>Collision test field: BeWell-style overlap item name</label>
+    </input>
+  </h:body>
+</h:html>

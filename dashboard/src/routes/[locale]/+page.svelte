@@ -1,93 +1,71 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { authStore } from '$lib/stores';
-  import { listSchools, query, type School, type QueryResponse, type QueryOptions } from '$lib/api';
+  import { authStore, isAuthenticated, currentSchools } from '$lib/stores';
+  import { 
+    getDimensions,
+    queryPeriodBased,
+    me,
+    type MeResponse,
+    type SchoolSummary,
+    type DimensionsResponse,
+    type NewQueryResponse,
+    type VariableDefinition,
+    type DimensionDefinition
+  } from '$lib/api';
   import ChartCard from '$lib/components/ChartCard.svelte';
-  import type { ChartJsData } from '$lib/chartUtils';
+  import { newQueryToChartData, newQueryToCSVWithLabels } from '$lib/chartUtils';
   import { createI18n, locale } from '$lib/i18n';
 
   const i18n = $derived(createI18n($locale));
 
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let schools = $state<School[]>([]);
+  let meResponse = $state<MeResponse | null>(null);
+  let schools = $state<SchoolSummary[]>([]);
   let selectedSchoolId = $state<number | null>(null);
-  let neighborType = $state<'geographical' | 'statistical'>('geographical');  // Always include neighbors, just choose type
   
-  // Query options from selected school
-  const selectedSchool = $derived(
-    schools.find(s => s.id === selectedSchoolId)
-  );
+  // Dimensions from the API
+  let dimensions = $state<DimensionsResponse | null>(null);
   
-  const queryOptions = $derived(selectedSchool?.query_options);
+  // Query options derived from dimensions
+  const availableVariables = $derived(dimensions?.variables ?? []);
+  const availableDimensions = $derived(dimensions?.dimensions ?? []);
   
-  // Query parameters - now loaded from school's query_options
-  const variables = $derived(
-    queryOptions?.variables.map(v => ({
-      value: v,
-      label: i18n.t(`api.${v}`)
-    })) ?? []
-  );
+  // Query parameters
+  let selectedVariables = $state<string[]>([]);
+  let selectedDimensions = $state<string[]>([]);
   
-  const aggregationOptions = $derived(
-    queryOptions?.aggregations
-      .filter(a => a.scope === 'shared')  // Filter out focus_only aggregations
-      .map(a => ({
-        value: a.value,
-        label: i18n.t(`api.${a.value}`)
-      })) ?? []
-  );
-  
-  const filterOptions = $derived(
-    queryOptions?.filters
-      .filter(f => f.value !== 'wave' && f.scope === 'shared')  // Wave is first-class, filter out focus_only
-      .map(f => ({
-        value: f.value,
-        label: i18n.t(`api.${f.value}`),
-        values: f.values ?? []
-      })) ?? []
-  );
-  
-  const waveOptions = $derived(
-    queryOptions?.waves ?? []
-  );
-  
-  let selectedVariable = $state<string>('');
-  let selectedAggregations = $state<string[]>([]);
-  let selectedFilters = $state<Record<string, string[]>>({});
-  let selectedWaves = $state<string[]>([]);  // Wave is now first-class
-  
-  let queryResult = $state<QueryResponse | null>(null);
+  let queryResult = $state<NewQueryResponse | null>(null);
   let queryLoading = $state(false);
   let queryError = $state<string | null>(null);
 
   onMount(async () => {
-    const token = $authStore.token;
-    if (!token) return;
-
     try {
-      // Fetch schools with query_options
-      schools = await listSchools(token);
+      // Get user identity (works for both anonymous and authenticated)
+      const token = $authStore.token ?? undefined;
+      meResponse = await me(token);
       
-      // Pre-select user's first school if available
-      if ($authStore.user?.school_ids && $authStore.user.school_ids.length > 0) {
-        selectedSchoolId = $authStore.user.school_ids[0];
-      } else if (schools.length > 0) {
-        selectedSchoolId = schools[0].id;
+      // Extract schools from authenticated response
+      if (meResponse.kind === "authenticated") {
+        schools = meResponse.schools;
+        
+        // Pre-select user's first school if available
+        if ($currentSchools && $currentSchools.length > 0) {
+          selectedSchoolId = Number($currentSchools[0]);
+        } else if (schools.length > 0) {
+          selectedSchoolId = schools[0].id;
+        }
       }
       
-      // Set defaults based on selected school's query options
-      const opts = selectedSchool?.query_options;
-      if (opts) {
-        // Set default variable if available
-        if (opts.variables.length > 0) {
-          selectedVariable = opts.variables[0];
-        }
-        
-        // Set default waves to all available waves
-        if (opts.waves.length > 0) {
-          selectedWaves = [...opts.waves];
-        }
+      // Fetch dimensions - works for both anonymous and authenticated
+      // If authenticated with a selected school, get school-specific dimensions
+      const school_id = selectedSchoolId ?? undefined;
+      
+      dimensions = await getDimensions({ school_id, token });
+      
+      // Set default variable if available
+      if (dimensions.variables.length > 0) {
+        selectedVariables = [dimensions.variables[0].key];
       }
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : i18n.t('dashboard.loadErrorHelp');
@@ -96,50 +74,56 @@
     }
   });
 
-  function toggleWave(value: string) {
-    if (selectedWaves.includes(value)) {
-      selectedWaves = selectedWaves.filter(w => w !== value);
+  // Refetch dimensions when school selection changes
+  $effect(() => {
+    if (!loading && meResponse?.kind === "authenticated") {
+      const school_id = selectedSchoolId ?? undefined;
+      const token = $authStore.token ?? undefined;
+      
+      // Refetch dimensions for the new school scope
+      getDimensions({ school_id, token })
+        .then(newDimensions => {
+          dimensions = newDimensions;
+          
+          // Clear current selections if they're no longer valid
+          if (selectedVariables.length > 0) {
+            const validVars = new Set(newDimensions.variables.map(v => v.key));
+            selectedVariables = selectedVariables.filter(v => validVars.has(v));
+            
+            // If no variables remain selected, select first available
+            if (selectedVariables.length === 0 && newDimensions.variables.length > 0) {
+              selectedVariables = [newDimensions.variables[0].key];
+            }
+          }
+          
+          // Clear query results when school changes
+          queryResult = null;
+        })
+        .catch(e => {
+          error = e instanceof Error ? e.message : i18n.t('dashboard.loadErrorHelp');
+        });
+    }
+  });
+
+  function toggleVariable(key: string) {
+    if (selectedVariables.includes(key)) {
+      selectedVariables = selectedVariables.filter(v => v !== key);
     } else {
-      selectedWaves = [...selectedWaves, value];
+      selectedVariables = [...selectedVariables, key];
     }
   }
 
-  function toggleAggregation(value: string) {
-    if (selectedAggregations.includes(value)) {
-      selectedAggregations = selectedAggregations.filter(a => a !== value);
+  function toggleDimension(key: string) {
+    if (selectedDimensions.includes(key)) {
+      selectedDimensions = selectedDimensions.filter(d => d !== key);
     } else {
-      selectedAggregations = [...selectedAggregations, value];
+      selectedDimensions = [...selectedDimensions, key];
     }
-  }
-
-  function toggleFilter(dimension: string, value: string) {
-    if (!selectedFilters[dimension]) {
-      selectedFilters[dimension] = [];
-    }
-    
-    if (selectedFilters[dimension].includes(value)) {
-      selectedFilters[dimension] = selectedFilters[dimension].filter(v => v !== value);
-      if (selectedFilters[dimension].length === 0) {
-        delete selectedFilters[dimension];
-      }
-    } else {
-      selectedFilters[dimension] = [...selectedFilters[dimension], value];
-    }
-    selectedFilters = { ...selectedFilters };
   }
 
   async function executeQuery() {
-    const token = $authStore.token;
-    if (!token) {
-      queryError = i18n.t("dashboard.tokenErrorHelp");
-      return;
-    }
-    if (selectedSchoolId === null) {
-      queryError = i18n.t("dashboard.noSchoolErrorHelp");
-      return;
-    }
-    if(selectedWaves.length === 0) {
-      queryError = i18n.t("dashboard.noWavesErrorHelp");
+    if (selectedVariables.length === 0) {
+      queryError = i18n.t("explore.selectAtLeastOneVariable");
       return;
     }
 
@@ -148,17 +132,14 @@
     queryResult = null;
 
     try {
-      // Class aggregation not allowed with neighbors (and neighbors are always included)
-      const aggregations = selectedAggregations.filter(a => a !== 'class');
-
-      queryResult = await query(token, {
-        school_id: selectedSchoolId,
-        variable: selectedVariable,
-        waves: selectedWaves,
-        aggregations,
-        filters: selectedFilters,
-        include_neighbors: true,  // Always include neighbors
-        neighbor_type: neighborType,
+      const token = $authStore.token ?? undefined;
+      const school_id = selectedSchoolId ?? undefined;
+      
+      queryResult = await queryPeriodBased({
+        v: selectedVariables,
+        d: selectedDimensions,
+        school_id,
+        token,
       });
     } catch (e: unknown) {
       queryError = e instanceof Error ? e.message : i18n.t('dashboard.loadErrorHelp');
@@ -167,297 +148,49 @@
     }
   }
 
-  function queryToChartData(response: QueryResponse): ChartJsData {
-    const { focus_school, neighbors, waves } = response;
-
-    // If all waves are suppressed for focus school, return empty
-    const hasAnyData = waves.some(wave => {
-      const waveResult = focus_school.results[wave];
-      return waveResult && !waveResult.suppressed && waveResult.results;
-    });
-
-    if (!hasAnyData) {
-      return { labels: [], datasets: [] };
-    }
-
-    const aggregations = response.aggregations;
-    const datasets: any[] = [];
-    
-    // For multiple waves: x-axis = waves, datasets = school-aggregation combinations
-    // For single wave: x-axis = aggregation values (or school if no aggregations), datasets = schools
-    
-    if (waves.length > 1) {
-      // Multiple waves: line chart with waves on x-axis
-      const labels = waves;
-      
-      if (aggregations.length === 0) {
-        // No aggregations: one dataset per school showing overall mean over time
-        const focusData: number[] = [];
-        waves.forEach(wave => {
-          const waveData = focus_school.results[wave];
-          if (waveData && !waveData.suppressed && waveData.results && waveData.results.length > 0) {
-            focusData.push(waveData.results[0].mean as number);
-          } else {
-            focusData.push(NaN); // Missing data
-          }
-        });
-        
-        datasets.push({
-          label: "Us",
-          data: focusData,
-          backgroundColor: 'rgba(59, 130, 246, 0.8)',
-          borderColor: 'rgba(59, 130, 246, 1)',
-          borderWidth: 2,
-          tension: 0.3,
-          fill: false,
-        });
-        
-        // Add neighbor datasets
-        neighbors.forEach((neighbor, idx) => {
-          const neighborData: number[] = [];
-          waves.forEach(wave => {
-            const waveData = neighbor.results[wave];
-            if (waveData && !waveData.suppressed && waveData.results && waveData.results.length > 0) {
-              neighborData.push(waveData.results[0].mean as number);
-            } else {
-              neighborData.push(NaN);
-            }
-          });
-          
-          const colors = [
-            'rgba(156, 163, 175, 0.5)',
-            'rgba(156, 163, 175, 0.4)',
-            'rgba(156, 163, 175, 0.3)',
-          ];
-          const borderColors = [
-            'rgba(156, 163, 175, 0.8)',
-            'rgba(156, 163, 175, 0.7)',
-            'rgba(156, 163, 175, 0.6)',
-          ];
-          
-          datasets.push({
-            label: `${i18n.t('chart.neighbour')} ${idx + 1}`,
-            data: neighborData,
-            backgroundColor: colors[idx % colors.length],
-            borderColor: borderColors[idx % borderColors.length],
-            borderWidth: 2,
-            tension: 0.3,
-            fill: false,
-          });
-        });
-        
-        return { labels, datasets };
-      } else {
-        // With aggregations: one dataset per school-aggregation combination
-        // First, collect all unique aggregation value combinations from first wave
-        const firstWave = waves[0];
-        const firstWaveData = focus_school.results[firstWave];
-        if (!firstWaveData || firstWaveData.suppressed || !firstWaveData.results) {
-          return { labels: [], datasets: [] };
-        }
-        
-        const aggValueCombinations = firstWaveData.results.map(r => 
-          aggregations.map(agg => r[agg]).join(' - ')
-        );
-        
-        // For each aggregation value combination in focus school
-        aggValueCombinations.forEach((aggCombo, aggIdx) => {
-          const data: number[] = [];
-          
-          waves.forEach(wave => {
-            const waveData = focus_school.results[wave];
-            if (waveData && !waveData.suppressed && waveData.results) {
-              const matchingRow = waveData.results[aggIdx];
-              if (matchingRow) {
-                data.push(matchingRow.mean as number);
-              } else {
-                data.push(NaN);
-              }
-            } else {
-              data.push(NaN);
-            }
-          });
-          
-          const colors = [
-            'rgba(59, 130, 246, 0.8)',
-            'rgba(16, 185, 129, 0.8)',
-            'rgba(245, 158, 11, 0.8)',
-            'rgba(236, 72, 153, 0.8)',
-            'rgba(139, 92, 246, 0.8)',
-          ];
-          const borderColors = [
-            'rgba(59, 130, 246, 1)',
-            'rgba(16, 185, 129, 1)',
-            'rgba(245, 158, 11, 1)',
-            'rgba(236, 72, 153, 1)',
-            'rgba(139, 92, 246, 1)',
-          ];
-          
-          datasets.push({
-            label: `Us - ${aggCombo}`,
-            data,
-            backgroundColor: colors[aggIdx % colors.length],
-            borderColor: borderColors[aggIdx % borderColors.length],
-            borderWidth: 2,
-            tension: 0.3,
-            fill: false,
-          });
-        });
-        
-        // Add neighbor datasets
-        neighbors.forEach((neighbor, neighborIdx) => {
-          aggValueCombinations.forEach((aggCombo, aggIdx) => {
-            const data: number[] = [];
-            
-            waves.forEach(wave => {
-              const waveData = neighbor.results[wave];
-              if (waveData && !waveData.suppressed && waveData.results) {
-                const matchingRow = waveData.results[aggIdx];
-                if (matchingRow) {
-                  data.push(matchingRow.mean as number);
-                } else {
-                  data.push(NaN);
-                }
-              } else {
-                data.push(NaN);
-              }
-            });
-            
-            const colors = [
-              'rgba(156, 163, 175, 0.5)',
-              'rgba(156, 163, 175, 0.4)',
-              'rgba(156, 163, 175, 0.3)',
-            ];
-            const borderColors = [
-              'rgba(156, 163, 175, 0.8)',
-              'rgba(156, 163, 175, 0.7)',
-              'rgba(156, 163, 175, 0.6)',
-            ];
-            
-            datasets.push({
-              label: `${i18n.t('chart.neighbour')} ${neighborIdx + 1} - ${aggCombo}`,
-              data,
-              backgroundColor: colors[neighborIdx % colors.length],
-              borderColor: borderColors[neighborIdx % borderColors.length],
-              borderWidth: 2,
-              tension: 0.3,
-              fill: false,
-            });
-          });
-        });
-        
-        return { labels, datasets };
-      }
-    } else {
-      // Single wave: horizontal bar chart with aggregations on x-axis
-      const wave = waves[0];
-      const focusWaveData = focus_school.results[wave];
-      
-      if (!focusWaveData || focusWaveData.suppressed || !focusWaveData.results) {
-        return { labels: [], datasets: [] };
-      }
-      
-      const labels = focusWaveData.results.map(r => {
-        if (aggregations.length === 0) {
-          return "Us";
-        }
-        return aggregations.map(agg => r[agg]).join(' - ');
-      });
-      
-      const focusValues = focusWaveData.results.map(r => r.mean as number);
-      
-      datasets.push({
-        label: "Us",
-        data: focusValues,
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgba(59, 130, 246, 1)',
-        borderWidth: 2,
-      });
-      
-      // Add neighbor datasets
-      neighbors.forEach((neighbor, idx) => {
-        const neighborWaveData = neighbor.results[wave];
-        if (neighborWaveData && !neighborWaveData.suppressed && neighborWaveData.results && neighborWaveData.results.length > 0) {
-          const neighborValues = neighborWaveData.results.map(r => r.mean as number);
-          const color = 'rgba(156, 163, 175, 0.5)';
-          const borderColor = 'rgba(156, 163, 175, 0.8)';
-
-          datasets.push({
-            label: `${i18n.t('chart.neighbour')} ${idx + 1}`,
-            data: neighborValues,
-            backgroundColor: color,
-            borderColor: borderColor,
-            borderWidth: 2,
-          });
-        }
-      });
-      
-      return { labels, datasets };
-    }
-  }
-
-  function queryToCSV(response: QueryResponse): string {
-    const { focus_school, neighbors, waves } = response;
-    const aggregations = response.aggregations;
-
-    // Build CSV header
-    const headers = ['School', 'Wave', ...aggregations, 'Mean', 'Student count'];
-    const rows = [headers.join(',')];
-
-    // Add focus school rows for each wave
-    waves.forEach(wave => {
-      const waveData = focus_school.results[wave];
-      if (waveData && !waveData.suppressed && waveData.results) {
-        waveData.results.forEach(row => {
-          const csvRow = [
-            "Us",
-            wave,
-            ...aggregations.map(agg => row[agg]),
-            (row.mean as number).toFixed(2),
-            row.student_n,
-          ];
-          rows.push(csvRow.join(','));
-        });
-      }
-    });
-
-    // Add neighbor rows for each wave
-    neighbors.forEach((neighbor, neighbor_idx) => {
-      waves.forEach(wave => {
-        const waveData = neighbor.results[wave];
-        if (waveData && !waveData.suppressed && waveData.results) {
-          waveData.results.forEach(row => {
-            const csvRow = [
-              `${i18n.t('chart.neighbour')} ${neighbor_idx + 1}`,
-              wave,
-              ...aggregations.map(agg => row[agg]),
-              (row.mean as number).toFixed(2),
-              row.student_n,
-            ];
-            rows.push(csvRow.join(','));
-          });
-        }
-      });
-    });
-
-    return rows.join('\n');
-  }
-
-  const chartData = $derived(queryResult ? queryToChartData(queryResult) : { labels: [], datasets: [] });
-  const chartCSV = $derived(queryResult ? queryToCSV(queryResult) : '');
+  // Chart rendering using utility functions
+  const chartData = $derived(queryResult ? newQueryToChartData(queryResult, i18n.chartFormatters).data : { labels: [], datasets: [] });
+  const chartCSV = $derived(queryResult ? newQueryToCSVWithLabels(queryResult, i18n.chartFormatters) : '');
   const chartType = $derived.by(() => {
     if (!queryResult) return 'bar' as const;
-    // Multiple waves use line chart, single wave uses horizontal bar
-    return queryResult.waves.length > 1 ? 'line' as const : 'horizontalBar' as const;
+    const output = newQueryToChartData(queryResult, i18n.chartFormatters);
+    return output.type ?? 'bar';
   });
 
   const selectedSchoolName = $derived(
     schools.find(s => s.id === selectedSchoolId)?.name ?? ''
   );
 
-  const variableLabel = $derived(
-    variables.find(v => v.value === queryResult?.variable)?.value
+  const variableLabels = $derived(
+    selectedVariables.map(v => i18n.columnLabel(v)).join(', ')
   );
+
+  const queryNotes = $derived.by(() => {
+    if (!queryResult) return [] as string[];
+
+    let hasRescaled = false;
+    let hasMultipleVersions = false;
+
+    for (const variableSlice of queryResult.variables) {
+      for (const periodSlice of Object.values(variableSlice.periods)) {
+        if (periodSlice.notes?.includes('values-rescaled')) {
+          hasRescaled = true;
+        }
+        if (periodSlice.question_versions && Object.keys(periodSlice.question_versions).length > 1) {
+          hasMultipleVersions = true;
+        }
+      }
+    }
+
+    const notes: string[] = [];
+    if (hasMultipleVersions) {
+      notes.push(i18n.t('explore.multipleCompatibleVersionsNote'));
+    }
+    if (hasRescaled) {
+      notes.push(i18n.t('explore.rescaledValuesNote'));
+    }
+    return notes;
+  });
 
 </script>
 
@@ -480,143 +213,63 @@
         <div class="card">
           <h2 class="text-lg font-semibold mb-4">{i18n.t('explore.queryParameters')}</h2>
 
-          <!-- School Selector -->
-          <div class="mb-4">
-            <label for="school-select" class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.school')}</label>
-            <select
-              id="school-select"
-              bind:value={selectedSchoolId}
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {#each schools as school}
-                <option value={school.id}>{school.name}</option>
-              {/each}
-            </select>
-          </div>
+          <!-- School Selector (only for authenticated users) -->
+          {#if meResponse?.kind === "authenticated" && schools.length > 0}
+            <div class="mb-4">
+              <label for="school-select" class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.school')}</label>
+              <select
+                id="school-select"
+                bind:value={selectedSchoolId}
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {#each schools as school}
+                  <option value={school.id}>{school.name}</option>
+                {/each}
+              </select>
+            </div>
+          {/if}
 
-          <!-- Variable Selector -->
+          <!-- Variable Selector (multi-select checkboxes) -->
           <div class="mb-4">
-            <label for="variable-select" class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.variable')}</label>
-            <select
-              id="variable-select"
-              bind:value={selectedVariable}
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              onchange={executeQuery}
-            >
-              {#each variables as variable}
-                <option value={variable.value}>{variable.label} [{variable.value}]</option>
-              {/each}
-            </select>
-          </div>
-
-          <!-- Aggregations -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.groupBy')}</label>
-            <div class="space-y-2">
-              {#each aggregationOptions as option}
+            <p class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.variables')}</p>
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+              {#each availableVariables as variable}
                 <label class="flex items-center">
                   <input
                     type="checkbox"
-                    checked={selectedAggregations.includes(option.value)}
-                    onchange={() => {
-                      toggleAggregation(option.value);
-                      executeQuery();
-                    }}
+                    checked={selectedVariables.includes(variable.key)}
+                    onchange={() => toggleVariable(variable.key)}
                     class="mr-2"
                   />
-                  <span class="text-sm">{option.label}</span>
+                  <span class="text-sm">{i18n.columnLabel(variable.key)} [{variable.key}]</span>
                 </label>
               {/each}
             </div>
           </div>
 
-          <!-- Wave Selector -->
+          <!-- Dimension Selector (optional grouping) -->
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.waves')}</label>
-            <div class="flex flex-wrap gap-2">
-              {#each waveOptions as wave}
-                <button
-                  type="button"
-                  class="px-3 py-1.5 text-sm rounded-md border transition-colors {selectedWaves.includes(wave)
-                    ? 'bg-blue-500 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}"
-                  onclick={() => {
-                    toggleWave(wave);
-                    executeQuery();
-                  }}
-                >
-                  Wave {wave}
-                </button>
+            <p class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.groupBy')}</p>
+            <div class="space-y-2">
+              {#each availableDimensions as dimension}
+                <label class="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedDimensions.includes(dimension.key)}
+                    onchange={() => toggleDimension(dimension.key)}
+                    class="mr-2"
+                  />
+                  <span class="text-sm">{i18n.t(`api.${dimension.key}`)}</span>
+                </label>
               {/each}
             </div>
           </div>
-
-          <!-- Filters -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.filters')}</label>
-            {#each filterOptions as filter}
-              <div class="mb-3">
-                <p class="text-xs font-medium text-gray-600 mb-1">{filter.label}</p>
-                <div class="flex flex-wrap gap-2">
-                  {#each filter.values as value}
-                    <button
-                      type="button"
-                      class="px-2 py-1 text-xs rounded-md border transition-colors {selectedFilters[filter.value]?.includes(value)
-                        ? 'bg-blue-500 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}"
-                      onclick={() => {
-                        toggleFilter(filter.value, value);
-                        executeQuery();
-                      }}
-                    >
-                      {value}
-                    </button>
-                  {/each}
-                </div>
-              </div>
-            {/each}
-          </div>
-
-          <!-- Neighbor Type Selection (always active) -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">{i18n.t('explore.neighborType')}</label>
-            <div class="space-y-2">
-              <label class="flex items-center">
-                <input
-                  type="radio"
-                  value="geographical"
-                  bind:group={neighborType}
-                  class="mr-2"
-                  onchange={executeQuery}
-                />
-                <span class="text-sm">{i18n.t('explore.geographical')}</span>
-              </label>
-              <label class="flex items-center">
-                <input
-                  type="radio"
-                  value="statistical"
-                  bind:group={neighborType}
-                  class="mr-2"
-                  onchange={executeQuery}
-                />
-                <span class="text-sm">{i18n.t('explore.statistical')}</span>
-              </label>
-            </div>
-          </div>
-
-          {#if selectedAggregations.includes('class')}
-            <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-              <p class="text-xs text-yellow-800">
-                {i18n.t('explore.classAggregationNote')}
-              </p>
-            </div>
-          {/if}
 
           <!-- Execute Button -->
           <button
             type="button"
             onclick={executeQuery}
-            disabled={queryLoading || selectedSchoolId === null}
+            disabled={queryLoading || selectedVariables.length === 0}
             class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             {queryLoading ? i18n.t('explore.querying') : i18n.t('explore.runQuery')}
@@ -631,11 +284,28 @@
             <p class="text-red-700">{queryError}</p>
           </div>
         {:else if queryResult}
-          <!-- Check if all waves are suppressed -->
-          {#if queryResult.waves.every(wave => queryResult.focus_school.results[wave]?.suppressed)}
+          <!-- Display period information -->
+          <div class="card">
+            <p class="text-sm text-gray-600">
+              <strong>{i18n.t('explore.periodsObserved')}:</strong> {queryResult.periods.join(', ')}
+            </p>
+            <p class="text-sm text-gray-600 mt-1">
+              <strong>{i18n.t('explore.variablesSelected')}:</strong> {variableLabels}
+            </p>
+            {#if queryNotes.length > 0}
+              <div class="mt-3 space-y-1">
+                {#each queryNotes as note}
+                  <p class="text-xs text-gray-500">(i) {note}</p>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          <!-- Check if all periods are suppressed for all variables -->
+          {#if queryResult?.variables.every(v => queryResult?.periods.every(p => v.periods[p]?.suppressed))}
             <div class="card bg-yellow-50 border border-yellow-200">
               <p class="text-yellow-800 font-medium text-center">
-                {queryResult.focus_school.results[queryResult.waves[0]]?.suppression_message || 'Results cannot be displayed due to small group sizes.'}
+                {i18n.t('explore.allDataSuppressed')}
               </p>
               <p class="text-sm text-yellow-700 mt-2 text-center">
                 {i18n.t('explore.tryAdjustingFilters')}
@@ -643,24 +313,12 @@
             </div>
           {:else}
             <ChartCard
-              title={i18n.t(`api.${variableLabel}`)}
+              title={variableLabels}
               type={chartType}
               data={chartData}
               csv={chartCSV}
               filename="explore-results"
-              noNeighborData={queryResult.neighbors.length === 0}
             />
-
-            {#if queryResult.neighbors.length > 0}
-              <div class="card p-3 bg-blue-50 border border-blue-200">
-                <p class="text-sm text-blue-800">
-                  {i18n.t('explore.showingComparison', { 
-                    count: queryResult.neighbors.length, 
-                    plural: queryResult.neighbors.length > 1 ? 's' : '' 
-                  })}
-                </p>
-              </div>
-            {/if}
           {/if}
         {:else if queryLoading}
           <div class="card text-center py-12">

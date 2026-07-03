@@ -1,6 +1,0 @@
-# Requirements for ODK seeding script
-# Install with: pip install -r deploy/scripts/requirements.txt
-
-pandas>=2.0.0
-requests>=2.31.0
-tqdm>=4.65.0

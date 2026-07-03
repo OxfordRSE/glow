@@ -33,15 +33,17 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def _alembic_ini_path() -> Path:
     """Locate alembic.ini in the project (supports both dev and installed modes)."""
     import os
-    
+
     # Allow override via environment variable (for production deployments)
     env_path = os.getenv("GLOW_ALEMBIC_INI")
     if env_path:
         path = Path(env_path)
         if path.exists():
             return path
-        raise FileNotFoundError(f"GLOW_ALEMBIC_INI points to non-existent file: {env_path}")
-    
+        raise FileNotFoundError(
+            f"GLOW_ALEMBIC_INI points to non-existent file: {env_path}"
+        )
+
     # Search upward from current file (for development/editable installs)
     here = Path(__file__).parent
     level = 0
@@ -60,8 +62,9 @@ def _alembic_ini_path() -> Path:
 def run_migrations() -> None:
     """Apply all pending Alembic migrations (used at application startup)."""
     import logging
+
     logger = logging.getLogger(__name__)
-    
+
     logger.info("run_migrations: Finding alembic.ini...")
     ini_path = _alembic_ini_path()
     logger.info(f"run_migrations: Found at {ini_path}")
@@ -71,8 +74,10 @@ def run_migrations() -> None:
     # Override the URL from settings so env vars are respected
     cfg.set_main_option("sqlalchemy.url", settings.METADATA_DATABASE_URL)
     logger.info("run_migrations: Running alembic upgrade...")
-    logger.info(f"run_migrations: Database URL: {settings.METADATA_DATABASE_URL.split('@')[1] if '@' in settings.METADATA_DATABASE_URL else 'unknown'}")
-    
+    logger.info(
+        f"run_migrations: Database URL: {settings.METADATA_DATABASE_URL.split('@')[1] if '@' in settings.METADATA_DATABASE_URL else 'unknown'}"
+    )
+
     try:
         command.upgrade(cfg, "head")
         logger.info("run_migrations: Upgrade complete")

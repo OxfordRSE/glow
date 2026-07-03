@@ -59,7 +59,7 @@
   const chartOptions = $derived({
     responsive: true,
     maintainAspectRatio: false,
-    indexAxis: type === 'horizontalBar' ? 'y' : 'x',
+    indexAxis: type === 'horizontalBar' ? 'y' as const : 'x' as const,
     ...options
   });
 </script>

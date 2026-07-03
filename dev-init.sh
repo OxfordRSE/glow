@@ -317,7 +317,7 @@ docker compose exec -T odk-service \
 }
 
 # Source ODK API helper functions
-source ./deploy/scripts/odk-api-helper.sh
+source ./scripts/odk/odk-api-helper.sh
 
 # Override for external access from host (use HTTPS with self-signed cert)
 export ODK_API_BASE="https://localhost:8443/v1"
@@ -347,29 +347,36 @@ API_ACTOR_ID=$(odk_create_user "${ODK_API_EMAIL}" "${ODK_API_PASSWORD}" "${ADMIN
 info "Assigning manager role to API user (for data seeding)"
 odk_assign_role "${PROJECT_ID}" "${API_ACTOR_ID}" "1" "${ADMIN_TOKEN}"
 
-# Step 8: Upload Form & Seed Data
-step "Uploading form definition"
+# Step 8: Prepare & Seed Data
+SEED_DIR="./data/mock_seed"
+MANIFEST_PATH="${SEED_DIR}/manifest.csv"
 
-info "Reading XML form definition"
-XML_CONTENT=$(cat "./odk-forms/bewell_questionnaire.xml")
+if [[ ! -f "${MANIFEST_PATH}" && -f ./data/glow_base.csv ]]; then
+  step "Transforming canonical base data"
 
-info "Uploading form to ODK Central (project ${PROJECT_ID})"
-FORM_ID=$(odk_upload_form "${PROJECT_ID}" "${XML_CONTENT}" "${ADMIN_TOKEN}")
-info "Form uploaded: ${FORM_ID}"
+  python ./scripts/odk/transform_mock_data.py \
+    --input ./data/glow_base.csv \
+    --output-dir "${SEED_DIR}" \
+    --forms-dir ./odk-forms
+fi
 
-# Check if data.csv exists
-if [[ ! -f ./data/data.csv ]]; then
+if [[ ! -f "${MANIFEST_PATH}" ]]; then
   step "Test data not found"
   
-  warn "No test data found at ./data/data.csv"
+  warn "No transformed mock data found at ${MANIFEST_PATH}"
   echo ""
-  echo "   To generate test data:"
+  echo "   To generate and transform canonical mock data:"
   echo ""
   echo "   uvx glow-dummies \\"
-  echo "     --config https://raw.githubusercontent.com/OxfordRSE/glow-dummies/main/examples/beewell_model.toml \\"
+  echo "     --config https://raw.githubusercontent.com/OxfordRSE/glow-dummies/main/examples/glow_model.toml \\"
   echo "     --seed 42 \\"
   echo "     --output csv \\"
-  echo "     > data/data.csv"
+  echo "     > data/glow_base.csv"
+  echo ""
+  echo "   python scripts/odk/transform_mock_data.py \\"
+  echo "     --input data/glow_base.csv \\"
+  echo "     --output-dir data/mock_seed \\"
+  echo "     --forms-dir odk-forms"
   echo ""
   echo "   Then run: docker compose restart api"
   echo "   And run: docker compose exec api uv run glow-api schools sync"
@@ -379,15 +386,18 @@ if [[ ! -f ./data/data.csv ]]; then
 else
   step "Seeding test data${LIMIT:+ (limit: $LIMIT rows)}"
   
-  # Run with uv (use HTTPS for ODK Central)
-  ./deploy/scripts/seed_odk_test_data.py \
-    --csv ./data/data.csv \
+  uv run ./scripts/odk/seed_odk_test_data.py \
+    --seed-dir "${SEED_DIR}" \
+    --manifest "${MANIFEST_PATH}" \
+    --forms-dir ./odk-forms \
     --odk-url https://localhost:8443 \
     --email "${ODK_API_EMAIL}" \
     --password "${ODK_API_PASSWORD}" \
     --project-id "${PROJECT_ID}" \
-    --form-id "${FORM_ID}" \
     ${LIMIT:+--limit $LIMIT}
+
+  python ./scripts/odk/rewrite_odk_submission_timestamps.py \
+    --manifest "${MANIFEST_PATH}"
   
   SKIP_SEED=false
 fi
@@ -439,7 +449,6 @@ echo "   (Full credentials saved in .env.dev)"
 echo ""
 echo "📋 ODK Central:"
 echo "   Project ID:   ${PROJECT_ID}"
-echo "   Form ID:      ${FORM_ID}"
 if [[ ${SKIP_SEED} != true ]]; then
   echo "   Status:       ✅ Data seeded"
 else

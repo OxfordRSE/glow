@@ -1,0 +1,154 @@
+<?xml version="1.0" ?>
+<h:html xmlns="http://www.w3.org/2002/xforms" xmlns:h="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" xmlns:odk="http://www.opendatakit.org/xforms">
+  <h:head>
+    <h:title>Demographics Questionnaire</h:title>
+    <model odk:xforms-version="1.0.0">
+      <instance>
+        <data id="demographics_questionnaire" version="1">
+          <uid/>
+          <school/>
+          <yearGroup/>
+          <d_age/>
+          <d_sex/>
+          <d_ethnicity/>
+          <d_sexualOrientation/>
+          <d_genderIdentity/>
+          <meta>
+            <instanceID/>
+          </meta>
+        </data>
+      </instance>
+      <instance id="sex">
+        <root>
+          <item>
+            <name>M</name>
+            <label>Male</label>
+          </item>
+          <item>
+            <name>F</name>
+            <label>Female</label>
+          </item>
+          <item>
+            <name>I</name>
+            <label>Intersex</label>
+          </item>
+        </root>
+      </instance>
+      <instance id="ethnicity">
+        <root>
+          <item>
+            <name>White_British</name>
+            <label>White British</label>
+          </item>
+          <item>
+            <name>Asian</name>
+            <label>Asian</label>
+          </item>
+          <item>
+            <name>Black</name>
+            <label>Black</label>
+          </item>
+          <item>
+            <name>Mixed</name>
+            <label>Mixed</label>
+          </item>
+          <item>
+            <name>Other</name>
+            <label>Other</label>
+          </item>
+        </root>
+      </instance>
+      <instance id="sexual_orientation">
+        <root>
+          <item>
+            <name>Heterosexual</name>
+            <label>Heterosexual</label>
+          </item>
+          <item>
+            <name>Gay_or_lesbian</name>
+            <label>Gay or lesbian</label>
+          </item>
+          <item>
+            <name>Bisexual</name>
+            <label>Bisexual</label>
+          </item>
+          <item>
+            <name>Other</name>
+            <label>Other</label>
+          </item>
+        </root>
+      </instance>
+      <instance id="gender_identity">
+        <root>
+          <item>
+            <name>Cisgender</name>
+            <label>Cisgender</label>
+          </item>
+          <item>
+            <name>Transgender</name>
+            <label>Transgender</label>
+          </item>
+          <item>
+            <name>Non_binary</name>
+            <label>Non-binary</label>
+          </item>
+          <item>
+            <name>Other</name>
+            <label>Other</label>
+          </item>
+        </root>
+      </instance>
+      <bind nodeset="/data/uid" type="string" required="false()"/>
+      <bind nodeset="/data/school" type="string" required="false()"/>
+      <bind nodeset="/data/yearGroup" type="int" constraint=". &gt;= 0" required="false()"/>
+      <bind nodeset="/data/d_age" type="int" constraint=". &gt;= 0" required="false()"/>
+      <bind nodeset="/data/d_sex" type="string" required="false()"/>
+      <bind nodeset="/data/d_ethnicity" type="string" required="false()"/>
+      <bind nodeset="/data/d_sexualOrientation" type="string" required="false()"/>
+      <bind nodeset="/data/d_genderIdentity" type="string" required="false()"/>
+      <bind nodeset="/data/meta/instanceID" type="string" readonly="true()" jr:preload="uid"/>
+    </model>
+  </h:head>
+  <h:body>
+    <input ref="/data/uid">
+      <label>Unique ID</label>
+    </input>
+    <input ref="/data/school">
+      <label>School</label>
+    </input>
+    <input ref="/data/yearGroup">
+      <label>Year Group</label>
+    </input>
+    <input ref="/data/d_age">
+      <label>Age</label>
+    </input>
+    <select1 ref="/data/d_sex">
+      <label>Sex</label>
+      <itemset nodeset="instance('sex')/root/item">
+        <value ref="name"/>
+        <label ref="label"/>
+      </itemset>
+    </select1>
+    <select1 ref="/data/d_ethnicity">
+      <label>Ethnicity</label>
+      <itemset nodeset="instance('ethnicity')/root/item">
+        <value ref="name"/>
+        <label ref="label"/>
+      </itemset>
+    </select1>
+    <select1 ref="/data/d_sexualOrientation">
+      <label>Sexual Orientation</label>
+      <itemset nodeset="instance('sexual_orientation')/root/item">
+        <value ref="name"/>
+        <label ref="label"/>
+      </itemset>
+    </select1>
+    <select1 ref="/data/d_genderIdentity">
+      <label>Gender Identity</label>
+      <itemset nodeset="instance('gender_identity')/root/item">
+        <value ref="name"/>
+        <label ref="label"/>
+      </itemset>
+    </select1>
+  </h:body>
+</h:html>

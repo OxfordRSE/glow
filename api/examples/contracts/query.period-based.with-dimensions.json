@@ -1,0 +1,41 @@
+{
+  "id": "query.period-based.with-dimensions",
+  "method": "GET",
+  "path": "/query?v=bewell_questionnaire__bw_wbeing_1&d=d_sex",
+  "status": 200,
+  "request_model": null,
+  "response_model": "NewQueryResponse",
+  "request": null,
+  "response": {
+    "query": {
+      "school_id": null,
+      "variables": ["bewell_questionnaire__bw_wbeing_1"],
+      "dimensions": ["d_sex"],
+      "variable_prefixes": []
+    },
+    "dimensions": ["d_sex"],
+    "periods": ["2023-2024"],
+    "variables": [
+      {
+        "variable": "bewell_questionnaire__bw_wbeing_1",
+        "periods": {
+          "2023-2024": {
+            "suppressed": false,
+            "cells": [
+              {
+                "mean": 3.2,
+                "n": 5,
+                "d_sex": "M"
+              },
+              {
+                "mean": 3.8,
+                "n": 5,
+                "d_sex": "F"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
