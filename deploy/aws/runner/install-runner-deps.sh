@@ -81,7 +81,7 @@ systemctl enable amazon-cloudwatch-agent
 
 sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
 
-sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/init.json >/dev/null <<'EOF'
+sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/cloud_init.json >/dev/null <<'EOF'
 {
   "logs": {
     "logs_collected": {
@@ -109,6 +109,6 @@ sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
   -a fetch-config \
   -m ec2 \
   -s \
-  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/init.json
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/cloud_init.json
 
 mkdir -p /opt/glow-runner
