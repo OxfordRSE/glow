@@ -19,5 +19,6 @@ phases:
       - cd /tmp/glow-source
       - git checkout "$GIT_REF"
       - test "$(tr -d '\n' < deploy/aws/runner/VERSION)" = "$RUNNER_AMI_VERSION"
+      - cd /tmp/glow-source/deploy/aws/runner
       - packer init deploy/aws/runner/packer.pkr.hcl
       - packer build -var "aws_region=$AWS_DEFAULT_REGION" -var "runner_ami_version=$RUNNER_AMI_VERSION" deploy/aws/runner/packer.pkr.hcl
