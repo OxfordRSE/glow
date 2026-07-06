@@ -16,6 +16,8 @@ FORMS_STATE="${DATA_DIR}/.deploy/share/odk-forms-state.json"
 FORMS_DIR="${WORK_DIR}/odk-forms"
 export ODK_API_BASE="http://127.0.0.1:8080/v1"
 
+export BUILDKIT_PROGRESS=plain   # make docker quieter
+
 info() { echo "[INFO] $*"; }
 warn() { echo "[WARN] $*"; }
 step() { echo "[PROGRESS] $*"; }
@@ -136,7 +138,7 @@ compose() {
 start_stack() {
   step "Building and starting containers"
   cd "${WORK_DIR}"
-  compose up -d --build --progress quiet
+  compose up -d --build --quiet-pull
 }
 
 wait_for_odk() {
