@@ -17,6 +17,7 @@ log "installing base dependencies"
 dnf install -y \
   awscli \
   docker \
+  git \
   jq \
   amazon-cloudwatch-agent \
   amazon-ssm-agent

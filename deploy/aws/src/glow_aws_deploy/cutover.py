@@ -49,9 +49,16 @@ def perform_cutover(
     old_stopped = False
     new_registered = False
 
+    def verbose_log(msg: str, fn=console.info):
+        if config.verbose:
+            fn(msg)
+
     try:
+        verbose_log("Wait for instance running")
         wait_for_instance_running(console, ec2_client, new_instance_id)
+        verbose_log("\tok.\nWait for ssm online")
         wait_for_ssm_online(console, ssm_client, new_instance_id)
+        verbose_log("\tok.\nWait for runner bootstrap")
         wait_for_remote_check(
             console,
             ssm_client,
@@ -59,6 +66,7 @@ def perform_cutover(
             comment="wait for runner bootstrap",
             commands=["test -f /opt/glow-runner/bootstrap.ready"],
         )
+        verbose_log("\tok.")
 
         if old_instance_id:
             console.info(f"Draining old runner {old_instance_id}")
@@ -77,9 +85,11 @@ def perform_cutover(
 
             detach_volume(console, ec2_client, volume_id, old_instance_id)
 
+        verbose_log(f"Attaching volume {volume_id} to {new_instance_id}")
         attach_volume(console, ec2_client, volume_id, new_instance_id)
         volume_attached_to_new = True
 
+        verbose_log("Activating stack")
         env_prefix = shell_env({"DOMAIN_NAME": config.domain_name})
         wait_for_remote_check(
             console,
@@ -90,6 +100,7 @@ def perform_cutover(
             timeout_seconds=5400,
         )
 
+        verbose_log("\tok.\nHeathcheck")
         wait_for_remote_check(
             console,
             ssm_client,
@@ -98,6 +109,7 @@ def perform_cutover(
             commands=["sudo /opt/glow-runner/healthcheck.sh"],
             timeout_seconds=1200,
         )
+        verbose_log("\tok.")
 
         register_instance_with_target_groups(elbv2_client, target_group_arns, new_instance_id)
         new_registered = True
@@ -110,6 +122,26 @@ def perform_cutover(
         console.info(f"Cutover complete: {new_instance_id}")
     except Exception as exc:
         console.warn(f"Cutover failed: {exc}")
+        if config.verbose:
+            try:
+                command_id = wait_for_remote_check(
+                    ssm_client=ssm_client,
+                    instance_id=new_instance_id,
+                    comment="debugging info for failed cutover",
+                    commands=[
+                        "echo /opt",
+                        "ls -la /opt",
+                        "echo /opt/glow-runner",
+                        "ls -la /opt/glow-runner",
+                        "echo /var/log/cloud-init.log",
+                        "sudo cat /var/log/cloud-init.log",
+                        "echo /var/log/glow-runner-bootstrap.log",
+                        "sudo cat /var/log/glow-runner-bootstrap.log"
+                    ],
+                    timeout_seconds=10
+                )
+            except Exception:
+                console.warn("Verbose debugging queries failed.")
         rollback_cutover(
             console,
             ec2_client=ec2_client,
