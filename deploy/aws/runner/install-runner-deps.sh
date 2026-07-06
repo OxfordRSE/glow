@@ -74,17 +74,17 @@ fi
 if dnf list --available docker-buildx-plugin >/dev/null 2>&1; then
   dnf install -y docker-buildx-plugin
 else
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64) buildx_arch="x86_64" ;;
-    aarch64) buildx_arch="arm64" ;;
-    *)
-      log "unsupported architecture for docker buildx plugin: $arch"
-      exit 1
-      ;;
+  case "$(uname -m)" in
+  x86_64) buildx_arch="amd64" ;;
+  aarch64) buildx_arch="arm64" ;;
+  *)
+    log "unsupported architecture: $(uname -m)"
+    exit 1
+    ;;
   esac
+  BUILDX_VERSION="${BUILDX_VERSION:-v0.35.0}"
 
-  buildx_url="${DOCKER_BUILDX_URL:-https://github.com/docker/buildx/releases/latest/download/buildx-v0.35.0.linux-${buildx_arch}}"
+  buildx_url="${DOCKER_BUILDX_URL:-https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-${buildx_arch}}"
   log "buildx_url=${buildx_url}"
   curl -fsSL "$buildx_url" -o "$buildx_plugin"
   chmod 0755 "$buildx_plugin"
