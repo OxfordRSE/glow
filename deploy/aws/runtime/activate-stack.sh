@@ -138,7 +138,7 @@ compose() {
 start_stack() {
   step "Building and starting containers"
   cd "${WORK_DIR}"
-  compose up -d --build --quiet-pull
+  compose up -d --build --quiet-pull --quiet-build
 }
 
 wait_for_odk() {
