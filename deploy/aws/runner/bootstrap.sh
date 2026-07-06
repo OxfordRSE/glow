@@ -3,6 +3,13 @@ set -euo pipefail
 
 exec > >(tee -a /var/log/glow-runner-bootstrap.log) 2>&1
 
+if [[ -d /opt/glow-runner ]]; then
+  echo "[PROGRESS] dir /opt/glow-runner exists"
+else
+  echo "[ERROR] could not find /opt/glow-runner"
+  exit 101
+fi
+
 AWS_REGION="${AWS_REGION:?AWS_REGION is required}"
 DOMAIN_NAME="${DOMAIN_NAME:?DOMAIN_NAME is required}"
 GIT_REPO_URL="${GIT_REPO_URL:?GIT_REPO_URL is required}"
