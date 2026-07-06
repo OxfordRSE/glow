@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set --Eeuo pipefail
+set -Eeuo pipefail
 set -x
 trap 'rc=$?; echo "FAILED at line ${LINENO}: ${BASH_COMMAND}" >&2; exit $rc' ERR
 
