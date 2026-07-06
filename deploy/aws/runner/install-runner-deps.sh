@@ -77,6 +77,27 @@ docker compose version
 log "enabling cloudwatch logging"
 systemctl enable amazon-cloudwatch-agent
 
+sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
+
+sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json >/dev/null <<'EOF'
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/cloud-init.log",
+            "log_group_name": "/debug/glow/cloud-init",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+
 log "runner dependencies installed"
 
 mkdir -p /opt/glow-runner
