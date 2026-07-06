@@ -66,7 +66,7 @@ else
   esac
   COMPOSE_VERSION="${COMPOSE_VERSION:-v5.3.0}"
 
-  compose_url="${DOCKER_COMPOSE_URL:-https://github.com/docker/compose/releases/${COMPOSE_VERSION}/download/docker-compose-linux-${compose_arch}}"
+  compose_url="${DOCKER_COMPOSE_URL:-https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${compose_arch}}"
   log "compose_url=${compose_url}"
   curl -fsSL "$compose_url" -o "$compose_plugin"
   chmod 0755 "$compose_plugin"
