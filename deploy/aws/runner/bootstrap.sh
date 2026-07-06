@@ -6,6 +6,7 @@ trap 'rc=$?; echo "FAILED at line ${LINENO}: ${BASH_COMMAND}" >&2; exit $rc' ERR
 exec > >(tee -a /var/log/glow-runner-bootstrap.log) 2>&1
 
 cloud_init_config=/opt/aws/amazon-cloudwatch-agent/etc/cloud_init.json
+cloud_glow_config=/opt/aws/amazon-cloudwatch-agent/etc/glow.json
 
 AWS_REGION="${AWS_REGION:?AWS_REGION is required}"
 DOMAIN_NAME="${DOMAIN_NAME:?DOMAIN_NAME is required}"
@@ -19,8 +20,7 @@ TOKEN=$(curl -fsS -X PUT "http://169.254.169.254/latest/api/token" \
 INSTANCE_ID=$(curl -fsS -H "X-aws-ec2-metadata-token: ${TOKEN}" \
   http://169.254.169.254/latest/meta-data/instance-id)
 
-mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d
-cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/glow.json <<EOF
+cat > ${cloud_glow_config} <<EOF
 {
   "logs": {
     "logs_collected": {
@@ -53,7 +53,7 @@ EOF
 /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
   -a append-config \
   -m ec2 \
-  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/glow.json
+  -c file:${cloud_glow_config}
 
 if [[ -d /opt/glow-runner ]]; then
   echo "[PROGRESS] dir /opt/glow-runner exists"
