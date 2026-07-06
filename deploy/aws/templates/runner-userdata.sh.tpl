@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+touch /opt/glow-runner/userdata.checkpoint
+
 export AWS_REGION="${aws_region}"
 export DOMAIN_NAME="${domain_name}"
 export GIT_REPO_URL="${git_repo_url}"
