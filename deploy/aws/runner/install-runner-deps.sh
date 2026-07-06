@@ -45,13 +45,13 @@ if id ec2-user >/dev/null 2>&1; then
   usermod -aG docker ec2-user
 fi
 
-log "installing docker compose plugin"
+log "installing docker compose and buildx plugins"
 mkdir -p /usr/local/lib/docker/cli-plugins
 
 compose_plugin="/usr/local/lib/docker/cli-plugins/docker-compose"
+buildx_plugin="/usr/local/lib/docker/cli-plugins/docker-buildx"
 
-# Prefer a repo package if it is available, otherwise install the plugin binary
-# directly from Docker's release channel.
+# Prefer repo packages if available.
 if dnf list --available docker-compose-plugin >/dev/null 2>&1; then
   dnf install -y docker-compose-plugin
 else
@@ -70,8 +70,27 @@ else
   chmod 0755 "$compose_plugin"
 fi
 
+if dnf list --available docker-buildx-plugin >/dev/null 2>&1; then
+  dnf install -y docker-buildx-plugin
+else
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64) buildx_arch="x86_64" ;;
+    aarch64) buildx_arch="arm64" ;;
+    *)
+      log "unsupported architecture for docker buildx plugin: $arch"
+      exit 1
+      ;;
+  esac
+
+  buildx_url="${DOCKER_BUILDX_URL:-https://github.com/docker/buildx/releases/latest/download/buildx-v0.17.0.linux-${buildx_arch}}"
+  curl -fsSL "$buildx_url" -o "$buildx_plugin"
+  chmod 0755 "$buildx_plugin"
+fi
+
 log "verifying docker installation"
 docker --version
+docker buildx version
 docker compose version
 
 log "runner dependencies installed"
