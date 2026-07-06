@@ -159,11 +159,11 @@ start_stack() {
   compose --progress quiet build dashboard
 
   step "Smoke check API"
-  compose up -d api || true
+  compose --progress quiet up -d api || true
   wait_for_api
 
   step "Bringing up all containers"
-  compose up -d --build --quiet-pull --quiet-build
+  compose --progress quiet up -d --build --quiet-pull --quiet-build
 }
 
 wait_for_odk() {
