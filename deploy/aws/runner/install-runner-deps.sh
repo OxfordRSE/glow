@@ -79,9 +79,11 @@ log "runner dependencies installed"
 log "enabling cloudwatch logging for cloud init"
 systemctl enable amazon-cloudwatch-agent
 
+cloud_init_config=/opt/aws/amazon-cloudwatch-agent/etc/cloud_init.json
+
 sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
 
-sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/cloud_init.json >/dev/null <<'EOF'
+sudo tee "$cloud_init_config" >/dev/null <<'EOF'
 {
   "logs": {
     "logs_collected": {
@@ -109,6 +111,6 @@ sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
   -a fetch-config \
   -m ec2 \
   -s \
-  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/cloud_init.json
+  -c "file:${cloud_init_config}"
 
 mkdir -p /opt/glow-runner

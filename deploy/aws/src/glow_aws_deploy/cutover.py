@@ -132,7 +132,9 @@ def perform_cutover(
             for commands in [
                 ["echo /opt", "ls -la /opt"],
                 ["echo /opt/glow-runner", "ls -la /opt/glow-runner"],
-                ["echo /var/log/cloud-init.log", "sudo cat /var/log/cloud-init.log"],
+                ["echo /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d",
+                 "ls -la /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d"],
+                # ["echo /var/log/cloud-init.log", "sudo cat /var/log/cloud-init.log"],
                 ["echo /var/log/glow-runner-bootstrap.log", "sudo cat /var/log/glow-runner-bootstrap.log"]
             ]:
                 try:
