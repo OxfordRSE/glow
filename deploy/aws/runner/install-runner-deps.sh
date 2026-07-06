@@ -88,6 +88,11 @@ sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/init.jso
       "files": {
         "collect_list": [
           {
+            "file_path": "/var/log/cloud-init-output.log",
+            "log_group_name": "/debug/glow/cloud-init-output",
+            "log_stream_name": "{instance_id}/cloud-init-output"
+          },
+          {
             "file_path": "/var/log/cloud-init.log",
             "log_group_name": "/debug/glow/cloud-init",
             "log_stream_name": "{instance_id}",

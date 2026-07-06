@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set --Eeuo pipefail
+set -x
+trap 'rc=$?; echo "FAILED at line ${LINENO}: ${BASH_COMMAND}" >&2; exit $rc' ERR
 
 exec > >(tee -a /var/log/glow-runner-bootstrap.log) 2>&1
 
@@ -10,11 +12,6 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/glow.json <
     "logs_collected": {
       "files": {
         "collect_list": [
-          {
-            "file_path": "/var/log/cloud-init-output.log",
-            "log_group_name": "${CLOUDWATCH_BOOTSTRAP_LOG_GROUP}",
-            "log_stream_name": "${INSTANCE_ID}/cloud-init-output"
-          },
           {
             "file_path": "/var/log/glow-runner-bootstrap.log",
             "log_group_name": "${CLOUDWATCH_BOOTSTRAP_LOG_GROUP}",
