@@ -66,6 +66,7 @@ else
   esac
 
   compose_url="${DOCKER_COMPOSE_URL:-https://github.com/docker/compose/releases/latest/download/docker-compose-linux-${compose_arch}}"
+  log "compose_url=${compose_url}"
   curl -fsSL "$compose_url" -o "$compose_plugin"
   chmod 0755 "$compose_plugin"
 fi
@@ -83,7 +84,8 @@ else
       ;;
   esac
 
-  buildx_url="${DOCKER_BUILDX_URL:-https://github.com/docker/buildx/releases/latest/download/buildx-v0.17.0.linux-${buildx_arch}}"
+  buildx_url="${DOCKER_BUILDX_URL:-https://github.com/docker/buildx/releases/latest/download/buildx-v0.35.0.linux-${buildx_arch}}"
+  log "buildx_url=${buildx_url}"
   curl -fsSL "$buildx_url" -o "$buildx_plugin"
   chmod 0755 "$buildx_plugin"
 fi
