@@ -3,6 +3,43 @@ set -euo pipefail
 
 exec > >(tee -a /var/log/glow-runner-bootstrap.log) 2>&1
 
+mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/glow.json <<EOF
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/cloud-init-output.log",
+            "log_group_name": "${CLOUDWATCH_BOOTSTRAP_LOG_GROUP}",
+            "log_stream_name": "${INSTANCE_ID}/cloud-init-output"
+          },
+          {
+            "file_path": "/var/log/glow-runner-bootstrap.log",
+            "log_group_name": "${CLOUDWATCH_BOOTSTRAP_LOG_GROUP}",
+            "log_stream_name": "${INSTANCE_ID}/runner-bootstrap"
+          },
+          {
+            "file_path": "/var/log/messages",
+            "log_group_name": "${CLOUDWATCH_SYSTEM_LOG_GROUP}",
+            "log_stream_name": "${INSTANCE_ID}/messages"
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a stop || true
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config \
+  -m ec2 \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/glow.json \
+  -s
+
 if [[ -d /opt/glow-runner ]]; then
   echo "[PROGRESS] dir /opt/glow-runner exists"
 else
@@ -44,43 +81,6 @@ DOMAIN_NAME=${DOMAIN_NAME}
 GIT_REPO_URL=${GIT_REPO_URL}
 GIT_CHECKOUT_REF=${GIT_CHECKOUT_REF}
 EOF
-
-mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d
-cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/glow.json <<EOF
-{
-  "logs": {
-    "logs_collected": {
-      "files": {
-        "collect_list": [
-          {
-            "file_path": "/var/log/cloud-init-output.log",
-            "log_group_name": "${CLOUDWATCH_BOOTSTRAP_LOG_GROUP}",
-            "log_stream_name": "${INSTANCE_ID}/cloud-init-output"
-          },
-          {
-            "file_path": "/var/log/glow-runner-bootstrap.log",
-            "log_group_name": "${CLOUDWATCH_BOOTSTRAP_LOG_GROUP}",
-            "log_stream_name": "${INSTANCE_ID}/runner-bootstrap"
-          },
-          {
-            "file_path": "/var/log/messages",
-            "log_group_name": "${CLOUDWATCH_SYSTEM_LOG_GROUP}",
-            "log_stream_name": "${INSTANCE_ID}/messages"
-          }
-        ]
-      }
-    }
-  }
-}
-EOF
-
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
-  -a stop || true
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
-  -a fetch-config \
-  -m ec2 \
-  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/glow.json \
-  -s
 
 touch /opt/glow-runner/bootstrap.ready
 echo "[SUCCESS] Runner bootstrap complete"

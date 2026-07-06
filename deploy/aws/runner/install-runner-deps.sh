@@ -74,7 +74,9 @@ log "verifying docker installation"
 docker --version
 docker compose version
 
-log "enabling cloudwatch logging"
+log "runner dependencies installed"
+
+log "enabling cloudwatch logging for cloud init"
 systemctl enable amazon-cloudwatch-agent
 
 sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
@@ -98,6 +100,10 @@ sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json >/dev
 }
 EOF
 
-log "runner dependencies installed"
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config \
+  -m ec2 \
+  -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
 
 mkdir -p /opt/glow-runner
