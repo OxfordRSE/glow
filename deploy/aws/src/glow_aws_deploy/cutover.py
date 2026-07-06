@@ -69,7 +69,7 @@ def perform_cutover(
             ssm_client,
             new_instance_id,
             comment="wait for runner bootstrap",
-            commands=["test -f /opt/glow-runner/bootstrap.ready"],
+            commands=["timeout 1800 bash -c 'test -f /opt/glow-runner/bootstrap.ready'"],
         )
         verbose_log("\tok.")
 
@@ -132,8 +132,8 @@ def perform_cutover(
             for commands in [
                 # ["echo /opt", "ls -la /opt"],
                 ["echo ls /opt/glow-runner", "ls -la /opt/glow-runner"],
-                # ["echo /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d",
-                #  "ls -la /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d"],
+                ["echo /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d",
+                 "ls -la /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d"],
                 # ["echo /var/log/cloud-init.log", "sudo cat /var/log/cloud-init.log"],
                 ["echo /var/log/glow-runner-bootstrap.log", "sudo cat /var/log/glow-runner-bootstrap.log"]
             ]:
