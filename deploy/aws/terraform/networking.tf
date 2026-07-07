@@ -129,8 +129,8 @@ resource "aws_lb_target_group" "odk" {
   target_type = "instance"
 
   health_check {
-    path    = "/"
-    matcher = "200,302"
+    path    = "/alb-health"
+    matcher = "200"
   }
 
   tags = local.tags
