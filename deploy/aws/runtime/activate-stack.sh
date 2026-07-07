@@ -167,8 +167,11 @@ configure_odk() {
   source "${ADMIN_ENV}"
   source "${RUNTIME_ENV}"
 
-  compose exec -T odk-service node /usr/odk/lib/bin/cli.js user-create "${ODK_ADMIN_EMAIL}" "${ODK_ADMIN_PASSWORD}" || true
-  compose exec -T odk-service node /usr/odk/lib/bin/cli.js user-promote "${ODK_ADMIN_EMAIL}" || true
+  compose exec -T odk-service node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" user-create
+  compose exec -T odk-service node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" "${ODK_ADMIN_PASSWORD}" user-set-password
+  compose exec -T odk-service node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" user-promote 2>/dev/null || {
+    info "(Already promoted - continuing)"
+  }
 
   local token
   token="$(odk_login "${ODK_ADMIN_EMAIL}" "${ODK_ADMIN_PASSWORD}")"
