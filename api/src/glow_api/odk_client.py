@@ -65,7 +65,7 @@ class ODKClient:
                 verify=self.verify_ssl,
             )
             response.raise_for_status()
-        except (requests.exceptions.HTTPError, ConnectionError) as err:
+        except requests.exceptions.RequestException as err:
             logger.warning(f"ODKClient.try_login failed {err}")
             return False
         try:
