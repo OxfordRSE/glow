@@ -77,7 +77,7 @@ class DataStore:
             df = self._merge_form_frames(form_frames)
             self._response_etags = new_etags
 
-            metadata_map = self._odk_client.get_form_metadata()
+            metadata_map = self._odk_client._get_form_metadata()
             flat_metadata = self._flatten_current_metadata(metadata_map)
             dataset_version = self._odk_client.dataset_version_from_etags(new_etags)
             self._metadata = {
@@ -439,8 +439,9 @@ class DataStore:
         try:
             df = self._load()
         except Exception:
-            logger.exception(
-                "Failed to load data from ODK Central — keeping previous data"
+            logger.warning(
+                "Failed to load data from ODK Central; keeping previous data",
+                exc_info=True,
             )
             # Serve stale data on error (graceful degradation)
             return
@@ -472,19 +473,7 @@ class DataStore:
                 "Loaded from cache: %d rows, %d columns", len(df), len(df.columns)
             )
 
-        # Try to refresh on startup, but don't fail if ODK isn't ready yet
-        try:
-            self.refresh()
-        except Exception:
-            logger.warning(
-                "Failed to refresh data from ODK Central on startup - will retry on schedule",
-                exc_info=True,
-            )
-            # If we have no cached data either, create empty DataFrame
-            if cached is None:
-                with self._lock:
-                    self._df = pd.DataFrame()
-                    self._metadata = {}
+        self.refresh()
 
         if self._refresh_hours > 0:
             self._scheduler.add_job(

@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+import glow_api.data as data_module
 from glow_api.data import DataStore
 from glow_api.settings import settings
 from tests.mock_odk import MockODKClient
@@ -388,6 +389,32 @@ class TestDataStore:
         assert len(frozen.df) == 1
         assert "uid" in frozen.df.columns
 
+    def test_refresh_odk_error_logs_warning(self, monkeypatch):
+        """Test that failed refreshes are logged at warning level."""
+
+        class ErrorODKClient(MockODKClient):
+            def fetch_submissions(self, etags=None):
+                raise RuntimeError("ODK Central connection failed")
+
+        mock_client = ErrorODKClient()
+        ds = DataStore(odk_client=mock_client, refresh_hours=0)
+
+        warnings = []
+
+        def fake_warning(message, *args, **kwargs):
+            warnings.append((message, args, kwargs))
+
+        monkeypatch.setattr(data_module.logger, "warning", fake_warning)
+
+        ds.refresh()
+
+        assert len(warnings) == 1
+        assert (
+            warnings[0][0]
+            == "Failed to load data from ODK Central; keeping previous data"
+        )
+        assert warnings[0][2]["exc_info"] is True
+
     def test_get_dataframe_returns_copy(self):
         """Test that to_frozen returns a copy, not the original."""
         mock_client = MockODKClient()
@@ -497,6 +524,34 @@ class TestDataStore:
 
         # Verify scheduler is not running
         assert not ds._scheduler.running
+
+    def test_startup_odk_error_logs_warning_and_keeps_empty_dataframe(
+        self, monkeypatch
+    ):
+        """Test startup tolerates ODK failures and logs refresh warnings."""
+
+        class ErrorODKClient(MockODKClient):
+            def fetch_submissions(self, etags=None):
+                raise RuntimeError("ODK Central connection failed")
+
+        ds = DataStore(odk_client=ErrorODKClient(), refresh_hours=0)
+
+        warnings = []
+
+        def fake_warning(message, *args, **kwargs):
+            warnings.append((message, args, kwargs))
+
+        monkeypatch.setattr(data_module.logger, "warning", fake_warning)
+
+        ds.startup()
+
+        assert ds._df.empty
+        assert len(warnings) == 1
+        assert (
+            warnings[0][0]
+            == "Failed to load data from ODK Central; keeping previous data"
+        )
+        assert warnings[0][2]["exc_info"] is True
 
     def test_cache_save_and_load(self):
         """Test that cache is saved and loaded correctly."""

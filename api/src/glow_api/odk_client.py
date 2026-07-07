@@ -40,6 +40,8 @@ class ODKClient:
             project_id: Default project ID
             verify_ssl: Whether to verify SSL certificates (default: True)
         """
+        self.access_token = None
+        self.token_expires = None
         self.base_url = base_url
         self.username = username
         self.password = password
@@ -51,6 +53,9 @@ class ODKClient:
         if "nginx" in base_url.lower():
             self.default_headers["Host"] = "odk.local"
 
+        self._try_login()
+
+    def _try_login(self) -> bool:
         # Authenticate with ODK Central
         response = requests.post(
             f"{self.base_url}/v1/sessions",
@@ -59,10 +64,11 @@ class ODKClient:
             verify=self.verify_ssl,
         )
         if response.status_code != 200:
-            response.raise_for_status()
-            raise ConnectionError(
-                f"Failed to connect to ODK Central: {response.status_code}"
-            )
+            try:
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as err:
+                logger.warning(f"ODKClient.try_login failed {err}")
+                return False
         try:
             data = response.json()
             self.access_token = data["token"]
@@ -71,9 +77,10 @@ class ODKClient:
             )
         except (JSONDecodeError, KeyError):
             logger.warning(f"Unexpeted ODK Central response format: {response.content}")
-            raise ValueError("ODK Central response did not match expected shape.")
+            return False
+        return True
 
-    def get(self, *args, **kwargs):
+    def get(self, *args, **kwargs) -> requests.Response:
         # Add SSL verification setting if not explicitly provided
         if "verify" not in kwargs:
             kwargs["verify"] = self.verify_ssl
@@ -88,13 +95,13 @@ class ODKClient:
         request.raise_for_status()
         return request
 
-    def list_forms(self) -> list[dict[str, Any]]:
+    def _list_forms(self) -> list[dict[str, Any]]:
         """List forms visible in the configured project."""
         url = f"{self.base_url}/v1/projects/{self.project_id}/forms"
         response = self.get(url)
         return response.json()
 
-    def fetch_form_submission_list(
+    def _fetch_form_submission_list(
         self,
         form_id: str,
         etag: Optional[str] = None,
@@ -108,7 +115,7 @@ class ODKClient:
             return None, etag
         return response.json(), response.headers.get("etag")
 
-    def download_submission_xml(self, form_id: str, instance_id: str) -> str:
+    def _download_submission_xml(self, form_id: str, instance_id: str) -> str:
         """Download one submission XML payload."""
         url = (
             f"{self.base_url}/v1/projects/{self.project_id}/forms/"
@@ -117,7 +124,7 @@ class ODKClient:
         response = self.get(url)
         return response.text
 
-    def parse_submission_xml(self, xml_content: str) -> dict[str, Any]:
+    def _parse_submission_xml(self, xml_content: str) -> dict[str, Any]:
         """Parse one submission XML into a flat row dict with __version."""
         root = ET.fromstring(xml_content)
         row: dict[str, Any] = {
@@ -137,7 +144,7 @@ class ODKClient:
 
         return row
 
-    def build_form_submissions_dataframe(
+    def _build_form_submissions_dataframe(
         self,
         form_id: str,
         submissions: list[dict[str, Any]],
@@ -146,10 +153,10 @@ class ODKClient:
         rows: list[dict[str, Any]] = []
         for submission in submissions:
             instance_id = submission["instanceId"]
-            xml_content = self.download_submission_xml(
+            xml_content = self._download_submission_xml(
                 form_id=form_id, instance_id=instance_id
             )
-            row = self.parse_submission_xml(xml_content)
+            row = self._parse_submission_xml(xml_content)
             row["instanceId"] = instance_id
             row["createdAt"] = submission.get("createdAt")
             row["updatedAt"] = submission.get("updatedAt")
@@ -180,12 +187,12 @@ class ODKClient:
             self.project_id,
             form_id,
         )
-        submissions, new_etag = self.fetch_form_submission_list(
+        submissions, new_etag = self._fetch_form_submission_list(
             form_id=form_id, etag=etag
         )
         if submissions is None:
             return None, new_etag
-        df = self.build_form_submissions_dataframe(
+        df = self._build_form_submissions_dataframe(
             form_id=form_id, submissions=submissions
         )
         return df, new_etag
@@ -199,10 +206,13 @@ class ODKClient:
         Returns a per-form mapping where a `None` frame means the endpoint
         returned 304 Not Modified for that form.
         """
+        if self.token_expires is None or self.token_expires < datetime.now():
+            if not self._try_login():
+                return {}, {}
         existing_etags = etags or {}
         form_frames: dict[str, Optional[pd.DataFrame]] = {}
         new_etags: dict[str, Optional[str]] = {}
-        for form in self.list_forms():
+        for form in self._list_forms():
             form_id = form["xmlFormId"]
             frame, new_etag = self.fetch_form_submissions(
                 form_id=form_id,
@@ -212,13 +222,13 @@ class ODKClient:
             new_etags[form_id] = new_etag
         return form_frames, new_etags
 
-    def get_form_versions(self, form_id: str) -> list[dict[str, Any]]:
+    def _get_form_versions(self, form_id: str) -> list[dict[str, Any]]:
         """List published versions for a form."""
         url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{form_id}/versions"
         response = self.get(url)
         return response.json()
 
-    def download_form_xml(self, form_id: str, version: Optional[str] = None) -> str:
+    def _download_form_xml(self, form_id: str, version: Optional[str] = None) -> str:
         """Download current or versioned XML form definition."""
         if version is None:
             url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{form_id}.xml"
@@ -230,22 +240,22 @@ class ODKClient:
         response = self.get(url)
         return response.text
 
-    def get_form_metadata(self) -> dict[str, Any]:
+    def _get_form_metadata(self) -> dict[str, Any]:
         """Build per-form, per-version variable metadata maps."""
         forms_metadata: dict[str, Any] = {}
         current_versions: dict[str, str] = {}
 
         try:
-            for form in self.list_forms():
+            for form in self._list_forms():
                 form_id = form["xmlFormId"]
                 current_versions[form_id] = str(form.get("version", ""))
                 forms_metadata[form_id] = {}
-                for version_info in self.get_form_versions(form_id):
+                for version_info in self._get_form_versions(form_id):
                     version = str(version_info["version"])
-                    xml_content = self.download_form_xml(
+                    xml_content = self._download_form_xml(
                         form_id=form_id, version=version
                     )
-                    variable_metadata = self.extract_metadata_from_xml(xml_content)
+                    variable_metadata = self._extract_metadata_from_xml(xml_content)
                     forms_metadata[form_id][version] = {
                         "variables": variable_metadata,
                     }
@@ -266,7 +276,7 @@ class ODKClient:
         )
         return hashlib.sha256(text.encode()).hexdigest()[:16]
 
-    def extract_metadata_from_xml(self, xml_content: str) -> Dict[str, Dict[str, int]]:
+    def _extract_metadata_from_xml(self, xml_content: str) -> Dict[str, Dict[str, int]]:
         """Extract min/max metadata from XML form definition.
 
         Args:

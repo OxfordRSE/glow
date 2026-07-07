@@ -74,7 +74,7 @@ class MockODKClient:
             df["__xmlFormId"] = "bewell_questionnaire"
         self.submissions_by_form["bewell_questionnaire"] = df
 
-    def list_forms(self) -> list[dict[str, Any]]:
+    def _list_forms(self) -> list[dict[str, Any]]:
         self.list_forms_count += 1
         current_versions = self.metadata.get("_current_versions", {})
         return [
@@ -107,7 +107,7 @@ class MockODKClient:
                 new_etags[form_id] = current_etag
         return frames, new_etags
 
-    def get_form_metadata(self) -> Dict[str, Any]:
+    def _get_form_metadata(self) -> Dict[str, Any]:
         """Mock get_form_metadata that returns predefined metadata map."""
         self.metadata_fetch_count += 1
         return copy.deepcopy(self.metadata)
@@ -116,11 +116,11 @@ class MockODKClient:
         text = "||".join(f"{form}:{etags[form] or ''}" for form in sorted(etags))
         return hashlib.sha256(text.encode()).hexdigest()[:16]
 
-    def download_xlsform(self) -> bytes:
+    def _download_xlsform(self) -> bytes:
         """Mock download_xlsform (not used in tests)."""
         raise NotImplementedError("Mock download_xlsform not implemented")
 
-    def extract_metadata_from_xlsform(
+    def _extract_metadata_from_xlsform(
         self, xlsform_bytes: bytes
     ) -> Dict[str, Dict[str, int]]:
         """Mock extract_metadata_from_xlsform (not used in tests)."""
