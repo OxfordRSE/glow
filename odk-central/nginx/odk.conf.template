@@ -1,11 +1,16 @@
 server {
   listen 443 default_server ssl;
   server_tokens off;
-
   ssl_certificate /etc/nginx/ssl/nginx.default.crt;
   ssl_certificate_key /etc/nginx/ssl/nginx.default.key;
-
-  return 421;
+  location = /alb-health {
+    access_log off;
+    default_type text/plain;
+    return 200 "ok\n";
+  }
+  location / {
+    return 421;
+  }
 }
 
 types {
