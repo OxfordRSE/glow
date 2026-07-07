@@ -69,8 +69,7 @@ def perform_cutover(
             ssm_client,
             new_instance_id,
             comment="wait for runner bootstrap",
-            commands=["timeout 1800 bash -c 'test -f /opt/glow-runner/bootstrap.ready'"],
-            timeout_seconds=20000
+            commands=["timeout 1800 bash -c 'until test -f /opt/glow-runner/bootstrap.ready; do sleep 1; done'"],
         )
         verbose_log("\tok.")
 

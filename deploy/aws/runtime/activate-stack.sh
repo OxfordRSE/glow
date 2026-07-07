@@ -135,21 +135,6 @@ compose() {
   docker compose --profile odk --env-file "${RUNTIME_ENV}" "$@"
 }
 
-wait_for_api() {
-  local retries=60
-  while [[ ${retries} -gt 0 ]]; do
-    if curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1; then
-      info "API is ready"
-      return
-    fi
-    sleep 10
-    retries=$((retries - 1))
-  done
-  error "API did not become ready"
-  compose logs api
-  exit 1
-}
-
 start_stack() {
   step "Building and starting containers"
   cd "${WORK_DIR}"
@@ -157,10 +142,6 @@ start_stack() {
   compose --progress quiet build api
   step "Building Dashboard"
   compose --progress quiet build dashboard
-
-  step "Smoke check API"
-  compose --progress quiet up -d api || true
-  wait_for_api
 
   step "Bringing up all containers"
   compose --progress quiet up -d --build --quiet-pull --quiet-build
@@ -177,8 +158,7 @@ wait_for_odk() {
     sleep 10
     retries=$((retries - 1))
   done
-  error "ODK service did not become ready"
-  compose logs odk-service
+  error "ODK service did not become ready. Check logs in ${CLOUDWATCH_CONTAINERS_LOG_GROUP} for details."
   exit 1
 }
 
