@@ -132,7 +132,7 @@ EOF
 }
 
 compose() {
-  docker compose --profile odk --env-file "${RUNTIME_ENV}" "$@"
+  docker compose --profile odk --env-file "${RUNTIME_ENV}" -f $WORK_DIR/compose.yml "$@"
 }
 
 start_stack() {
