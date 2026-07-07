@@ -56,6 +56,8 @@ class ODKClient:
         self._try_login()
 
     def _try_login(self) -> bool:
+        if self.token_expires is not None and self.token_expires > datetime.now():
+            return True
         # Authenticate with ODK Central
         try:
             response = requests.post(
@@ -205,9 +207,8 @@ class ODKClient:
         Returns a per-form mapping where a `None` frame means the endpoint
         returned 304 Not Modified for that form.
         """
-        if self.token_expires is None or self.token_expires < datetime.now():
-            if not self._try_login():
-                return {}, {}
+        if not self._try_login():
+            return {}, {}
         existing_etags = etags or {}
         form_frames: dict[str, Optional[pd.DataFrame]] = {}
         new_etags: dict[str, Optional[str]] = {}
@@ -239,8 +240,10 @@ class ODKClient:
         response = self.get(url)
         return response.text
 
-    def _get_form_metadata(self) -> dict[str, Any]:
+    def get_form_metadata(self) -> dict[str, Any]:
         """Build per-form, per-version variable metadata maps."""
+        if not self._try_login():
+            return {}
         forms_metadata: dict[str, Any] = {}
         current_versions: dict[str, str] = {}
 

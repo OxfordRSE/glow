@@ -77,7 +77,7 @@ class DataStore:
             df = self._merge_form_frames(form_frames)
             self._response_etags = new_etags
 
-            metadata_map = self._odk_client._get_form_metadata()
+            metadata_map = self._odk_client.get_form_metadata()
             flat_metadata = self._flatten_current_metadata(metadata_map)
             dataset_version = self._odk_client.dataset_version_from_etags(new_etags)
             self._metadata = {

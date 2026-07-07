@@ -107,7 +107,7 @@ class MockODKClient:
                 new_etags[form_id] = current_etag
         return frames, new_etags
 
-    def _get_form_metadata(self) -> Dict[str, Any]:
+    def get_form_metadata(self) -> Dict[str, Any]:
         """Mock get_form_metadata that returns predefined metadata map."""
         self.metadata_fetch_count += 1
         return copy.deepcopy(self.metadata)
