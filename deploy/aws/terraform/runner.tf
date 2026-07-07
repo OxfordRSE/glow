@@ -91,12 +91,13 @@ resource "aws_launch_template" "runner" {
   user_data = base64encode(templatefile(
     "${path.module}/../templates/runner-userdata.sh.tpl",
     {
-      aws_region                     = var.aws_region
-      domain_name                    = var.domain_name
-      git_repo_url                   = var.git_repo_url
-      git_checkout_ref               = var.git_checkout_ref
-      cloudwatch_bootstrap_log_group = aws_cloudwatch_log_group.bootstrap.name
-      cloudwatch_system_log_group    = aws_cloudwatch_log_group.system.name
+      aws_region                      = var.aws_region
+      domain_name                     = var.domain_name
+      git_repo_url                    = var.git_repo_url
+      git_checkout_ref                = var.git_checkout_ref
+      cloudwatch_bootstrap_log_group  = aws_cloudwatch_log_group.bootstrap.name
+      cloudwatch_containers_log_group = aws_cloudwatch_log_group.containers.name
+      cloudwatch_system_log_group     = aws_cloudwatch_log_group.system.name
     }
   ))
 

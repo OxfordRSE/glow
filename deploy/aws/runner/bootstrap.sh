@@ -16,6 +16,7 @@ DOMAIN_NAME="${DOMAIN_NAME:?DOMAIN_NAME is required}"
 GIT_REPO_URL="${GIT_REPO_URL:?GIT_REPO_URL is required}"
 GIT_CHECKOUT_REF="${GIT_CHECKOUT_REF:?GIT_CHECKOUT_REF is required}"
 CLOUDWATCH_BOOTSTRAP_LOG_GROUP="${CLOUDWATCH_BOOTSTRAP_LOG_GROUP:?CLOUDWATCH_BOOTSTRAP_LOG_GROUP is required}"
+CLOUDWATCH_CONTAINERS_LOG_GROUP="${CLOUDWATCH_CONTAINERS_LOG_GROUP:?CLOUDWATCH_CONTAINERS_LOG_GROUP is required}"
 CLOUDWATCH_SYSTEM_LOG_GROUP="${CLOUDWATCH_SYSTEM_LOG_GROUP:?CLOUDWATCH_SYSTEM_LOG_GROUP is required}"
 
 touch /opt/glow-runner/bootstrap.loadenv
@@ -66,6 +67,21 @@ EOF
 
 touch /opt/glow-runner/bootstrap.conflog
 
+echo "[PROGRESS] Configure docker logging"
+
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<EOF
+{
+  "log-driver": "awslogs",
+  "log-opts": {
+    "awslogs-region": "${AWS_REGION}",
+    "awslogs-group": "${CLOUDWATCH_CONTAINERS_LOG_GROUP}",
+    "awslogs-create-group": "false",
+    "tag": "${INSTANCE_ID}-{{.Name}}"
+  }
+}
+EOF
+
 if [[ -d /opt/glow-runner ]]; then
   echo "[PROGRESS] dir /opt/glow-runner exists"
 else
@@ -73,8 +89,8 @@ else
   exit 101
 fi
 
-echo "[PROGRESS] Start docker service"
-systemctl start docker
+echo "[PROGRESS] Restart docker service"
+systemctl restart docker
 
 touch /opt/glow-runner/bootstrap.dockerready
 
@@ -102,6 +118,7 @@ AWS_REGION=${AWS_REGION}
 DOMAIN_NAME=${DOMAIN_NAME}
 GIT_REPO_URL=${GIT_REPO_URL}
 GIT_CHECKOUT_REF=${GIT_CHECKOUT_REF}
+CLOUDWATCH_CONTAINERS_LOG_GROUP=${CLOUDWATCH_CONTAINERS_LOG_GROUP}
 EOF
 
 touch /opt/glow-runner/bootstrap.ready

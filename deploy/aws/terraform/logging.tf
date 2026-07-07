@@ -12,6 +12,13 @@ resource "aws_cloudwatch_log_group" "system" {
   tags = local.tags
 }
 
+resource "aws_cloudwatch_log_group" "containers" {
+  name              = "/glow/${var.domain_name}/containers"
+  retention_in_days = 14
+
+  tags = local.tags
+}
+
 resource "aws_cloudwatch_log_group" "init" {
   name              = "/debug/glow/cloud-init"
   retention_in_days = 14

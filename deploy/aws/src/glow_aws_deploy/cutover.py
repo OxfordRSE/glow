@@ -70,6 +70,7 @@ def perform_cutover(
             new_instance_id,
             comment="wait for runner bootstrap",
             commands=["timeout 1800 bash -c 'test -f /opt/glow-runner/bootstrap.ready'"],
+            timeout_seconds=20000
         )
         verbose_log("\tok.")
 
