@@ -57,18 +57,17 @@ class ODKClient:
 
     def _try_login(self) -> bool:
         # Authenticate with ODK Central
-        response = requests.post(
-            f"{self.base_url}/v1/sessions",
-            json={"email": self.username, "password": self.password},
-            headers=self.default_headers,
-            verify=self.verify_ssl,
-        )
-        if response.status_code != 200:
-            try:
-                response.raise_for_status()
-            except requests.exceptions.HTTPError as err:
-                logger.warning(f"ODKClient.try_login failed {err}")
-                return False
+        try:
+            response = requests.post(
+                f"{self.base_url}/v1/sessions",
+                json={"email": self.username, "password": self.password},
+                headers=self.default_headers,
+                verify=self.verify_ssl,
+            )
+            response.raise_for_status()
+        except (requests.exceptions.HTTPError, ConnectionError) as err:
+            logger.warning(f"ODKClient.try_login failed {err}")
+            return False
         try:
             data = response.json()
             self.access_token = data["token"]
