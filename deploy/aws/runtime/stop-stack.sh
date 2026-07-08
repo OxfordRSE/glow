@@ -2,7 +2,8 @@
 set -euo pipefail
 
 WORK_DIR="/opt/glow"
-RUNTIME_ENV="/data/.deploy/share/.env.runtime"
+STATE_DIR="/var/lib/glow"
+RUNTIME_ENV="${STATE_DIR}/.deploy/share/.env.runtime"
 
 if [[ ! -f "${RUNTIME_ENV}" ]]; then
   echo "[WARN] Runtime environment missing; nothing to stop"

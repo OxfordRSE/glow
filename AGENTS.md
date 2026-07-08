@@ -121,24 +121,81 @@ Restarting either should not restart the other.
 For production deployments on AWS, see `deploy/aws/README.md` and `DEPLOYMENT.md`.
 
 The AWS deployment provides:
-- Automated infrastructure provisioning
-- Runner AMI builds via CodeBuild + Packer
-- EC2 replacement with persistent EBS volume handoff
-- HTTPS certificates via AWS Certificate Manager after external DNS validation
-- Load balancing and health checks
-- Persistent data storage on EBS volumes
-- Automated backups and monitoring
+- Automated infrastructure provisioning with Terraform
+- Local Packer AMI builds in your AWS account
+- Long-lived EC2 instance with persistent root volume
+- SSM-based in-place updates for routine releases
+- HTTPS via AWS Certificate Manager with external DNS validation
+- Application Load Balancer with health checks
+- CloudWatch logging
+
+#### Using Docker (Recommended)
+
+Build the launcher image:
+```bash
+docker build -t glow-launcher -f deploy/aws/Dockerfile .
+```
+
+Initial provision with AWS SSO:
+```bash
+aws sso login --profile my-profile
+
+docker run --rm -it \
+  -e AWS_PROFILE=my-profile \
+  -e AWS_REGION=eu-west-2 \
+  -v "$HOME/.aws:/root/.aws:ro" \
+  glow-launcher \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:...
+```
+
+Update existing deployment:
+```bash
+docker run --rm -it \
+  -e AWS_PROFILE=my-profile \
+  -e AWS_REGION=eu-west-2 \
+  -v "$HOME/.aws:/root/.aws:ro" \
+  glow-launcher \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
+```
+
+For CI/CD, use environment credentials instead:
+```bash
+docker run --rm -it \
+  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+  -e AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
+  -e AWS_REGION=eu-west-2 \
+  glow-launcher \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:...
+```
+
+#### Using Direct Python
 
 Quick start:
 ```bash
-uv run --project deploy/aws deploy/aws/deploy.py --domain eu.glow-project.org
+uv run --project deploy/aws deploy/aws/deploy.py \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:...
+```
+
+Update existing deployment:
+```bash
+uv run --project deploy/aws deploy/aws/deploy.py \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
 ```
 
 Notes:
-- The deployment assumes DNS is managed outside Route53.
-- A successful deploy requires an already-issued ACM certificate for the requested root, `api.`, and `odk.` hostnames.
-- The deploy command prints the ALB routing records to send to the owner of the enclosing DNS zone.
-- If no issued ACM certificate exists yet, the deploy command prints the ACM validation records needed for certificate issuance and stops before the HTTPS ALB is created.
+- DNS is assumed to be managed externally
+- Requires an already-issued ACM certificate for root, `api.`, and `odk.` hostnames
+- The deploy script prints ALB DNS records to configure with your DNS provider
+- Instance updates happen in-place via SSM without replacement
+- All persistent data lives on the instance root volume
 
 ### Self-Hosted Deployment (Manual)
 

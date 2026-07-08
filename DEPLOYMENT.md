@@ -1,84 +1,170 @@
 # Glow Deployment Quick Start
 
-## Command
+## Prerequisites
+
+### Option 1: Docker (Recommended)
+
+1. Docker
+2. AWS credentials (via SSO, profile, or environment variables)
+
+Build the launcher image from the repository root:
 
 ```bash
-uv run --project deploy/aws deploy/aws/deploy.py --domain eu.glow-project.org
+docker build -t glow-launcher -f deploy/aws/Dockerfile .
 ```
 
-Optional flags:
-
-- `--certificate-arn arn:aws:acm:...`
-- `--git-ref v1.2.3`
-- `--aws-region eu-west-2`
-- `--force-rebuild`
-- `--dry-run`
-- `--verbose`
-
-## What It Does
-
-1. Validates AWS credentials and the requested Git ref.
-2. Ensures an S3 bucket exists for Terraform state.
-3. Applies bootstrap Terraform for the runner AMI CodeBuild project.
-4. Builds or reuses the thin runner AMI.
-5. Applies main Terraform for ALB, ACM, IAM, launch template, and persistent EBS volume.
-6. Launches a fresh EC2 runner instance.
-7. Waits for SSM/bootstrap readiness.
-8. Deregisters the old instance, stops the old stack, detaches the persistent data volume, and reattaches it to the new instance.
-9. Activates the stack on the new instance and waits for health.
-10. Registers the new instance in the ALB target groups and terminates the old instance.
-
-If the volume handoff fails after the old instance is stopped, the tool attempts rollback by reattaching the volume to the old instance and restarting the old stack.
-
-## Prerequisites
+### Option 2: Direct Python
 
 1. `uv`
 2. `terraform`
-3. `git`
-4. AWS credentials that can manage EC2, ALB, ACM, S3, IAM, and CodeBuild
+3. `packer`
+4. `git`
+5. AWS credentials for EC2, ALB, ACM, S3, IAM, and SSM
+
+## Initial Provision
+
+### Using Docker with AWS SSO (Individual Users)
+
+```bash
+# Authenticate on your host machine first
+aws sso login --profile my-profile
+
+# Run deployment
+docker run --rm -it \
+  -e AWS_PROFILE=my-profile \
+  -e AWS_REGION=eu-west-2 \
+  -v "$HOME/.aws:/root/.aws:ro" \
+  glow-launcher \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+```
+
+### Using Docker with Environment Credentials (CI/CD)
+
+```bash
+docker run --rm -it \
+  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+  -e AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
+  -e AWS_REGION=eu-west-2 \
+  glow-launcher \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+```
+
+### Using Direct Python
+
+```bash
+uv run --project deploy/aws deploy/aws/deploy.py \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+```
+
+## Update Existing Deployment
+
+### Using Docker with AWS SSO
+
+```bash
+docker run --rm -it \
+  -e AWS_PROFILE=my-profile \
+  -e AWS_REGION=eu-west-2 \
+  -v "$HOME/.aws:/root/.aws:ro" \
+  glow-launcher \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
+```
+
+### Using Docker with Environment Credentials
+
+```bash
+docker run --rm -it \
+  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+  -e AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
+  -e AWS_REGION=eu-west-2 \
+  glow-launcher \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
+```
+
+### Using Direct Python
+
+```bash
+uv run --project deploy/aws deploy/aws/deploy.py \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
+```
+
+## What It Does
+
+### Initial Provision
+
+1. Resolves the git reference to a commit SHA
+2. Checks if a runner AMI exists in your AWS account for that commit
+3. Builds the AMI using Packer if not found
+4. Applies Terraform to create:
+   - ALB with HTTPS listeners
+   - Security groups and IAM roles
+   - Single long-lived EC2 instance with 100GB root volume
+   - CloudWatch log groups
+5. Waits for the instance to bootstrap and activate the stack
+6. Verifies service health
+
+### Update
+
+1. Finds the existing instance via Terraform state
+2. Sends an SSM command to:
+   - Fetch and checkout the target git reference
+   - Run optional `deploy/update-instance.sh` hook
+   - Stop and restart containers
+3. Verifies service health
+
+## Flags
+
+- `--domain` (required): deployment domain
+- `--certificate-arn`: ACM certificate ARN
+- `--git-ref`: git tag/branch/commit (default: main)
+- `--aws-region`: AWS region (default: eu-west-2 or AWS_REGION env var)
+- `--runner-instance-type`: instance type (default: t3.medium)
+- `--runner-root-volume-size-gb`: root volume size (default: 100GB)
+- `--force-rebuild-ami`: rebuild AMI even if one exists
+- `--dry-run`: plan only, do not apply
+- `--update`: update existing instance instead of provision
 
 ## Certificate Assumption
 
-Successful deployment assumes an already-issued ACM certificate for:
+Deployment requires an already-issued ACM certificate for:
 
 - `<domain>`
 - `api.<domain>`
 - `odk.<domain>`
 
-You can provide this explicitly with `--certificate-arn`, or let the deploy tool auto-discover a matching issued certificate in the target AWS account.
+Provide the ARN with `--certificate-arn`.
 
-If no issued certificate is available, the deploy tool will stop and print the ACM validation records needed to get one issued.
+## DNS Ownership
 
-## DNS Ownership Assumption
+DNS is assumed to be managed externally. After deployment, configure these records with your DNS provider:
 
-This deployment flow assumes **you do not own the Route53 zone**.
+- `<domain>` → ALB DNS (CNAME or ALIAS)
+- `api.<domain>` → ALB DNS (CNAME)
+- `odk.<domain>` → ALB DNS (CNAME)
 
-For a successful deployment, the tool prints the routing records to send to the external DNS owner:
+The deploy script prints the exact ALB DNS name.
 
-1. Dashboard/API/ODK routing records to the ALB DNS name
+## Architecture
 
-If no issued ACM certificate exists yet, it also prints the validation CNAME records for the certificate request and then exits before main deployment.
-
-The message is phrased as:
-
-```text
-Ask the owner of <enveloping-domain> to create these DNS records...
-```
-
-## HTTPS Behavior
-
-In the successful path, the ALB is created directly in HTTPS mode.
-
-- Port `443` serves the application.
-- Port `80` redirects to HTTPS.
-- Once the external DNS owner points the requested hostnames at the ALB, the site should behave normally without a follow-up deploy.
-
-If no issued ACM certificate exists yet, deployment stops early and prints the validation records that need to be added before a later deploy can succeed.
-
-That failure mode is expected and deliberate: there is no HTTP-only fallback ALB mode in this flow.
+- **AMI**: Thin image with Docker, git, and dependencies pre-installed
+- **Instance**: Long-lived EC2 with persistent root volume
+- **State**: All data stored in `/var/lib/glow` on the root volume
+- **Updates**: In-place via SSM, no instance replacement
+- **Backups**: Use AWS Backup or EBS snapshots
 
 ## Notes
 
-- The root dashboard host may need `ALIAS`/`ANAME` support instead of a plain `CNAME` if the external DNS provider treats it as a zone apex.
-- The deploy tool uses a thin runner AMI and builds the application containers on instance startup.
-- The persistent application state remains on a single EBS volume in v1, so a brief outage during cutover is expected.
+- The instance is protected with `delete_on_termination = false` on the root volume
+- Terraform ignores AMI and userdata changes to prevent accidental replacement
+- For dependency updates, rebuild the AMI with `--force-rebuild-ami`
+- Routine application updates use `--update` and happen over SSM

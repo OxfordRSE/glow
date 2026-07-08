@@ -14,12 +14,12 @@ variable "aws_region" {
   default = "eu-west-2"
 }
 
-variable "runner_ami_version" {
+variable "git_commit" {
   type = string
 }
 
 locals {
-  ami_name = "glow-runner-${var.runner_ami_version}-${formatdate("YYYYMMDDhhmmss", timestamp())}"
+  ami_name = "glow-runner-${substr(var.git_commit, 0, 8)}-${formatdate("YYYYMMDDhhmmss", timestamp())}"
 }
 
 source "amazon-ebs" "runner" {
@@ -49,7 +49,7 @@ source "amazon-ebs" "runner" {
   tags = {
     Name      = local.ami_name
     Component = "glow-runner"
-    Version   = var.runner_ami_version
+    GitCommit = var.git_commit
   }
 }
 
@@ -62,11 +62,6 @@ build {
   }
 
   provisioner "file" {
-    source      = "./bootstrap.sh"
-    destination = "/tmp/bootstrap.sh"
-  }
-
-  provisioner "file" {
     source      = "./healthcheck.sh"
     destination = "/tmp/healthcheck.sh"
   }
@@ -74,9 +69,8 @@ build {
   provisioner "shell" {
     inline = [
       "sudo mkdir -p /opt/glow-runner",
-      "sudo mv /tmp/bootstrap.sh /opt/glow-runner/bootstrap.sh",
       "sudo mv /tmp/healthcheck.sh /opt/glow-runner/healthcheck.sh",
-      "sudo chmod 0755 /opt/glow-runner/bootstrap.sh /opt/glow-runner/healthcheck.sh"
+      "sudo chmod 0755 /opt/glow-runner/healthcheck.sh"
     ]
   }
 }

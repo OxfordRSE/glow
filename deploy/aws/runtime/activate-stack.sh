@@ -7,15 +7,14 @@ source /etc/glow-runner.env
 
 DOMAIN_NAME="${DOMAIN_NAME:?DOMAIN_NAME is required}"
 WORK_DIR="/opt/glow"
-DATA_MOUNT_POINT="/data"
-DATA_DIR="${DATA_MOUNT_POINT}"
-ADMIN_ENV="${DATA_DIR}/.deploy/.env.admin"
-RUNTIME_ENV="${DATA_DIR}/.deploy/share/.env.runtime"
-FORMS_STATE="${DATA_DIR}/.deploy/share/odk-forms-state.json"
+STATE_DIR="/var/lib/glow"
+ADMIN_ENV="${STATE_DIR}/.deploy/.env.admin"
+RUNTIME_ENV="${STATE_DIR}/.deploy/share/.env.runtime"
+FORMS_STATE="${STATE_DIR}/.deploy/share/odk-forms-state.json"
 FORMS_DIR="${WORK_DIR}/odk-forms"
 export ODK_API_BASE="http://127.0.0.1:8080/v1"
 
-export BUILDKIT_PROGRESS=plain   # make docker quieter
+export BUILDKIT_PROGRESS=plain
 
 info() { echo "[INFO] $*"; }
 warn() { echo "[WARN] $*"; }
@@ -24,33 +23,21 @@ error() { echo "[ERROR] $*" >&2; }
 
 source "${WORK_DIR}/scripts/odk/odk-api-helper.sh"
 
-ensure_data_volume_available() {
-  step "Checking persistent data volume"
-  mkdir -p "${DATA_MOUNT_POINT}"
-  if ! mountpoint -q "${DATA_MOUNT_POINT}"; then
-    error "${DATA_MOUNT_POINT} is not mounted"
-    exit 1
-  fi
-  local probe="${DATA_MOUNT_POINT}/.glow-write-test"
-  touch "${probe}" || {
-    error "Mounted data volume at ${DATA_MOUNT_POINT} is not writable"
-    exit 1
-  }
-  rm -f "${probe}"
-}
-
 prepare_data_layout() {
   step "Preparing persistent directory layout"
-  mkdir -p "${DATA_DIR}/.deploy/share"
-  mkdir -p "${DATA_DIR}/glow-postgres"
-  mkdir -p "${DATA_DIR}/odk-postgres"
-  mkdir -p "${DATA_DIR}/odk-transfer"
-  mkdir -p "${DATA_DIR}/odk-secrets"
-  mkdir -p "${DATA_DIR}/odk-enketo-redis-main"
-  mkdir -p "${DATA_DIR}/odk-enketo-redis-cache"
+  mkdir -p "${STATE_DIR}/.deploy/share"
+  mkdir -p "${STATE_DIR}/glow-postgres"
+  mkdir -p "${STATE_DIR}/odk-postgres"
+  mkdir -p "${STATE_DIR}/odk-transfer"
+  mkdir -p "${STATE_DIR}/odk-secrets"
+  mkdir -p "${STATE_DIR}/odk-enketo-redis-main"
+  mkdir -p "${STATE_DIR}/odk-enketo-redis-cache"
 
-  rm -rf "${WORK_DIR}/docker-mount-data"
-  ln -s "${DATA_DIR}" "${WORK_DIR}/docker-mount-data"
+  mkdir -p "${WORK_DIR}/docker-mount-data"
+  if [[ ! -L "${WORK_DIR}/docker-mount-data" ]]; then
+    rm -rf "${WORK_DIR}/docker-mount-data"
+    ln -s "${STATE_DIR}" "${WORK_DIR}/docker-mount-data"
+  fi
 
   touch "${FORMS_STATE}"
   if [[ ! -s "${FORMS_STATE}" ]]; then
@@ -144,7 +131,7 @@ wait_for_odk() {
     sleep 10
     retries=$((retries - 1))
   done
-  error "ODK service did not become ready. Check logs in ${CLOUDWATCH_CONTAINERS_LOG_GROUP} for details."
+  error "ODK service did not become ready"
   exit 1
 }
 
@@ -223,7 +210,7 @@ write_metadata() {
   step "Writing deployment metadata"
   local checkout_ref
   checkout_ref="$(git -C "${WORK_DIR}" rev-parse HEAD)"
-  cat > "${DATA_DIR}/.glow-deployment.json" <<EOF
+  cat > "${STATE_DIR}/.glow-deployment.json" <<EOF
 {
   "domain_name": "${DOMAIN_NAME}",
   "git_commit": "${checkout_ref}",
@@ -234,7 +221,6 @@ EOF
 
 main() {
   step "Starting Glow stack activation"
-  ensure_data_volume_available
   prepare_data_layout
   generate_runtime_env
   start_stack

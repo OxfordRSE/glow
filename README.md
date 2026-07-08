@@ -220,20 +220,32 @@ npm run check
 
 See `deploy/aws/` for the AWS deployment package.
 
-See `DEPLOYMENT.md` for the quick start guide using `uv run --project deploy/aws deploy/aws/deploy.py`.
+See `DEPLOYMENT.md` for the quick start guide.
 
 The deployment uses:
-- A thin runner AMI built with CodeBuild + Packer
-- EC2 runner instances launched from a Terraform-managed launch template
-- An Application Load Balancer with host-based routing
-- A persistent EBS data volume that is detached from the old instance and reattached to the new one during deployment
-- ACM for TLS certificates, with DNS validation records emitted for the external DNS owner
+- Local Packer builds for thin runner AMIs
+- Single-pass Terraform for infrastructure
+- Long-lived EC2 instance with persistent root volume
+- SSM-based in-place updates
+- Application Load Balancer with host-based routing
+- ACM for TLS certificates with external DNS validation
 - Auto-configured ODK Central integration
 
-### Deployment entrypoint
+### Initial Provision
 
 ```bash
-uv run --project deploy/aws deploy/aws/deploy.py --domain eu.glow-project.org
+uv run --project deploy/aws deploy/aws/deploy.py \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:...
+```
+
+### Update
+
+```bash
+uv run --project deploy/aws deploy/aws/deploy.py \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
 ```
 
 Useful flags:
@@ -241,10 +253,11 @@ Useful flags:
 - `--certificate-arn arn:aws:acm:...`
 - `--git-ref v1.2.3`
 - `--aws-region eu-west-2`
-- `--force-rebuild`
-- `--verbose`
+- `--force-rebuild-ami`
+- `--dry-run`
+- `--update`
 
-Because DNS is assumed to be managed externally, the deploy command prints the ALB routing records you need to send to the owner of the enclosing DNS zone. If no matching issued ACM certificate exists yet, it also prints the ACM validation records needed before deployment can proceed.
+DNS is assumed to be managed externally. The deploy script prints the ALB DNS records to configure with your DNS provider.
 
 ## Data Collection & Format
 

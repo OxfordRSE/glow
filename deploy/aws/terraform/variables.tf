@@ -22,7 +22,7 @@ variable "git_checkout_ref" {
   type = string
 }
 
-variable "runner_ami_version" {
+variable "runner_ami_id" {
   type = string
 }
 
@@ -31,9 +31,6 @@ variable "runner_instance_type" {
 }
 
 variable "runner_root_volume_size_gb" {
-  type = number
-}
-
-variable "data_volume_size_gb" {
-  type = number
+  type    = number
+  default = 100
 }

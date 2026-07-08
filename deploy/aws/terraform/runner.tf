@@ -1,30 +1,3 @@
-data "aws_ami" "runner" {
-  owners      = ["self"]
-  most_recent = true
-
-  filter {
-    name   = "tag:Component"
-    values = ["glow-runner"]
-  }
-
-  filter {
-    name   = "tag:Version"
-    values = [var.runner_ami_version]
-  }
-}
-
-resource "aws_ebs_volume" "data" {
-  availability_zone = data.aws_subnet.runner.availability_zone
-  size              = var.data_volume_size_gb
-  type              = "gp3"
-  encrypted         = true
-
-  tags = merge(local.tags, {
-    Name      = "${var.app_name}-data"
-    Component = "glow-data"
-  })
-}
-
 resource "aws_iam_role" "runner" {
   name = "${var.app_name}-runner-role"
 
@@ -59,36 +32,21 @@ resource "aws_iam_instance_profile" "runner" {
   role = aws_iam_role.runner.name
 }
 
-resource "aws_launch_template" "runner" {
-  name_prefix            = "${var.app_name}-runner-"
-  image_id               = data.aws_ami.runner.id
+resource "aws_instance" "runner" {
+  ami                    = var.runner_ami_id
   instance_type          = var.runner_instance_type
-  update_default_version = true
-
-  iam_instance_profile {
-    name = aws_iam_instance_profile.runner.name
-  }
-
+  iam_instance_profile   = aws_iam_instance_profile.runner.name
+  subnet_id              = data.aws_subnet.runner.id
   vpc_security_group_ids = [aws_security_group.runner.id]
 
-  block_device_mappings {
-    device_name = "/dev/xvda"
-
-    ebs {
-      volume_type           = "gp3"
-      volume_size           = var.runner_root_volume_size_gb
-      encrypted             = true
-      delete_on_termination = true
-    }
+  root_block_device {
+    volume_type           = "gp3"
+    volume_size           = var.runner_root_volume_size_gb
+    encrypted             = true
+    delete_on_termination = false
   }
 
-  metadata_options {
-    http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = 1
-  }
-
-  user_data = base64encode(templatefile(
+  user_data = templatefile(
     "${path.module}/../templates/runner-userdata.sh.tpl",
     {
       aws_region                      = var.aws_region
@@ -99,21 +57,39 @@ resource "aws_launch_template" "runner" {
       cloudwatch_containers_log_group = aws_cloudwatch_log_group.containers.name
       cloudwatch_system_log_group     = aws_cloudwatch_log_group.system.name
     }
-  ))
+  )
 
-  tag_specifications {
-    resource_type = "instance"
-    tags = merge(local.tags, {
-      Name      = "${var.app_name}-runner"
-      Component = "glow-runner"
-      Version   = var.runner_ami_version
-    })
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
   }
 
-  tag_specifications {
-    resource_type = "volume"
-    tags          = local.tags
-  }
+  tags = merge(local.tags, {
+    Name      = "${var.app_name}-runner"
+    Component = "glow-runner"
+    GitRef    = var.git_checkout_ref
+  })
 
-  tags = local.tags
+  lifecycle {
+    ignore_changes = [ami, user_data]
+  }
+}
+
+resource "aws_lb_target_group_attachment" "api" {
+  target_group_arn = aws_lb_target_group.api.arn
+  target_id        = aws_instance.runner.id
+  port             = 8000
+}
+
+resource "aws_lb_target_group_attachment" "dashboard" {
+  target_group_arn = aws_lb_target_group.dashboard.arn
+  target_id        = aws_instance.runner.id
+  port             = 3000
+}
+
+resource "aws_lb_target_group_attachment" "odk" {
+  target_group_arn = aws_lb_target_group.odk.arn
+  target_id        = aws_instance.runner.id
+  port             = 8080
 }
