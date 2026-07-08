@@ -45,8 +45,6 @@ def perform_cutover(
         runner_ami_version=config.runner_ami_version,
     )
     volume_attached_to_new = False
-    old_deregistered = False
-    old_stopped = False
     new_registered = False
 
     checkpoint = "Begin cutover"
@@ -76,7 +74,6 @@ def perform_cutover(
         if old_instance_id:
             console.info(f"Draining old runner {old_instance_id}")
             deregister_instance_from_target_groups(elbv2_client, target_group_arns, old_instance_id)
-            old_deregistered = True
             wait_for_target_absence(console, elbv2_client, target_group_arns, old_instance_id)
 
             wait_for_remote_check(
@@ -86,12 +83,11 @@ def perform_cutover(
                 comment="stop old stack",
                 commands=["sudo bash /opt/glow/deploy/aws/runtime/stop-stack.sh"],
             )
-            old_stopped = True
 
-            detach_volume(console, ec2_client, volume_id, old_instance_id)
+            detach_volume(console, ec2_client, ssm_client, volume_id, old_instance_id)
 
         checkpoint = verbose_log(f"Attaching volume {volume_id} to {new_instance_id}")
-        attach_volume(console, ec2_client, volume_id, new_instance_id)
+        attach_volume(console, ec2_client, ssm_client, volume_id, new_instance_id)
         volume_attached_to_new = True
 
         checkpoint = verbose_log("Activating stack")
@@ -158,8 +154,6 @@ def perform_cutover(
             volume_id=volume_id,
             target_group_arns=target_group_arns,
             volume_attached_to_new=volume_attached_to_new,
-            old_deregistered=old_deregistered,
-            old_stopped=old_stopped,
             new_registered=new_registered,
             domain_name=config.domain_name,
         )
@@ -373,16 +367,30 @@ def wait_for_target_health(console: Console, elbv2_client: Any, target_group_arn
         time.sleep(10)
 
 
-def detach_volume(console: Console, ec2_client: Any, volume_id: str, instance_id: str) -> None:
+def detach_volume(console: Console, ec2_client: Any, ssm_client: Any, volume_id: str, instance_id: str) -> None:
+    wait_for_remote_check(
+        console,
+        ssm_client,
+        instance_id,
+        comment="unmount data volume",
+        commands=["sudo bash /opt/glow/deploy/aws/runtime/unmount-data-volume.sh"],
+    )
     console.info(f"Detaching volume {volume_id} from {instance_id}")
     ec2_client.detach_volume(VolumeId=volume_id, InstanceId=instance_id)
     ec2_client.get_waiter("volume_available").wait(VolumeIds=[volume_id])
 
 
-def attach_volume(console: Console, ec2_client: Any, volume_id: str, instance_id: str) -> None:
+def attach_volume(console: Console, ec2_client: Any, ssm_client: Any, volume_id: str, instance_id: str) -> None:
     console.info(f"Attaching volume {volume_id} to {instance_id}")
     ec2_client.attach_volume(VolumeId=volume_id, InstanceId=instance_id, Device="/dev/xvdf")
     ec2_client.get_waiter("volume_in_use").wait(VolumeIds=[volume_id])
+    wait_for_remote_check(
+        console,
+        ssm_client,
+        instance_id,
+        comment="mount data volume",
+        commands=["sudo bash /opt/glow/deploy/aws/runtime/mount-data-volume.sh"],
+    )
 
 
 def rollback_cutover(
@@ -396,8 +404,6 @@ def rollback_cutover(
     volume_id: str,
     target_group_arns: list[str],
     volume_attached_to_new: bool,
-    old_deregistered: bool,
-    old_stopped: bool,
     new_registered: bool,
     domain_name: str,
 ) -> None:
@@ -420,13 +426,13 @@ def rollback_cutover(
             console.warn(f"Failed to stop new stack during rollback: {exc}")
 
         try:
-            detach_volume(console, ec2_client, volume_id, new_instance_id)
+            detach_volume(console, ec2_client, ssm_client, volume_id, new_instance_id)
         except Exception as exc:
             console.warn(f"Failed to detach volume from new runner during rollback: {exc}")
 
     if old_instance_id:
         try:
-            attach_volume(console, ec2_client, volume_id, old_instance_id)
+            attach_volume(console, ec2_client, ssm_client, volume_id, old_instance_id)
             env_prefix = shell_env({"DOMAIN_NAME": domain_name})
             wait_for_remote_check(
                 console,

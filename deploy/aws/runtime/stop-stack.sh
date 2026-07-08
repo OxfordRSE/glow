@@ -10,5 +10,5 @@ if [[ ! -f "${RUNTIME_ENV}" ]]; then
 fi
 
 cd "${WORK_DIR}"
-docker compose --profile odk --env-file "${RUNTIME_ENV}" down --remove-orphans
+docker compose --profile odk --env-file "${RUNTIME_ENV}" -f "$WORK_DIR/compose.yml" down --remove-orphans
 echo "[SUCCESS] Stack stopped"

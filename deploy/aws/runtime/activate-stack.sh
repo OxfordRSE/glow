@@ -7,7 +7,6 @@ source /etc/glow-runner.env
 
 DOMAIN_NAME="${DOMAIN_NAME:?DOMAIN_NAME is required}"
 WORK_DIR="/opt/glow"
-DATA_DEVICE="/dev/xvdf"
 DATA_MOUNT_POINT="/data"
 DATA_DIR="${DATA_MOUNT_POINT}"
 ADMIN_ENV="${DATA_DIR}/.deploy/.env.admin"
@@ -25,32 +24,19 @@ error() { echo "[ERROR] $*" >&2; }
 
 source "${WORK_DIR}/scripts/odk/odk-api-helper.sh"
 
-mount_data_volume() {
-  step "Mounting persistent data volume"
-  local retries=30
-  while [[ ! -e "${DATA_DEVICE}" && ${retries} -gt 0 ]]; do
-    sleep 2
-    retries=$((retries - 1))
-  done
-
-  if [[ ! -e "${DATA_DEVICE}" ]]; then
-    error "Persistent data device not present: ${DATA_DEVICE}"
-    exit 1
-  fi
-
-  if ! file -s "${DATA_DEVICE}" | grep -qiE 'filesystem|ext4'; then
-    step "Formatting fresh data volume"
-    mkfs.ext4 -F "${DATA_DEVICE}"
-  fi
-
+ensure_data_volume_available() {
+  step "Checking persistent data volume"
   mkdir -p "${DATA_MOUNT_POINT}"
   if ! mountpoint -q "${DATA_MOUNT_POINT}"; then
-    mount "${DATA_DEVICE}" "${DATA_MOUNT_POINT}"
+    error "${DATA_MOUNT_POINT} is not mounted"
+    exit 1
   fi
-
-  if ! grep -q "${DATA_DEVICE} ${DATA_MOUNT_POINT}" /etc/fstab 2>/dev/null; then
-    echo "${DATA_DEVICE} ${DATA_MOUNT_POINT} ext4 defaults,nofail 0 2" >> /etc/fstab
-  fi
+  local probe="${DATA_MOUNT_POINT}/.glow-write-test"
+  touch "${probe}" || {
+    error "Mounted data volume at ${DATA_MOUNT_POINT} is not writable"
+    exit 1
+  }
+  rm -f "${probe}"
 }
 
 prepare_data_layout() {
@@ -132,7 +118,7 @@ EOF
 }
 
 compose() {
-  docker compose --profile odk --env-file "${RUNTIME_ENV}" -f $WORK_DIR/compose.yml "$@"
+  docker compose --profile odk --env-file "${RUNTIME_ENV}" -f "$WORK_DIR/compose.yml" "$@"
 }
 
 start_stack() {
@@ -248,7 +234,7 @@ EOF
 
 main() {
   step "Starting Glow stack activation"
-  mount_data_volume
+  ensure_data_volume_available
   prepare_data_layout
   generate_runtime_env
   start_stack
