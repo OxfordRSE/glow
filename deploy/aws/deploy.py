@@ -284,6 +284,16 @@ def wait_for_ssm_online(instance_id: str, region: str) -> None:
     wait_with_spinner("Waiting for SSM online", check, timeout=300)
 
 
+def wait_for_runner_bootstrap_completion(instance_id: str, region: str) -> None:
+    """Wait for the initial cloud-init bootstrap to finish."""
+    run_ssm_command(
+        instance_id,
+        region,
+        ["timeout 1800 bash -c 'while [ ! -f /opt/glow-runner/bootstrap.ready ]; do sleep 1; done'"],
+        "wait for runner bootstrap completion",
+    )
+
+
 def run_ssm_command(
     instance_id: str,
     region: str,
@@ -473,6 +483,7 @@ def provision(config: Config) -> None:
     alb_dns = outputs["alb_dns_name"]
 
     wait_for_ssm_online(instance_id, config.aws_region)
+    wait_for_runner_bootstrap_completion(instance_id, config.aws_region)
     prepare_runner_repository(
         instance_id,
         config.aws_region,
@@ -511,6 +522,7 @@ def update(config: Config) -> None:
     instance_id = outputs["runner_instance_id"]
 
     wait_for_ssm_online(instance_id, config.aws_region)
+    wait_for_runner_bootstrap_completion(instance_id, config.aws_region)
 
     prepare_runner_repository(
         instance_id,

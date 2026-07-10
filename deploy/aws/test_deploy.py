@@ -83,12 +83,33 @@ def test_prepare_runner_repository_clones_and_checks_out_requested_ref(monkeypat
     assert "checkout_ref=deadbeef" in command
 
 
+def test_wait_for_runner_bootstrap_completion_uses_cloud_init(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def fake_run_ssm_command(instance_id, region, commands, comment, timeout=1800):
+        captured["instance_id"] = instance_id
+        captured["region"] = region
+        captured["commands"] = commands
+        captured["comment"] = comment
+        captured["timeout"] = timeout
+
+    monkeypatch.setattr(deploy, "run_ssm_command", fake_run_ssm_command)
+
+    deploy.wait_for_runner_bootstrap_completion("i-1234567890", "eu-west-2")
+
+    assert captured["instance_id"] == "i-1234567890"
+    assert captured["region"] == "eu-west-2"
+    assert captured["comment"] == "wait for runner bootstrap completion"
+    assert captured["timeout"] == 1800
+    assert captured["commands"] == ["sudo cloud-init status --wait"]
+
+
 def test_runner_userdata_prefers_git_environment_over_template_defaults():
     template_path = Path(__file__).with_name("templates") / "runner-userdata.sh.tpl"
     template = template_path.read_text()
 
-    assert 'GIT_REPO_URL="${GIT_REPO_URL:-${git_repo_url}}"' in template
-    assert 'GIT_CHECKOUT_REF="${GIT_CHECKOUT_REF:-${git_checkout_ref}}"' in template
+    assert 'GIT_REPO_URL="$${GIT_REPO_URL:-${git_repo_url}}"' in template
+    assert 'GIT_CHECKOUT_REF="$${GIT_CHECKOUT_REF:-${git_checkout_ref}}"' in template
 
 
 def test_runner_userdata_uses_var_lib_glow_for_persistent_state_check():
@@ -126,6 +147,11 @@ def test_update_prepares_repository_before_rerunning_userdata(monkeypatch):
     )
     monkeypatch.setattr(
         deploy,
+        "wait_for_runner_bootstrap_completion",
+        lambda instance_id, region: calls.append(("bootstrap", instance_id)),
+    )
+    monkeypatch.setattr(
+        deploy,
         "prepare_runner_repository",
         lambda instance_id, region, repo_url, checkout_ref: calls.append(
             ("prepare", (instance_id, region, repo_url, checkout_ref))
@@ -160,6 +186,7 @@ def test_update_prepares_repository_before_rerunning_userdata(monkeypatch):
 
     assert calls == [
         ("wait", "i-1234567890"),
+        ("bootstrap", "i-1234567890"),
         (
             "prepare",
             (
@@ -203,6 +230,11 @@ def test_provision_prepares_repository_before_rerunning_userdata(monkeypatch):
     )
     monkeypatch.setattr(
         deploy,
+        "wait_for_runner_bootstrap_completion",
+        lambda instance_id, region: calls.append(("bootstrap", instance_id)),
+    )
+    monkeypatch.setattr(
+        deploy,
         "prepare_runner_repository",
         lambda instance_id, region, repo_url, checkout_ref: calls.append(
             ("prepare", (instance_id, region, repo_url, checkout_ref))
@@ -237,6 +269,7 @@ def test_provision_prepares_repository_before_rerunning_userdata(monkeypatch):
 
     assert calls == [
         ("wait", "i-1234567890"),
+        ("bootstrap", "i-1234567890"),
         (
             "prepare",
             (
