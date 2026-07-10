@@ -10,8 +10,8 @@ echo "[PROGRESS] Start bootstrap"
 
 AWS_REGION="${aws_region}"
 DOMAIN_NAME="${domain_name}"
-GIT_REPO_URL="${git_repo_url}"
-GIT_CHECKOUT_REF="${git_checkout_ref}"
+GIT_REPO_URL="${GIT_REPO_URL:-${git_repo_url}}"
+GIT_CHECKOUT_REF="${GIT_CHECKOUT_REF:-${git_checkout_ref}}"
 CLOUDWATCH_BOOTSTRAP_LOG_GROUP="${cloudwatch_bootstrap_log_group}"
 CLOUDWATCH_CONTAINERS_LOG_GROUP="${cloudwatch_containers_log_group}"
 CLOUDWATCH_SYSTEM_LOG_GROUP="${cloudwatch_system_log_group}"
@@ -83,20 +83,6 @@ install -d -m 0755 /var/lib/glow
 touch /var/lib/glow/.mnttest
 rm -f /var/lib/glow/.mnttest
 
-echo "[PROGRESS] Clone repository"
-
-if [[ -d /opt/glow/.git ]]; then
-  echo "[PROGRESS] Refreshing existing repository clone"
-  git -C /opt/glow fetch --tags --prune origin
-else
-  rm -rf /opt/glow
-  git clone "$${GIT_REPO_URL}" /opt/glow
-fi
-
-echo "[PROGRESS] Checking out $${GIT_CHECKOUT_REF}"
-git -C /opt/glow fetch --tags --prune origin
-git -C /opt/glow checkout --force "$${GIT_CHECKOUT_REF}"
-
 echo "[PROGRESS] Write /etc/glow-runner.env"
 
 cat > /etc/glow-runner.env <<EOF
@@ -106,6 +92,11 @@ GIT_REPO_URL=$${GIT_REPO_URL}
 GIT_CHECKOUT_REF=$${GIT_CHECKOUT_REF}
 CLOUDWATCH_CONTAINERS_LOG_GROUP=$${CLOUDWATCH_CONTAINERS_LOG_GROUP}
 EOF
+
+if [[ ! -d /opt/glow/.git ]]; then
+  echo "[PROGRESS] Repository checkout not present yet; waiting for deploy.py to prepare it"
+  exit 0
+fi
 
 echo "[PROGRESS] Activate stack"
 DOMAIN_NAME="$${DOMAIN_NAME}" bash /opt/glow/deploy/aws/runtime/activate-stack.sh

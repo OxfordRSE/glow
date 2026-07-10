@@ -117,7 +117,7 @@ start_stack() {
   compose --progress quiet build dashboard
 
   step "Bringing up all containers"
-  compose --progress quiet up -d --build --quiet-pull --quiet-build
+  compose --progress quiet up -d --build --quiet-pull --quiet-build --remove-orphans
 }
 
 wait_for_odk() {

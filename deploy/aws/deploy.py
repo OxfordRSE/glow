@@ -54,7 +54,9 @@ def require_command(command: str) -> None:
         raise DeployError(f"required command not found: {command}")
 
 
-def run_command(args: list[str], *, check: bool = True, cwd: Path | None = None) -> subprocess.CompletedProcess:
+def run_command(
+    args: list[str], *, check: bool = True, cwd: Path | None = None
+) -> subprocess.CompletedProcess:
     """Run a command and return the result."""
     result = subprocess.run(args, capture_output=True, text=True, cwd=cwd)
     if check and result.returncode != 0:
@@ -78,23 +80,23 @@ def resolve_git_commit(repo_url: str, ref: str) -> str:
     """Resolve a git ref to a commit SHA."""
     if ref and len(ref) == 40 and all(c in "0123456789abcdef" for c in ref):
         return ref
-    
-    result = run_command([
-        "git", "ls-remote", repo_url, ref, f"refs/tags/{ref}", f"refs/heads/{ref}"
-    ])
-    
+
+    result = run_command(
+        ["git", "ls-remote", repo_url, ref, f"refs/tags/{ref}", f"refs/heads/{ref}"]
+    )
+
     for line in result.stdout.splitlines():
         if line.strip():
             sha, _ = line.split("\t", 1)
             return sha
-    
+
     raise DeployError(f"could not resolve git ref: {ref}")
 
 
 def find_ami_in_account(region: str, git_commit: str) -> str | None:
     """Find an existing AMI in the AWS account for the given commit."""
     import boto3
-    
+
     ec2 = boto3.client("ec2", region_name=region)
     response = ec2.describe_images(
         Owners=["self"],
@@ -103,8 +105,12 @@ def find_ami_in_account(region: str, git_commit: str) -> str | None:
             {"Name": "tag:GitCommit", "Values": [git_commit]},
         ],
     )
-    
-    images = sorted(response.get("Images", []), key=lambda i: i.get("CreationDate", ""), reverse=True)
+
+    images = sorted(
+        response.get("Images", []),
+        key=lambda i: i.get("CreationDate", ""),
+        reverse=True,
+    )
     if images:
         return images[0]["ImageId"]
     return None
@@ -113,48 +119,52 @@ def find_ami_in_account(region: str, git_commit: str) -> str | None:
 def build_ami_with_packer(region: str, git_commit: str) -> str:
     """Build the runner AMI using Packer."""
     write_line("[deploy] Building runner AMI with Packer")
-    
+
     packer_vars = [
-        f"-var", f"aws_region={region}",
-        f"-var", f"git_commit={git_commit}",
+        f"-var",
+        f"aws_region={region}",
+        f"-var",
+        f"git_commit={git_commit}",
     ]
-    
+
     run_command(["packer", "init", "packer.pkr.hcl"], cwd=PACKER_DIR)
-    
+
     result = run_command(
         ["packer", "build"] + packer_vars + ["packer.pkr.hcl"],
         cwd=PACKER_DIR,
     )
-    
+
     # Extract AMI ID from packer output
     for line in result.stdout.splitlines():
         if "AMI:" in line and "ami-" in line:
             ami_id = line.split("ami-")[1].split()[0]
             return f"ami-{ami_id}"
-    
+
     raise DeployError("could not extract AMI ID from packer output")
 
 
 def ensure_state_bucket(region: str, domain_name: str) -> str:
     """Ensure the Terraform state bucket exists."""
     import boto3
-    
+
     sts = boto3.client("sts", region_name=region)
     account_id = sts.get_caller_identity()["Account"]
-    
-    bucket_name = f"{domain_name.replace('.', '-')}-glow-deploy-state-{account_id}"[:63].rstrip("-")
-    
+
+    bucket_name = f"{domain_name.replace('.', '-')}-glow-deploy-state-{account_id}"[
+        :63
+    ].rstrip("-")
+
     s3 = boto3.client("s3", region_name=region)
-    
+
     try:
         s3.head_bucket(Bucket=bucket_name)
         write_line(f"[deploy] State bucket exists: {bucket_name}")
         return bucket_name
     except Exception:
         pass
-    
+
     write_line(f"[deploy] Creating state bucket: {bucket_name}")
-    
+
     if region == "us-east-1":
         s3.create_bucket(Bucket=bucket_name)
     else:
@@ -162,12 +172,12 @@ def ensure_state_bucket(region: str, domain_name: str) -> str:
             Bucket=bucket_name,
             CreateBucketConfiguration={"LocationConstraint": region},
         )
-    
+
     s3.put_bucket_versioning(
         Bucket=bucket_name,
         VersioningConfiguration={"Status": "Enabled"},
     )
-    
+
     s3.put_public_access_block(
         Bucket=bucket_name,
         PublicAccessBlockConfiguration={
@@ -177,19 +187,23 @@ def ensure_state_bucket(region: str, domain_name: str) -> str:
             "RestrictPublicBuckets": True,
         },
     )
-    
+
     return bucket_name
 
 
 def terraform_init(bucket: str, region: str) -> None:
     """Initialize Terraform."""
-    run_command([
-        "terraform", "init",
-        f"-backend-config=bucket={bucket}",
-        f"-backend-config=key=main.tfstate",
-        f"-backend-config=region={region}",
-        "-reconfigure",
-    ], cwd=TERRAFORM_DIR)
+    run_command(
+        [
+            "terraform",
+            "init",
+            f"-backend-config=bucket={bucket}",
+            f"-backend-config=key=main.tfstate",
+            f"-backend-config=region={region}",
+            "-reconfigure",
+        ],
+        cwd=TERRAFORM_DIR,
+    )
 
 
 def terraform_apply(config: Config, ami_id: str) -> dict[str, Any]:
@@ -205,23 +219,23 @@ def terraform_apply(config: Config, ami_id: str) -> dict[str, Any]:
         "runner_instance_type": config.runner_instance_type,
         "runner_root_volume_size_gb": config.runner_root_volume_size_gb,
     }
-    
+
     fd, tfvars_path = tempfile.mkstemp(suffix=".tfvars.json")
     try:
         Path(tfvars_path).write_text(json.dumps(tfvars, indent=2))
-        
+
         if config.dry_run:
             run_command(
                 ["terraform", "plan", f"-var-file={tfvars_path}"],
                 cwd=TERRAFORM_DIR,
             )
             return {}
-        
+
         run_command(
             ["terraform", "apply", "-auto-approve", f"-var-file={tfvars_path}"],
             cwd=TERRAFORM_DIR,
         )
-        
+
         result = run_command(["terraform", "output", "-json"], cwd=TERRAFORM_DIR)
         raw = json.loads(result.stdout)
         return {name: details["value"] for name, details in raw.items()}
@@ -235,19 +249,19 @@ def wait_with_spinner(message: str, check_fn, timeout: int = 600) -> None:
     spinner = ["|", "/", "-", "\\"]
     idx = 0
     start = time.time()
-    
+
     while True:
         elapsed = int(time.time() - start)
         write_inline(f"[deploy] {message} {spinner[idx % len(spinner)]} ({elapsed}s)")
-        
+
         if check_fn():
             write_line(f"[deploy] {message} ✓")
             return
-        
+
         if elapsed > timeout:
             write_line("")
             raise DeployError(f"timeout waiting for: {message}")
-        
+
         time.sleep(1)
         idx += 1
 
@@ -255,9 +269,9 @@ def wait_with_spinner(message: str, check_fn, timeout: int = 600) -> None:
 def wait_for_ssm_online(instance_id: str, region: str) -> None:
     """Wait for SSM to become available on the instance."""
     import boto3
-    
+
     ssm = boto3.client("ssm", region_name=region)
-    
+
     def check():
         response = ssm.describe_instance_information(
             Filters=[{"Key": "InstanceIds", "Values": [instance_id]}]
@@ -266,17 +280,23 @@ def wait_for_ssm_online(instance_id: str, region: str) -> None:
             if item.get("PingStatus") == "Online":
                 return True
         return False
-    
+
     wait_with_spinner("Waiting for SSM online", check, timeout=300)
 
 
-def run_ssm_command(instance_id: str, region: str, commands: list[str], comment: str, timeout: int = 1800) -> None:
+def run_ssm_command(
+    instance_id: str,
+    region: str,
+    commands: list[str],
+    comment: str,
+    timeout: int = 1800,
+) -> None:
     """Run a command via SSM and wait for completion."""
     import boto3
     from botocore.exceptions import ClientError
-    
+
     ssm = boto3.client("ssm", region_name=region)
-    
+
     response = ssm.send_command(
         InstanceIds=[instance_id],
         DocumentName="AWS-RunShellScript",
@@ -284,36 +304,80 @@ def run_ssm_command(instance_id: str, region: str, commands: list[str], comment:
         TimeoutSeconds=timeout,
         Parameters={"commands": commands},
     )
-    
+
     command_id = response["Command"]["CommandId"]
-    
+
     def check():
         try:
-            invocation = ssm.get_command_invocation(CommandId=command_id, InstanceId=instance_id)
+            invocation = ssm.get_command_invocation(
+                CommandId=command_id, InstanceId=instance_id
+            )
         except ClientError as exc:
             if exc.response.get("Error", {}).get("Code") == "InvocationDoesNotExist":
                 return False
             raise
-        
+
         status = invocation.get("Status", "Unknown")
-        
+
         if status == "Success" and int(invocation.get("ResponseCode", 1)) == 0:
             return True
-        
+
         if status in {"Cancelled", "TimedOut", "Failed", "Cancelling"}:
             stderr = invocation.get("StandardErrorContent", "").strip()
             stdout = invocation.get("StandardOutputContent", "").strip()
             details = stderr or stdout or status
             raise DeployError(f"remote command failed: {details}")
-        
+
         return False
-    
+
     wait_with_spinner(comment, check, timeout=timeout)
 
 
-def rerun_runner_userdata(instance_id: str, region: str) -> None:
+def prepare_runner_repository(
+    instance_id: str, region: str, repo_url: str, checkout_ref: str
+) -> None:
+    """Ensure the runner has the requested repository checkout."""
+    script = f"""set -euo pipefail
+repo_url={shlex.quote(repo_url)}
+checkout_ref={shlex.quote(checkout_ref)}
+
+if [[ -d /opt/glow/.git ]]; then
+  current_origin="$(git -C /opt/glow remote get-url origin || true)"
+  if [[ "${{current_origin}}" != "${{repo_url}}" ]]; then
+    rm -rf /opt/glow
+  fi
+else
+  rm -rf /opt/glow
+fi
+
+if [[ ! -d /opt/glow/.git ]]; then
+  git clone "${{repo_url}}" /opt/glow
+fi
+
+git -C /opt/glow fetch --tags --prune origin
+git -C /opt/glow checkout --force "${{checkout_ref}}"
+"""
+
+    run_ssm_command(
+        instance_id,
+        region,
+        [f"sudo bash -lc {shlex.quote(script)}"],
+        "prepare runner repository",
+        timeout=3600,
+    )
+
+
+def rerun_runner_userdata(
+    instance_id: str,
+    region: str,
+    env: dict[str, str] | None = None,
+) -> None:
     """Rerun the instance userdata script via SSM."""
-    script = """set -euo pipefail
+    env_exports = "\n".join(
+        f"export {name}={shlex.quote(value)}" for name, value in (env or {}).items()
+    )
+    script = f"""set -euo pipefail
+{env_exports}
 if test -f /var/lib/cloud/instance/user-data.txt; then
   userdata_script=/var/lib/cloud/instance/user-data.txt
 elif test -f /var/lib/cloud/instance/scripts/part-001; then
@@ -323,14 +387,14 @@ else
   exit 1
 fi
 
-bash \"${userdata_script}\" || {
+ bash \"${{userdata_script}}\" || {{
   status=$?
   last_log_line=\"$(tail -n 1 /var/log/glow-runner-bootstrap.log 2>/dev/null || true)\"
-  if test -n \"${last_log_line}\"; then
-    echo \"last bootstrap log line: ${last_log_line}\" >&2
+  if test -n \"${{last_log_line}}\"; then
+    echo \"last bootstrap log line: ${{last_log_line}}\" >&2
   fi
-  exit \"${status}\"
-}
+  exit \"${{status}}\"
+}}
 """
 
     run_ssm_command(
@@ -342,18 +406,28 @@ bash \"${userdata_script}\" || {
     )
 
 
+def verify_runner_health(instance_id: str, region: str) -> None:
+    """Verify the runner services are healthy."""
+    run_ssm_command(
+        instance_id,
+        region,
+        ["sudo /opt/glow-runner/healthcheck.sh"],
+        "verify runner health",
+    )
+
+
 def verify_alb_routing(alb_dns: str, domain_name: str) -> None:
     """Verify ALB routing works with Host headers."""
     import http.client
-    
+
     write_line("[deploy] Verifying ALB routing")
-    
+
     endpoints = [
         (domain_name, "/en", "Dashboard"),
         (f"api.{domain_name}", "/health", "API"),
         (f"odk.{domain_name}", "/", "ODK"),
     ]
-    
+
     for host, path, name in endpoints:
         conn = http.client.HTTPSConnection(alb_dns, timeout=10)
         try:
@@ -371,62 +445,50 @@ def provision(config: Config) -> None:
     """Initial provision: build AMI, apply Terraform, activate stack."""
     write_line(f"[deploy] Provisioning {config.domain_name}")
     write_line(f"[deploy] Git reference: {config.git_ref} ({config.git_commit[:8]})")
-    
+
     bucket = ensure_state_bucket(config.aws_region, config.domain_name)
-    
-    ami_id = None if config.force_rebuild_ami else find_ami_in_account(config.aws_region, config.git_commit)
-    
+
+    ami_id = (
+        None
+        if config.force_rebuild_ami
+        else find_ami_in_account(config.aws_region, config.git_commit)
+    )
+
     if ami_id:
         write_line(f"[deploy] Using existing AMI: {ami_id}")
     else:
         ami_id = build_ami_with_packer(config.aws_region, config.git_commit)
         write_line(f"[deploy] Built AMI: {ami_id}")
-    
+
     terraform_init(bucket, config.aws_region)
-    
+
     write_line("[deploy] Applying Terraform")
     outputs = terraform_apply(config, ami_id)
-    
+
     if config.dry_run:
         write_line("[deploy] Dry-run complete")
         return
-    
+
     instance_id = outputs["runner_instance_id"]
     alb_dns = outputs["alb_dns_name"]
-    
+
     wait_for_ssm_online(instance_id, config.aws_region)
-    
-    run_ssm_command(
+    prepare_runner_repository(
         instance_id,
         config.aws_region,
-        ["timeout 1800 bash -c 'until test -f /opt/glow-runner/bootstrap.ready; do sleep 1; done'"],
-        "wait for bootstrap",
-        timeout=1800,
+        config.git_repo_url,
+        config.git_commit,
     )
+    rerun_runner_userdata(
+        instance_id,
+        config.aws_region,
+        {
+            "GIT_REPO_URL": config.git_repo_url,
+            "GIT_CHECKOUT_REF": config.git_commit,
+        },
+    )
+    verify_runner_health(instance_id, config.aws_region)
 
-    rerun_runner_userdata(instance_id, config.aws_region)
-
-    run_ssm_command(
-        instance_id,
-        config.aws_region,
-        ["curl -fsS http://127.0.0.1:8000/health"],
-        "verify API health",
-    )
-    
-    run_ssm_command(
-        instance_id,
-        config.aws_region,
-        ["curl -fsS http://127.0.0.1:3000/en"],
-        "verify dashboard health",
-    )
-    
-    run_ssm_command(
-        instance_id,
-        config.aws_region,
-        ["curl -fsS http://127.0.0.1:8080/"],
-        "verify ODK health",
-    )
-    
     write_line(f"[deploy] Deployment complete!")
     write_line(f"[deploy] Instance ID: {instance_id}")
     write_line(f"[deploy] ALB DNS: {alb_dns}")
@@ -438,33 +500,34 @@ def provision(config: Config) -> None:
 def update(config: Config) -> None:
     """Update existing instance via SSM."""
     write_line(f"[deploy] Updating to {config.git_ref} ({config.git_commit[:8]})")
-    
+
     bucket = ensure_state_bucket(config.aws_region, config.domain_name)
     terraform_init(bucket, config.aws_region)
-    
+
     result = run_command(["terraform", "output", "-json"], cwd=TERRAFORM_DIR)
     raw = json.loads(result.stdout)
     outputs = {name: details["value"] for name, details in raw.items()}
-    
+
     instance_id = outputs["runner_instance_id"]
-    
+
     wait_for_ssm_online(instance_id, config.aws_region)
-    
-    update_command = (
-        f"sudo "
-        f"GIT_REF={shlex.quote(config.git_commit)} "
-        f"DOMAIN_NAME={shlex.quote(config.domain_name)} "
-        f"bash /opt/glow/deploy/aws/runtime/update-instance.sh"
-    )
-    
-    run_ssm_command(
+
+    prepare_runner_repository(
         instance_id,
         config.aws_region,
-        [update_command],
-        f"update to {config.git_ref}",
-        timeout=3600,
+        config.git_repo_url,
+        config.git_commit,
     )
-    
+    rerun_runner_userdata(
+        instance_id,
+        config.aws_region,
+        {
+            "GIT_REPO_URL": config.git_repo_url,
+            "GIT_CHECKOUT_REF": config.git_commit,
+        },
+    )
+    verify_runner_health(instance_id, config.aws_region)
+
     write_line(f"[deploy] Update complete!")
 
 
@@ -473,25 +536,33 @@ def main() -> int:
     parser.add_argument("--domain", required=True, dest="domain_name")
     parser.add_argument("--certificate-arn", default="")
     parser.add_argument("--git-ref", default="")
-    parser.add_argument("--git-repo-url", default="https://github.com/OxfordRSE/glow.git")
-    parser.add_argument("--aws-region", default=os.environ.get("AWS_REGION", "eu-west-2"))
+    parser.add_argument(
+        "--git-repo-url", default="https://github.com/OxfordRSE/glow.git"
+    )
+    parser.add_argument(
+        "--aws-region", default=os.environ.get("AWS_REGION", "eu-west-2")
+    )
     parser.add_argument("--app-name", default="glow-core")
     parser.add_argument("--runner-instance-type", default="t3.medium")
     parser.add_argument("--runner-root-volume-size-gb", type=int, default=100)
     parser.add_argument("--force-rebuild-ami", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--update", action="store_true", help="Update existing instance instead of provision")
-    
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="Update existing instance instead of provision",
+    )
+
     args = parser.parse_args()
-    
+
     try:
         require_command("git")
         require_command("terraform")
         require_command("packer")
-        
+
         git_ref = args.git_ref or "main"
         git_commit = resolve_git_commit(args.git_repo_url, git_ref)
-        
+
         config = Config(
             domain_name=args.domain_name,
             certificate_arn=args.certificate_arn,
@@ -505,14 +576,14 @@ def main() -> int:
             dry_run=args.dry_run,
             force_rebuild_ami=args.force_rebuild_ami,
         )
-        
+
         if args.update:
             update(config)
         else:
             provision(config)
-        
+
         return 0
-    
+
     except DeployError as exc:
         write_line(f"[deploy] ERROR: {exc}")
         return 1

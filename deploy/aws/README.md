@@ -255,10 +255,10 @@ The repository checkout at `/opt/glow` has `docker-mount-data` symlinked to `/va
 
 Routine updates happen via SSM without replacing the instance:
 
-1. Fetch and checkout the target git ref
-2. Optionally run `deploy/update-instance.sh` hook if present
-3. Stop containers
-4. Restart containers with `activate-stack.sh`
+1. Clone or refresh `/opt/glow` to the target repository
+2. Checkout the target git ref
+3. Rerun `runner-userdata.sh.tpl` with git overrides
+4. Reconcile containers via `activate-stack.sh`
 5. Verify health
 
 AMI rebuilds are only needed for:
