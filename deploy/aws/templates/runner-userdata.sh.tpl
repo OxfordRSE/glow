@@ -3,6 +3,9 @@ set -euo pipefail
 
 exec > >(tee -a /var/log/glow-runner-bootstrap.log) 2>&1
 
+mkdir -p /opt/glow-runner
+rm -f /opt/glow-runner/bootstrap.ready
+
 echo "[PROGRESS] Start bootstrap"
 
 AWS_REGION="${aws_region}"

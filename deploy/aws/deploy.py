@@ -311,6 +311,23 @@ def run_ssm_command(instance_id: str, region: str, commands: list[str], comment:
     wait_with_spinner(comment, check, timeout=timeout)
 
 
+def rerun_runner_userdata(instance_id: str, region: str) -> None:
+    """Rerun the instance userdata script via SSM."""
+    run_ssm_command(
+        instance_id,
+        region,
+        [
+            "if test -f /var/lib/cloud/instance/user-data.txt; then "
+            "sudo bash /var/lib/cloud/instance/user-data.txt; "
+            "elif test -f /var/lib/cloud/instance/scripts/part-001; then "
+            "sudo bash /var/lib/cloud/instance/scripts/part-001; "
+            "else echo 'userdata script not found' >&2; exit 1; fi"
+        ],
+        "rerun runner userdata",
+        timeout=3600,
+    )
+
+
 def verify_alb_routing(alb_dns: str, domain_name: str) -> None:
     """Verify ALB routing works with Host headers."""
     import http.client
@@ -372,7 +389,9 @@ def provision(config: Config) -> None:
         "wait for bootstrap",
         timeout=1800,
     )
-    
+
+    rerun_runner_userdata(instance_id, config.aws_region)
+
     run_ssm_command(
         instance_id,
         config.aws_region,

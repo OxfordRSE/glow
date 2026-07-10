@@ -140,8 +140,21 @@ configure_odk() {
   source "${ADMIN_ENV}"
   source "${RUNTIME_ENV}"
 
-  printf '%s\n' "${ODK_ADMIN_PASSWORD}" | compose exec -T odk-service \
-    node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" user-create
+  local admin_actor_id
+  admin_actor_id="$(compose exec -T postgres14 psql \
+    -U "${ODK_POSTGRES_USER}" \
+    -d "${ODK_POSTGRES_DB}" \
+    -tAc "SELECT id FROM users WHERE email = '${ODK_ADMIN_EMAIL}' LIMIT 1")"
+
+  if [[ -n "${admin_actor_id}" ]]; then
+    info "ODK admin user already exists; reconciling password"
+    printf '%s\n' "${ODK_ADMIN_PASSWORD}" | compose exec -T odk-service \
+      node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" user-set-password >/dev/null
+  else
+    printf '%s\n' "${ODK_ADMIN_PASSWORD}" | compose exec -T odk-service \
+      node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" user-create
+  fi
+
   compose exec -T odk-service node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" user-promote 2>/dev/null || {
     info "(Already promoted - continuing)"
   }
