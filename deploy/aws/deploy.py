@@ -289,7 +289,7 @@ def wait_for_runner_bootstrap_completion(instance_id: str, region: str) -> None:
     run_ssm_command(
         instance_id,
         region,
-        ["timeout 1800 bash -c 'while [ ! -f /opt/glow-runner/bootstrap.ready ]; do sleep 1; done'"],
+        ["timeout 300 bash -c 'while [ ! -f /opt/glow-runner/bootstrap.ready ]; do sleep 1; done'"],
         "wait for runner bootstrap completion",
     )
 
