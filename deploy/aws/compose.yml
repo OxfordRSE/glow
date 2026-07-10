@@ -10,6 +10,7 @@ services:
     volumes:
       # Seed container-local AWS state from a read-only host mount.
       - ${HOME}/.aws:/aws-host:ro
+      - .:/opt/glow/deploy/aws
     profiles:
       - sso
     # No command specified - pass arguments via 'docker compose run --profile sso deploy --domain ...'
@@ -24,6 +25,8 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
       - AWS_REGION=${AWS_REGION:-eu-west-2}
+    volumes:
+      - .:/opt/glow/deploy/aws
     profiles:
       - env
     # No volumes - uses environment credentials only

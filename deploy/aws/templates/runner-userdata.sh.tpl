@@ -78,6 +78,11 @@ EOF
 
 systemctl restart docker
 
+echo "[PROGRESS] Checking persistent state directory"
+install -d -m 0755 /var/lib/glow
+touch /var/lib/glow/.mnttest
+rm -f /var/lib/glow/.mnttest
+
 echo "[PROGRESS] Clone repository"
 
 if [[ -d /opt/glow/.git ]]; then

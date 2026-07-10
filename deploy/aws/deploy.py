@@ -313,16 +313,30 @@ def run_ssm_command(instance_id: str, region: str, commands: list[str], comment:
 
 def rerun_runner_userdata(instance_id: str, region: str) -> None:
     """Rerun the instance userdata script via SSM."""
+    script = """set -euo pipefail
+if test -f /var/lib/cloud/instance/user-data.txt; then
+  userdata_script=/var/lib/cloud/instance/user-data.txt
+elif test -f /var/lib/cloud/instance/scripts/part-001; then
+  userdata_script=/var/lib/cloud/instance/scripts/part-001
+else
+  echo 'userdata script not found' >&2
+  exit 1
+fi
+
+bash \"${userdata_script}\" || {
+  status=$?
+  last_log_line=\"$(tail -n 1 /var/log/glow-runner-bootstrap.log 2>/dev/null || true)\"
+  if test -n \"${last_log_line}\"; then
+    echo \"last bootstrap log line: ${last_log_line}\" >&2
+  fi
+  exit \"${status}\"
+}
+"""
+
     run_ssm_command(
         instance_id,
         region,
-        [
-            "if test -f /var/lib/cloud/instance/user-data.txt; then "
-            "sudo bash /var/lib/cloud/instance/user-data.txt; "
-            "elif test -f /var/lib/cloud/instance/scripts/part-001; then "
-            "sudo bash /var/lib/cloud/instance/scripts/part-001; "
-            "else echo 'userdata script not found' >&2; exit 1; fi"
-        ],
+        [f"sudo bash -lc {shlex.quote(script)}"],
         "rerun runner userdata",
         timeout=3600,
     )
