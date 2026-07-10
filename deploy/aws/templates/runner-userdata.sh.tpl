@@ -99,9 +99,9 @@ GIT_CHECKOUT_REF=$${GIT_CHECKOUT_REF}
 CLOUDWATCH_CONTAINERS_LOG_GROUP=$${CLOUDWATCH_CONTAINERS_LOG_GROUP}
 EOF
 
-touch /opt/glow-runner/bootstrap.ready
-
 echo "[PROGRESS] Activate stack"
 DOMAIN_NAME="$${DOMAIN_NAME}" bash /opt/glow/deploy/aws/runtime/activate-stack.sh
+
+touch /opt/glow-runner/bootstrap.ready
 
 echo "[SUCCESS] Runner bootstrap complete"
