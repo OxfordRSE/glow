@@ -24,9 +24,72 @@ Simplified deployment using:
 
 ## Usage
 
-### Docker-based Deployment (Recommended)
+### Docker Compose (Easiest)
 
-The easiest way to deploy is using the pre-built container, which includes all required tools (Terraform, Packer, Python, AWS CLI).
+The simplest way to deploy is using Docker Compose with profiles. Use `--profile sso` for AWS SSO authentication or
+`--profile env` for environment credentials.
+
+#### Initial Provision
+
+**Using AWS SSO (for individual users):**
+
+```bash
+# First, authenticate on your host machine
+export AWS_PROFILE=my-profile
+aws sso login
+
+# Navigate to deploy/aws directory
+cd deploy/aws
+
+# Run deployment with SSO profile
+docker compose --profile sso run --rm deploy \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+```
+
+**Using environment credentials (for CI or temporary credentials):**
+
+```bash
+cd deploy/aws
+
+# Run deployment with env profile
+docker compose --profile env run --rm deploy-env \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+```
+
+Note: Ensure `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optionally `AWS_SESSION_TOKEN` are set in your
+environment.
+
+#### Subsequent Updates
+
+**Using AWS SSO:**
+
+```bash
+AWS_PROFILE=my-profile 
+aws sso login
+cd deploy/aws
+
+docker compose --profile sso run --rm deploy \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
+```
+
+**Using environment credentials:**
+
+```bash
+cd deploy/aws
+
+docker compose --profile env run --rm deploy-env \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
+```
+
+### Docker Run (Alternative)
+
+If you prefer not to use Docker Compose, you can use `docker run` directly.
 
 #### Build the launcher image
 
@@ -48,7 +111,7 @@ aws sso login --profile my-profile
 docker run --rm -it \
   -e AWS_PROFILE=my-profile \
   -e AWS_REGION=eu-west-2 \
-  -v "$HOME/.aws:/root/.aws:ro" \
+  -v "$HOME/.aws:/aws-host:ro" \
   glow-launcher \
   --domain eu.glow-project.org \
   --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
@@ -82,7 +145,7 @@ This will:
 docker run --rm -it \
   -e AWS_PROFILE=my-profile \
   -e AWS_REGION=eu-west-2 \
-  -v "$HOME/.aws:/root/.aws:ro" \
+  -v "$HOME/.aws:/aws-host:ro" \
   glow-launcher \
   --domain eu.glow-project.org \
   --git-ref v1.2.3 \
@@ -153,6 +216,7 @@ The deploy script uses standard AWS credential resolution via boto3:
 For containerized deployments:
 
 - **AWS SSO users**: Mount `~/.aws` read-only and authenticate on the host before running the container
+- The launcher copies `~/.aws` into container-local `~/.aws` at startup, so cache or token refreshes inside Docker do not write root-owned files back to the host
 - **CI/CD**: Pass credentials as environment variables
 - **Credential process or vault tools**: If using `credential_process`, `aws-vault`, or OS keychain helpers, either:
   - Include the helper binary in the image, or

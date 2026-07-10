@@ -2,18 +2,17 @@
 
 ## Prerequisites
 
-### Option 1: Docker (Recommended)
+### Option 1: Docker Compose (Easiest)
+
+1. Docker with Compose plugin
+2. AWS credentials (via SSO, profile, or environment variables)
+
+### Option 2: Docker (Recommended)
 
 1. Docker
 2. AWS credentials (via SSO, profile, or environment variables)
 
-Build the launcher image from the repository root:
-
-```bash
-docker build -t glow-launcher -f deploy/aws/Dockerfile .
-```
-
-### Option 2: Direct Python
+### Option 3: Direct Python
 
 1. `uv`
 2. `terraform`
@@ -23,25 +22,49 @@ docker build -t glow-launcher -f deploy/aws/Dockerfile .
 
 ## Initial Provision
 
-### Using Docker with AWS SSO (Individual Users)
+### Using Docker Compose with AWS SSO (Easiest for Individual Users)
 
 ```bash
 # Authenticate on your host machine first
 aws sso login --profile my-profile
 
-# Run deployment
+# Navigate to deploy directory and run with SSO profile
+cd deploy/aws
+AWS_PROFILE=my-profile docker compose --profile sso run --rm deploy \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+```
+
+### Using Docker Compose with Environment Credentials (CI/CD)
+
+```bash
+cd deploy/aws
+docker compose --profile env run --rm deploy-env \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+```
+
+### Using Docker Run with AWS SSO
+
+```bash
+# Authenticate on your host machine first
+aws sso login --profile my-profile
+
+# Build and run deployment
+docker build -t glow-launcher -f deploy/aws/Dockerfile .
 docker run --rm -it \
   -e AWS_PROFILE=my-profile \
   -e AWS_REGION=eu-west-2 \
-  -v "$HOME/.aws:/root/.aws:ro" \
+  -v "$HOME/.aws:/aws-host:ro" \
   glow-launcher \
   --domain eu.glow-project.org \
   --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
 ```
 
-### Using Docker with Environment Credentials (CI/CD)
+### Using Docker Run with Environment Credentials
 
 ```bash
+docker build -t glow-launcher -f deploy/aws/Dockerfile .
 docker run --rm -it \
   -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
   -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
@@ -62,20 +85,40 @@ uv run --project deploy/aws deploy/aws/deploy.py \
 
 ## Update Existing Deployment
 
-### Using Docker with AWS SSO
+### Using Docker Compose with AWS SSO
+
+```bash
+cd deploy/aws
+AWS_PROFILE=my-profile docker compose --profile sso run --rm deploy \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
+```
+
+### Using Docker Compose with Environment Credentials
+
+```bash
+cd deploy/aws
+docker compose --profile env run --rm deploy-env \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
+```
+
+### Using Docker Run with AWS SSO
 
 ```bash
 docker run --rm -it \
   -e AWS_PROFILE=my-profile \
   -e AWS_REGION=eu-west-2 \
-  -v "$HOME/.aws:/root/.aws:ro" \
+  -v "$HOME/.aws:/aws-host:ro" \
   glow-launcher \
   --domain eu.glow-project.org \
   --git-ref v1.2.3 \
   --update
 ```
 
-### Using Docker with Environment Credentials
+### Using Docker Run with Environment Credentials
 
 ```bash
 docker run --rm -it \
@@ -99,6 +142,8 @@ uv run --project deploy/aws deploy/aws/deploy.py \
 ```
 
 ## What It Does
+
+For Docker-based AWS SSO runs, the launcher mounts the host `~/.aws` directory read-only and copies it into a container-local `~/.aws` before invoking the deploy script. Any cache or token refresh written by the AWS CLI inside Docker stays inside the container and does not leave root-owned files on the host.
 
 ### Initial Provision
 

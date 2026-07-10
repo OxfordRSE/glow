@@ -129,7 +129,35 @@ The AWS deployment provides:
 - Application Load Balancer with health checks
 - CloudWatch logging
 
-#### Using Docker (Recommended)
+#### Using Docker Compose (Easiest)
+
+Initial provision with AWS SSO:
+```bash
+aws sso login --profile my-profile
+cd deploy/aws
+AWS_PROFILE=my-profile docker compose --profile sso run --rm deploy \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:...
+```
+
+Update existing deployment:
+```bash
+cd deploy/aws
+AWS_PROFILE=my-profile docker compose --profile sso run --rm deploy \
+  --domain eu.glow-project.org \
+  --git-ref v1.2.3 \
+  --update
+```
+
+For CI/CD with environment credentials:
+```bash
+cd deploy/aws
+docker compose --profile env run --rm deploy-env \
+  --domain eu.glow-project.org \
+  --certificate-arn arn:aws:acm:...
+```
+
+#### Using Docker Run
 
 Build the launcher image:
 ```bash
@@ -143,7 +171,7 @@ aws sso login --profile my-profile
 docker run --rm -it \
   -e AWS_PROFILE=my-profile \
   -e AWS_REGION=eu-west-2 \
-  -v "$HOME/.aws:/root/.aws:ro" \
+  -v "$HOME/.aws:/aws-host:ro" \
   glow-launcher \
   --domain eu.glow-project.org \
   --certificate-arn arn:aws:acm:...
@@ -154,7 +182,7 @@ Update existing deployment:
 docker run --rm -it \
   -e AWS_PROFILE=my-profile \
   -e AWS_REGION=eu-west-2 \
-  -v "$HOME/.aws:/root/.aws:ro" \
+  -v "$HOME/.aws:/aws-host:ro" \
   glow-launcher \
   --domain eu.glow-project.org \
   --git-ref v1.2.3 \
