@@ -122,7 +122,7 @@ start_stack() {
 
 wait_for_odk() {
   step "Waiting for ODK service"
-  info "> curl http://127.0.0.1:8080 with Host: $DOMAIN_NAME"
+  info "> curl http://127.0.0.1:8080 with Host: odk.$DOMAIN_NAME"
   local retries=60
   while [[ ${retries} -gt 0 ]]; do
     if curl -fsS -H "Host: $DOMAIN_NAME" http://127.0.0.1:8080/ >/dev/null 2>&1; then
