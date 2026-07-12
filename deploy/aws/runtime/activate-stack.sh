@@ -141,19 +141,19 @@ configure_odk() {
   source "${ADMIN_ENV}"
   source "${RUNTIME_ENV}"
 
-  local admin_actor_id
-  admin_actor_id="$(compose exec -T postgres14 psql \
-    -U "${ODK_POSTGRES_USER}" \
-    -d "${ODK_POSTGRES_DB}" \
-    -tAc "SELECT id FROM users WHERE email = '${ODK_ADMIN_EMAIL}' LIMIT 1")"
+  local create_output
+  create_output="$(printf '%s\n' "${ODK_ADMIN_PASSWORD}" | compose exec -T odk-service \
+    node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" user-create 2>&1 || true)"
 
-  if [[ -n "${admin_actor_id}" ]]; then
+  if printf '%s' "${create_output}" | grep -qi "already exists"; then
     info "ODK admin user already exists; reconciling password"
     printf '%s\n' "${ODK_ADMIN_PASSWORD}" | compose exec -T odk-service \
       node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" user-set-password >/dev/null
+  elif printf '%s' "${create_output}" | grep -qiE '(error|failed)'; then
+    error "Failed to create ODK admin user: ${create_output}"
+    exit 1
   else
-    printf '%s\n' "${ODK_ADMIN_PASSWORD}" | compose exec -T odk-service \
-      node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" user-create
+    info "ODK admin user created"
   fi
 
   compose exec -T odk-service node /usr/odk/lib/bin/cli.js -u "${ODK_ADMIN_EMAIL}" user-promote 2>/dev/null || {

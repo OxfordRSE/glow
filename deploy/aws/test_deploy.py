@@ -83,7 +83,7 @@ def test_prepare_runner_repository_clones_and_checks_out_requested_ref(monkeypat
     assert "checkout_ref=deadbeef" in command
 
 
-def test_wait_for_runner_bootstrap_completion_uses_cloud_init(monkeypatch):
+def test_wait_for_runner_bootstrap_completion_waits_for_ready_file(monkeypatch):
     captured: dict[str, object] = {}
 
     def fake_run_ssm_command(instance_id, region, commands, comment, timeout=1800):
@@ -101,7 +101,9 @@ def test_wait_for_runner_bootstrap_completion_uses_cloud_init(monkeypatch):
     assert captured["region"] == "eu-west-2"
     assert captured["comment"] == "wait for runner bootstrap completion"
     assert captured["timeout"] == 1800
-    assert captured["commands"] == ["sudo cloud-init status --wait"]
+    assert captured["commands"] == [
+        "timeout 300 bash -c 'while [ ! -f /opt/glow-runner/bootstrap.ready ]; do sleep 1; done'"
+    ]
 
 
 def test_runner_userdata_prefers_git_environment_over_template_defaults():
@@ -126,6 +128,15 @@ def test_runner_userdata_does_not_clone_or_checkout_repository():
 
     assert "git clone" not in template
     assert "git -C /opt/glow checkout --force" not in template
+
+
+def test_activate_stack_configures_odk_without_querying_users_id():
+    script_path = Path(__file__).with_name("runtime") / "activate-stack.sh"
+    script = script_path.read_text()
+
+    assert "SELECT id FROM users" not in script
+    assert "user-create 2>&1 || true" in script
+    assert "user-set-password" in script
 
 
 def test_update_prepares_repository_before_rerunning_userdata(monkeypatch):
