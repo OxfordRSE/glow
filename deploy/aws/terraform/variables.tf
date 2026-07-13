@@ -14,6 +14,10 @@ variable "domain_name" {
   type = string
 }
 
+variable "git_ref" {
+  type = string
+}
+
 variable "git_repo_url" {
   type = string
 }

@@ -11,7 +11,8 @@ echo "[PROGRESS] Start bootstrap"
 AWS_REGION="${aws_region}"
 DOMAIN_NAME="${domain_name}"
 GIT_REPO_URL="$${GIT_REPO_URL:-${git_repo_url}}"
-GIT_CHECKOUT_REF="$${GIT_CHECKOUT_REF:-${git_checkout_ref}}"
+GIT_REF="$${GIT_REF:-${git_ref}}"
+GIT_COMMIT="$${GIT_COMMIT:-${git_checkout_ref}}"
 CLOUDWATCH_BOOTSTRAP_LOG_GROUP="${cloudwatch_bootstrap_log_group}"
 CLOUDWATCH_CONTAINERS_LOG_GROUP="${cloudwatch_containers_log_group}"
 CLOUDWATCH_SYSTEM_LOG_GROUP="${cloudwatch_system_log_group}"
@@ -89,11 +90,25 @@ cat > /etc/glow-runner.env <<EOF
 AWS_REGION=$${AWS_REGION}
 DOMAIN_NAME=$${DOMAIN_NAME}
 GIT_REPO_URL=$${GIT_REPO_URL}
-GIT_CHECKOUT_REF=$${GIT_CHECKOUT_REF}
+GIT_REF=$${GIT_REF}
+GIT_COMMIT=$${GIT_COMMIT}
 CLOUDWATCH_CONTAINERS_LOG_GROUP=$${CLOUDWATCH_CONTAINERS_LOG_GROUP}
 EOF
 
+tmp_environment_file="$(mktemp)"
+if [[ -f /etc/environment ]]; then
+  grep -vE '^(GIT_REPO_URL|GIT_REF|GIT_COMMIT)=' /etc/environment > "$${tmp_environment_file}" || true
+fi
+cat >> "$${tmp_environment_file}" <<EOF
+GIT_REPO_URL="$${GIT_REPO_URL}"
+GIT_REF="$${GIT_REF}"
+GIT_COMMIT="$${GIT_COMMIT}"
+EOF
+install -m 0644 "$${tmp_environment_file}" /etc/environment
+rm -f "$${tmp_environment_file}"
+
 if [[ ! -d /opt/glow/.git ]]; then
+  touch /opt/glow-runner/bootstrap.ready
   echo "[PROGRESS] Repository checkout not present yet; waiting for deploy.py to prepare it"
   exit 0
 fi

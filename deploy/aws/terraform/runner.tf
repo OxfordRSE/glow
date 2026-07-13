@@ -51,6 +51,7 @@ resource "aws_instance" "runner" {
     {
       aws_region                      = var.aws_region
       domain_name                     = var.domain_name
+      git_ref                         = var.git_ref
       git_repo_url                    = var.git_repo_url
       git_checkout_ref                = var.git_checkout_ref
       cloudwatch_bootstrap_log_group  = aws_cloudwatch_log_group.bootstrap.name
@@ -68,7 +69,8 @@ resource "aws_instance" "runner" {
   tags = merge(local.tags, {
     Name      = "${var.app_name}-runner"
     Component = "glow-runner"
-    GitRef    = var.git_checkout_ref
+    GitRef    = var.git_ref
+    GitCommit = var.git_checkout_ref
   })
 
   lifecycle {

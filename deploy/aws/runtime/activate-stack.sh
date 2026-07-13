@@ -227,6 +227,7 @@ write_metadata() {
   cat > "${STATE_DIR}/.glow-deployment.json" <<EOF
 {
   "domain_name": "${DOMAIN_NAME}",
+  "git_ref": "${GIT_REF:-}",
   "git_commit": "${checkout_ref}",
   "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }

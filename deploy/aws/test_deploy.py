@@ -2,6 +2,58 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import deploy
+import pytest
+
+
+def test_resolve_git_commit_prefers_peeled_annotated_tag_commit(monkeypatch):
+    def fake_run_command(args, check=True, cwd=None):
+        return SimpleNamespace(
+            stdout=(
+                "1111111111111111111111111111111111111111\trefs/tags/v1.2.3\n"
+                "2222222222222222222222222222222222222222\trefs/tags/v1.2.3^{}\n"
+            )
+        )
+
+    monkeypatch.setattr(deploy, "run_command", fake_run_command)
+
+    assert (
+        deploy.resolve_git_commit("https://example.com/glow.git", "v1.2.3")
+        == "2222222222222222222222222222222222222222"
+    )
+
+
+def test_extract_ami_id_from_packer_output_reads_machine_readable_artifact_id():
+    output = "\n".join(
+        [
+            "1720781200,,ui,say,Building AMI",
+            "1720781201,amazon-ebs.runner,artifact,0,id,eu-west-2:ami-0123456789abcdef0",
+        ]
+    )
+
+    assert (
+        deploy.extract_ami_id_from_packer_output(output) == "ami-0123456789abcdef0"
+    )
+
+
+def test_extract_ami_id_from_packer_output_ignores_trailing_control_characters():
+    output = (
+        "1720781201,amazon-ebs.runner,artifact,0,id,"
+        "eu-west-2:ami-0123456789abcdef0\u001b[0m"
+    )
+
+    assert (
+        deploy.extract_ami_id_from_packer_output(output) == "ami-0123456789abcdef0"
+    )
+
+
+def test_extract_ami_id_from_packer_output_rejects_missing_artifact_id():
+    with pytest.raises(deploy.DeployError, match="could not extract AMI ID"):
+        deploy.extract_ami_id_from_packer_output("1720781200,,ui,say,Building AMI")
+
+
+def test_validate_ami_id_rejects_invalid_characters():
+    with pytest.raises(deploy.DeployError, match="invalid AMI ID"):
+        deploy.validate_ami_id("ami-01234567\u0007")
 
 
 def test_rerun_runner_userdata_reports_last_bootstrap_log_line(monkeypatch):
@@ -45,13 +97,15 @@ def test_rerun_runner_userdata_accepts_git_environment_overrides(monkeypatch):
         "eu-west-2",
         {
             "GIT_REPO_URL": "https://example.com/glow.git",
-            "GIT_CHECKOUT_REF": "deadbeef",
+            "GIT_REF": "v1.2.3",
+            "GIT_COMMIT": "deadbeef",
         },
     )
 
     command = captured["commands"][0]
     assert "export GIT_REPO_URL=https://example.com/glow.git" in command
-    assert "export GIT_CHECKOUT_REF=deadbeef" in command
+    assert "export GIT_REF=v1.2.3" in command
+    assert "export GIT_COMMIT=deadbeef" in command
 
 
 def test_prepare_runner_repository_clones_and_checks_out_requested_ref(monkeypatch):
@@ -111,7 +165,34 @@ def test_runner_userdata_prefers_git_environment_over_template_defaults():
     template = template_path.read_text()
 
     assert 'GIT_REPO_URL="$${GIT_REPO_URL:-${git_repo_url}}"' in template
-    assert 'GIT_CHECKOUT_REF="$${GIT_CHECKOUT_REF:-${git_checkout_ref}}"' in template
+    assert 'GIT_REF="$${GIT_REF:-${git_ref}}"' in template
+    assert 'GIT_COMMIT="$${GIT_COMMIT:-${git_checkout_ref}}"' in template
+
+
+def test_runner_userdata_marks_bootstrap_ready_before_waiting_for_repository_checkout():
+    template_path = Path(__file__).with_name("templates") / "runner-userdata.sh.tpl"
+    template = template_path.read_text()
+
+    wait_line = (
+        '  echo "[PROGRESS] Repository checkout not present yet; waiting for deploy.py '
+        'to prepare it"'
+    )
+    assert "touch /opt/glow-runner/bootstrap.ready" in template
+    assert wait_line in template
+    assert template.index("touch /opt/glow-runner/bootstrap.ready") < template.index(
+        wait_line
+    )
+
+
+def test_runner_userdata_persists_git_ref_and_commit_in_environment_files():
+    template_path = Path(__file__).with_name("templates") / "runner-userdata.sh.tpl"
+    template = template_path.read_text()
+
+    assert "GIT_REF=$${GIT_REF}" in template
+    assert "GIT_COMMIT=$${GIT_COMMIT}" in template
+    assert "/etc/environment" in template
+    assert "GIT_REF=\"$${GIT_REF}\"" in template
+    assert "GIT_COMMIT=\"$${GIT_COMMIT}\"" in template
 
 
 def test_runner_userdata_uses_var_lib_glow_for_persistent_state_check():
@@ -137,6 +218,25 @@ def test_activate_stack_configures_odk_without_querying_users_id():
     assert "SELECT id FROM users" not in script
     assert "user-create 2>&1 || true" in script
     assert "user-set-password" in script
+
+
+def test_activate_stack_writes_requested_git_ref_and_commit_to_metadata():
+    script_path = Path(__file__).with_name("runtime") / "activate-stack.sh"
+    script = script_path.read_text()
+
+    assert '"git_ref": "${GIT_REF:-}",' in script
+    assert '"git_commit": "${checkout_ref}"' in script
+
+
+def test_get_git_ref_script_reads_runner_environment_file():
+    script_path = Path(__file__).with_name("runtime") / "get-git-ref.sh"
+    script = script_path.read_text()
+
+    assert 'ENV_FILE="/etc/glow-runner.env"' in script
+    assert 'case "${1:-}" in' in script
+    assert '--commit)' in script
+    assert 'printf \"%s\\n\" "${GIT_REF:-}"' in script
+    assert 'printf \"%s\\n\" "${GIT_COMMIT:-}"' in script
 
 
 def test_update_prepares_repository_before_rerunning_userdata(monkeypatch):
@@ -211,7 +311,8 @@ def test_update_prepares_repository_before_rerunning_userdata(monkeypatch):
             "rerun",
             {
                 "GIT_REPO_URL": "https://example.com/glow.git",
-                "GIT_CHECKOUT_REF": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+                "GIT_REF": "main",
+                "GIT_COMMIT": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
             },
         ),
         ("verify", "i-1234567890"),
@@ -294,7 +395,8 @@ def test_provision_prepares_repository_before_rerunning_userdata(monkeypatch):
             "rerun",
             {
                 "GIT_REPO_URL": "https://example.com/glow.git",
-                "GIT_CHECKOUT_REF": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+                "GIT_REF": "main",
+                "GIT_COMMIT": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
             },
         ),
         ("verify", "i-1234567890"),

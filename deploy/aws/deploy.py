@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -27,6 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 AWS_DEPLOY_DIR = REPO_ROOT / "deploy" / "aws"
 TERRAFORM_DIR = AWS_DEPLOY_DIR / "terraform"
 PACKER_DIR = AWS_DEPLOY_DIR / "runner"
+AMI_ID_PATTERN = re.compile(r"ami-[0-9a-fA-F]{8,17}")
 
 
 class DeployError(RuntimeError):
@@ -64,6 +66,26 @@ def run_command(
     return result
 
 
+def validate_ami_id(ami_id: str) -> str:
+    """Ensure an AMI ID is well-formed before passing it to AWS APIs."""
+    if not re.fullmatch(AMI_ID_PATTERN, ami_id):
+        raise DeployError(f"invalid AMI ID: {ami_id!r}")
+    return ami_id
+
+
+def extract_ami_id_from_packer_output(output: str) -> str:
+    """Extract the built AMI ID from Packer machine-readable output."""
+    for line in output.splitlines():
+        if ",artifact," not in line or ",id," not in line:
+            continue
+
+        match = AMI_ID_PATTERN.search(line)
+        if match:
+            return validate_ami_id(match.group(0))
+
+    raise DeployError("could not extract AMI ID from packer output")
+
+
 def write_inline(message: str) -> None:
     """Write a message that overwrites the current line."""
     sys.stderr.write(f"\r\033[K{message}")
@@ -82,13 +104,31 @@ def resolve_git_commit(repo_url: str, ref: str) -> str:
         return ref
 
     result = run_command(
-        ["git", "ls-remote", repo_url, ref, f"refs/tags/{ref}", f"refs/heads/{ref}"]
+        [
+            "git",
+            "ls-remote",
+            repo_url,
+            f"refs/tags/{ref}^{{}}",
+            f"refs/tags/{ref}",
+            f"refs/heads/{ref}",
+            ref,
+        ]
     )
 
+    matches: dict[str, str] = {}
     for line in result.stdout.splitlines():
         if line.strip():
-            sha, _ = line.split("\t", 1)
-            return sha
+            sha, remote_ref = line.split("\t", 1)
+            matches[remote_ref] = sha
+
+    for candidate in (
+        f"refs/tags/{ref}^{{}}",
+        f"refs/tags/{ref}",
+        f"refs/heads/{ref}",
+        ref,
+    ):
+        if candidate in matches:
+            return matches[candidate]
 
     raise DeployError(f"could not resolve git ref: {ref}")
 
@@ -130,17 +170,11 @@ def build_ami_with_packer(region: str, git_commit: str) -> str:
     run_command(["packer", "init", "packer.pkr.hcl"], cwd=PACKER_DIR)
 
     result = run_command(
-        ["packer", "build"] + packer_vars + ["packer.pkr.hcl"],
+        ["packer", "build", "-machine-readable"] + packer_vars + ["packer.pkr.hcl"],
         cwd=PACKER_DIR,
     )
 
-    # Extract AMI ID from packer output
-    for line in result.stdout.splitlines():
-        if "AMI:" in line and "ami-" in line:
-            ami_id = line.split("ami-")[1].split()[0]
-            return f"ami-{ami_id}"
-
-    raise DeployError("could not extract AMI ID from packer output")
+    return extract_ami_id_from_packer_output(result.stdout)
 
 
 def ensure_state_bucket(region: str, domain_name: str) -> str:
@@ -213,9 +247,10 @@ def terraform_apply(config: Config, ami_id: str) -> dict[str, Any]:
         "aws_region": config.aws_region,
         "certificate_arn": config.certificate_arn,
         "domain_name": config.domain_name,
+        "git_ref": config.git_ref,
         "git_repo_url": config.git_repo_url,
         "git_checkout_ref": config.git_commit,
-        "runner_ami_id": ami_id,
+        "runner_ami_id": validate_ami_id(ami_id),
         "runner_instance_type": config.runner_instance_type,
         "runner_root_volume_size_gb": config.runner_root_volume_size_gb,
     }
@@ -495,7 +530,8 @@ def provision(config: Config) -> None:
         config.aws_region,
         {
             "GIT_REPO_URL": config.git_repo_url,
-            "GIT_CHECKOUT_REF": config.git_commit,
+            "GIT_REF": config.git_ref,
+            "GIT_COMMIT": config.git_commit,
         },
     )
     verify_runner_health(instance_id, config.aws_region)
@@ -535,7 +571,8 @@ def update(config: Config) -> None:
         config.aws_region,
         {
             "GIT_REPO_URL": config.git_repo_url,
-            "GIT_CHECKOUT_REF": config.git_commit,
+            "GIT_REF": config.git_ref,
+            "GIT_COMMIT": config.git_commit,
         },
     )
     verify_runner_health(instance_id, config.aws_region)
