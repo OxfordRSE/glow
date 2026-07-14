@@ -13,6 +13,7 @@ RUNTIME_ENV="${STATE_DIR}/.deploy/share/.env.runtime"
 FORMS_STATE="${STATE_DIR}/.deploy/share/odk-forms-state.json"
 FORMS_DIR="${WORK_DIR}/odk-forms"
 export ODK_API_BASE="http://127.0.0.1:8080/v1"
+export ODK_DOMAIN="odk.${DOMAIN_NAME}"
 
 export BUILDKIT_PROGRESS=plain
 
@@ -122,10 +123,10 @@ start_stack() {
 
 wait_for_odk() {
   step "Waiting for ODK service"
-  info "> curl http://127.0.0.1:8080 with Host: odk.$DOMAIN_NAME"
+  info "> odk_ping"
   local retries=60
   while [[ ${retries} -gt 0 ]]; do
-    if curl -fsS -H "Host: odk.$DOMAIN_NAME" http://127.0.0.1:8080/ >/dev/null 2>&1; then
+    if odk_ping >/dev/null 2>&1; then
       info "ODK service is ready"
       return
     fi
@@ -217,7 +218,7 @@ verify_stack() {
   step "Verifying service health"
   curl -fsS http://127.0.0.1:8000/health >/dev/null
   curl -fsS http://127.0.0.1:3000/en >/dev/null
-  curl -fsS http://127.0.0.1:8080/ >/dev/null
+  odk_ping >/dev/null
 }
 
 write_metadata() {

@@ -228,6 +228,29 @@ def test_activate_stack_writes_requested_git_ref_and_commit_to_metadata():
     assert '"git_commit": "${checkout_ref}"' in script
 
 
+def test_activate_stack_uses_odk_domain_for_helper_host_header_and_ping():
+    script_path = Path(__file__).with_name("runtime") / "activate-stack.sh"
+    script = script_path.read_text()
+
+    assert 'export ODK_DOMAIN="odk.${DOMAIN_NAME}"' in script
+    assert 'info "> odk_ping"' in script
+    assert 'if odk_ping >/dev/null 2>&1; then' in script
+    assert "curl -fsS -H \"Host: odk.$DOMAIN_NAME\" http://127.0.0.1:8080/" not in script
+    assert 'curl -fsS http://127.0.0.1:8080/ >/dev/null' not in script
+
+
+def test_odk_api_helper_supports_optional_host_header_and_ping():
+    script_path = Path(__file__).parents[1] / ".." / "scripts" / "odk" / "odk-api-helper.sh"
+    script = script_path.resolve().read_text()
+
+    assert 'ODK_HOST_HEADER="${ODK_DOMAIN:-}"' in script
+    assert 'odk_curl() {' in script
+    assert 'curl -H "Host: ${ODK_HOST_HEADER}" "$@"' in script
+    assert 'odk_ping() {' in script
+    assert 'local root_url="${ODK_API_BASE%/v1}/"' in script
+    assert 'odk_curl -fsS "${root_url}"' in script
+
+
 def test_get_git_ref_script_reads_runner_environment_file():
     script_path = Path(__file__).with_name("runtime") / "get-git-ref.sh"
     script = script_path.read_text()

@@ -23,6 +23,7 @@ set -euo pipefail
 
 # ODK Central API base URL (internal Docker network)
 ODK_API_BASE="${ODK_API_BASE:-http://service:8383/v1}"
+ODK_HOST_HEADER="${ODK_DOMAIN:-}"
 
 # Color output
 RED='\033[0;31m'
@@ -33,6 +34,20 @@ RESET='\033[0m'
 odk_info()  { echo -e "${GREEN}[ODK]${RESET} $*" >&2; }
 odk_warn()  { echo -e "${YELLOW}[ODK WARN]${RESET} $*" >&2; }
 odk_error() { echo -e "${RED}[ODK ERROR]${RESET} $*" >&2; }
+
+odk_curl() {
+  if [[ -n "${ODK_HOST_HEADER}" ]]; then
+    curl -H "Host: ${ODK_HOST_HEADER}" "$@"
+    return
+  fi
+
+  curl "$@"
+}
+
+odk_ping() {
+  local root_url="${ODK_API_BASE%/v1}/"
+  odk_curl -fsS "${root_url}"
+}
 
 # ─── Authentication ──────────────────────────────────────────────────────────
 
@@ -45,7 +60,7 @@ odk_login() {
   local password="$2"
   
   local response
-  response=$(curl -sf -X POST "${ODK_API_BASE}/sessions" \
+  response=$(odk_curl -sf -X POST "${ODK_API_BASE}/sessions" \
     -H "Content-Type: application/json" \
     -d "$(jq -n --arg email "$email" --arg password "$password" \
       '{email: $email, password: $password}')" 2>&1) || {
@@ -75,7 +90,7 @@ odk_get_project_by_name() {
   local token="$2"
   
   local response
-  response=$(curl -sf -X GET "${ODK_API_BASE}/projects" \
+  response=$(odk_curl -sf -X GET "${ODK_API_BASE}/projects" \
     -H "Authorization: Bearer ${token}" 2>&1) || {
     odk_error "Failed to list projects"
     return 1
@@ -109,7 +124,7 @@ odk_create_project() {
   
   # Create new project
   local response
-  response=$(curl -sf -X POST "${ODK_API_BASE}/projects" \
+  response=$(odk_curl -sf -X POST "${ODK_API_BASE}/projects" \
     -H "Authorization: Bearer ${token}" \
     -H "Content-Type: application/json" \
     -d "$(jq -n --arg name "$project_name" '{name: $name}')" 2>&1) || {
@@ -140,7 +155,7 @@ odk_get_user_actor_id() {
   local token="$2"
   
   local response
-  response=$(curl -sf -X GET "${ODK_API_BASE}/users" \
+  response=$(odk_curl -sf -X GET "${ODK_API_BASE}/users" \
     -H "Authorization: Bearer ${token}" 2>&1) || {
     odk_error "Failed to list users"
     return 1
@@ -175,7 +190,7 @@ odk_create_user() {
   
   # Create new user
   local response
-  response=$(curl -sf -X POST "${ODK_API_BASE}/users" \
+  response=$(odk_curl -sf -X POST "${ODK_API_BASE}/users" \
     -H "Authorization: Bearer ${token}" \
     -H "Content-Type: application/json" \
     -d "$(jq -n --arg email "$email" --arg password "$password" \
@@ -208,7 +223,7 @@ odk_assign_role() {
   
   # Check if assignment already exists
   local response
-  response=$(curl -sf -X GET "${ODK_API_BASE}/projects/${project_id}/assignments" \
+  response=$(odk_curl -sf -X GET "${ODK_API_BASE}/projects/${project_id}/assignments" \
     -H "Authorization: Bearer ${token}" 2>&1) || {
     odk_warn "Failed to check existing role assignments"
   }
@@ -227,7 +242,7 @@ odk_assign_role() {
   
   # Assign role
   local assign_response
-  assign_response=$(curl -s -X POST "${ODK_API_BASE}/projects/${project_id}/assignments/${role_id}/${actor_id}" \
+  assign_response=$(odk_curl -s -X POST "${ODK_API_BASE}/projects/${project_id}/assignments/${role_id}/${actor_id}" \
     -H "Authorization: Bearer ${token}" 2>&1)
   
   # Check HTTP status - parse from JSON error response
@@ -259,7 +274,7 @@ odk_list_forms() {
   local token="$2"
   
   local response
-  response=$(curl -sf -X GET "${ODK_API_BASE}/projects/${project_id}/forms" \
+  response=$(odk_curl -sf -X GET "${ODK_API_BASE}/projects/${project_id}/forms" \
     -H "Authorization: Bearer ${token}" 2>&1) || {
     odk_error "Failed to list forms in project ${project_id}"
     return 1
@@ -280,7 +295,7 @@ odk_upload_form() {
   # POST or PUT depending on whether form exists
   # ODK Central creates a new version automatically if xmlFormId exists
   local response
-  response=$(curl -s -X POST "${ODK_API_BASE}/projects/${project_id}/forms?publish=true" \
+  response=$(odk_curl -s -X POST "${ODK_API_BASE}/projects/${project_id}/forms?publish=true" \
     -H "Authorization: Bearer ${token}" \
     -H "Content-Type: application/xml" \
     -H "X-XmlFormId-Fallback: true" \
