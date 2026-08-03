@@ -29,12 +29,6 @@ jobs:
       - name: Terraform Format Check
         run: terraform -chdir=deploy/aws/terraform fmt -check -recursive
 
-      - name: Terraform Init and Validate
-        if: false  # requires a key?
-        run: |
-          terraform -chdir=deploy/aws/terraform init -backend=false
-          terraform -chdir=deploy/aws/terraform validate -no-color
-
   tflint:
     name: TFLint
     runs-on: ubuntu-latest
@@ -54,6 +48,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run TFLint (main)
+      - name: Run TFLint
         run: tflint --format compact
         working-directory: deploy/aws/terraform

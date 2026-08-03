@@ -7,6 +7,29 @@ Simplified deployment using:
 - SSM-based in-place updates for routine releases
 - Long-lived EC2 instance with persistent root volume
 
+## GUI (recommended)
+
+Most deployments and updates don't need any of the CLI/Docker steps below —
+download the packaged GUI instead of installing Python, Terraform, Packer, or
+Docker.
+
+1. Download the build for your OS from the
+   [Releases page](https://github.com/OxfordRSE/glow/releases) — Windows
+   (`.zip`), macOS (`.tar.gz`), or Linux (`.AppImage` or `.tar.gz`).
+2. Run it. It opens a browser tab at `http://127.0.0.1:<port>` — no terminal
+   needed.
+3. Sign in with AWS SSO (recommended) or manual access keys.
+4. Use "New deployment" to provision, or open an existing deployment to
+   update it. Both flows show a plan/review step before anything actually
+   runs.
+
+Builds are unsigned for now, so the OS will warn about an unidentified
+developer/publisher on first run — click through it (Windows: "More info" →
+"Run anyway"; macOS: right-click the app → "Open").
+
+Everything below this section covers the underlying CLI and raw Terraform,
+for advanced use or automation (CI, scripting) where the GUI doesn't fit.
+
 ## Prerequisites
 
 ### Option 1: Docker (Recommended)
@@ -221,6 +244,61 @@ For containerized deployments:
 - **Credential process or vault tools**: If using `credential_process`, `aws-vault`, or OS keychain helpers, either:
   - Include the helper binary in the image, or
   - Use environment credentials instead
+
+### Advanced: driving Terraform directly
+
+Both the GUI and the `glow-deploy` CLI are wrappers around a single Terraform
+root module at `deploy/aws/terraform/`. You can skip both and drive it
+yourself.
+
+**You'll need:**
+
+- A runner AMI already built and tagged (`Component=glow-runner`,
+  `GitCommit=<sha>`) — either run `packer build` in `deploy/aws/runner/`
+  yourself, or find an existing one in the account:
+  `aws ec2 describe-images --owners self --filters Name=tag:Component,Values=glow-runner`.
+- An S3 state bucket. `glow-deploy` creates one automatically, named
+  `<domain-with-dots-replaced-by-dashes>-glow-deploy-state-<account-id>`;
+  reuse that name (with versioning and public-access-block enabled), or bring
+  your own.
+
+**Init** (backend config is required — there's no default backend block):
+
+```bash
+cd deploy/aws/terraform
+terraform init \
+  -backend-config=bucket=<your-state-bucket> \
+  -backend-config=key=main.tfstate \
+  -backend-config=region=<aws-region>
+```
+
+**Variables** (all required except `runner_root_volume_size_gb`, which
+defaults to `100`):
+
+| Variable | Meaning |
+| --- | --- |
+| `app_name` | Deployment name tag (matches CLI's `--app-name`, default `glow-core`) |
+| `aws_region` | AWS region |
+| `certificate_arn` | ACM certificate ARN for the ALB listener |
+| `domain_name` | Deployment domain |
+| `git_repo_url` | Git repository to check out on the runner |
+| `git_ref` | Branch/tag to record (informational — the actual checkout uses `git_checkout_ref`) |
+| `git_checkout_ref` | Commit SHA to check out |
+| `runner_ami_id` | AMI ID built above |
+| `runner_instance_type` | EC2 instance type |
+| `runner_root_volume_size_gb` | Root volume size in GB |
+
+```bash
+terraform plan  -var-file=my.tfvars.json
+terraform apply -var-file=my.tfvars.json
+```
+
+Applying does **not** run the runner's post-boot repository checkout/activation
+— that's a separate SSM step the CLI/GUI run afterwards
+(`prepare_runner_repository` + `rerun_runner_userdata` in
+`glow_deploy/core.py`). After a raw `terraform apply`, either replicate that
+manually via SSM, or run `glow-deploy --update` against the domain to finish
+activation.
 
 ## Architecture
 

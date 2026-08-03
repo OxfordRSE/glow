@@ -44,7 +44,7 @@ Before submitting a PR with Terraform changes:
 
 **Formatting:**
 ```bash
-cd deploy/terraform
+cd deploy/aws/terraform
 terraform fmt -recursive
 ```
 
