@@ -1,12 +1,26 @@
 [project]
 name = "glow-aws-deploy"
-version = "2.0.0"
+version = "3.0.0"
 requires-python = ">=3.12"
 dependencies = [
     "boto3>=1.35.0",
+    "httpx>=0.27.0",
 ]
 
-[tool.uv]
-dev-dependencies = [
+[project.scripts]
+glow-deploy = "glow_deploy.core:main"
+
+[dependency-groups]
+dev = [
     "pytest>=8.3.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

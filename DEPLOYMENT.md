@@ -17,8 +17,8 @@
 1. `uv`
 2. `terraform`
 3. `packer`
-4. `git`
-5. AWS credentials for EC2, ALB, ACM, S3, IAM, and SSM
+4. AWS credentials for EC2, ALB, ACM, S3, IAM, and SSM
+5. Network access to `api.github.com` (used to resolve git tags/branches to commits — no local `git` needed)
 
 ## Initial Provision
 
@@ -78,7 +78,7 @@ docker run --rm -it \
 ### Using Direct Python
 
 ```bash
-uv run --project deploy/aws deploy/aws/deploy.py \
+uv run --project deploy/aws glow-deploy \
   --domain eu.glow-project.org \
   --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
 ```
@@ -135,7 +135,7 @@ docker run --rm -it \
 ### Using Direct Python
 
 ```bash
-uv run --project deploy/aws deploy/aws/deploy.py \
+uv run --project deploy/aws glow-deploy \
   --domain eu.glow-project.org \
   --git-ref v1.2.3 \
   --update

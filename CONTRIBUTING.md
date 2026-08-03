@@ -52,23 +52,17 @@ terraform fmt -recursive
 ```bash
 terraform -chdir=deploy/aws/terraform init -backend=false
 terraform -chdir=deploy/aws/terraform validate
-
-terraform -chdir=deploy/aws/terraform_bootstrap init -backend=false
-terraform -chdir=deploy/aws/terraform_bootstrap validate
 ```
 
 **Linting:**
 ```bash
 tflint --init --chdir=deploy/aws/terraform
 tflint --chdir=deploy/aws/terraform
-
-tflint --init --chdir=deploy/aws/terraform_bootstrap
-tflint --chdir=deploy/aws/terraform_bootstrap
 ```
 
 **Plan (requires AWS credentials):**
 ```bash
-uv run --project deploy/aws deploy/aws/deploy.py --domain eu.glow-project.org --dry-run
+uv run --project deploy/aws glow-deploy --domain eu.glow-project.org --dry-run
 ```
 
 #### Installing TFLint

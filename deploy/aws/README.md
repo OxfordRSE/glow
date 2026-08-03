@@ -19,8 +19,8 @@ Simplified deployment using:
 1. `uv`
 2. `terraform`
 3. `packer`
-4. `git`
-5. AWS credentials for the target account
+4. AWS credentials for the target account
+5. Network access to `api.github.com` (used to resolve git tags/branches to commits — no local `git` needed)
 
 ## Usage
 
@@ -179,7 +179,7 @@ If you prefer to install dependencies locally:
 #### Initial Provision
 
 ```bash
-uv run --project deploy/aws deploy/aws/deploy.py \
+uv run --project deploy/aws glow-deploy \
   --domain eu.glow-project.org \
   --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
 ```
@@ -187,7 +187,7 @@ uv run --project deploy/aws deploy/aws/deploy.py \
 #### Subsequent Updates
 
 ```bash
-uv run --project deploy/aws deploy/aws/deploy.py \
+uv run --project deploy/aws glow-deploy \
   --domain eu.glow-project.org \
   --git-ref v1.2.3 \
   --update
