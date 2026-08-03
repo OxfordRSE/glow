@@ -6,8 +6,8 @@ Kept separate from app.py so routes can import it without a circular import
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi.templating import Jinja2Templates
 
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
+from glow_deploy.gui.paths import gui_dir
+
+templates = Jinja2Templates(directory=str(gui_dir() / "templates"))
