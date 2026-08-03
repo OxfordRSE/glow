@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Glow Deploy</title>
+</head>
+<body>
+  <h1>Deployments</h1>
+  <p><a href="/deployments/new">New deployment</a> | <form method="post" action="/signin/out" style="display:inline"><button type="submit">Sign out</button></form></p>
+
+  {% if not deployments %}
+    <p>No deployments found in this account/region.</p>
+  {% else %}
+    <ul>
+      {% for deployment in deployments %}
+      <li>
+        <a href="/deployments/{{ deployment.domain }}">{{ deployment.domain }}</a>
+        — {{ deployment.state }} — {{ deployment.git_ref }} ({{ (deployment.git_commit or "")[:8] }})
+      </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</body>
+</html>

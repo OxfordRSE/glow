@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Glow Deploy — New deployment</title>
+</head>
+<body>
+  <h1>New deployment</h1>
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+
+  <form method="post" action="/deployments/new/plan">
+    <label>Domain <input type="text" name="domain" required placeholder="example.com"></label>
+    <label>Certificate ARN <input type="text" name="certificate_arn"></label>
+    <label>Git repository URL <input type="url" name="git_repo_url" value="{{ defaults.git_repo_url }}" required></label>
+    <label>Git ref (branch/tag) <input type="text" name="git_ref" value="{{ defaults.git_ref }}" required></label>
+    <label>AWS region <input type="text" name="aws_region" value="{{ defaults.aws_region }}" required></label>
+    <label>App name <input type="text" name="app_name" value="{{ defaults.app_name }}" required></label>
+    <label>Instance type <input type="text" name="runner_instance_type" value="{{ defaults.runner_instance_type }}" required></label>
+    <label>Root volume size (GB) <input type="number" name="runner_root_volume_size_gb" value="{{ defaults.runner_root_volume_size_gb }}" required></label>
+    <label><input type="checkbox" name="force_rebuild_ami" value="true"> Force rebuild AMI</label>
+    <button type="submit">Review plan</button>
+  </form>
+</body>
+</html>

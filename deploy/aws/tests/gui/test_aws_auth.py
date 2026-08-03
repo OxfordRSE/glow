@@ -133,6 +133,36 @@ def test_poll_for_token_times_out(monkeypatch):
         aws_auth.poll_for_token(_device_auth(), timeout=300)
 
 
+def test_poll_once_returns_none_while_pending(monkeypatch):
+    pending_error = ClientError(
+        {"Error": {"Code": "AuthorizationPendingException"}}, "CreateToken"
+    )
+    fake_client = _FakeSsoOidcClient(token_responses=[pending_error])
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+
+    assert aws_auth.poll_once(_device_auth()) is None
+
+
+def test_poll_once_returns_token_on_success(monkeypatch):
+    fake_client = _FakeSsoOidcClient(
+        token_responses=[{"accessToken": "sso-access-token", "expiresIn": 3600}]
+    )
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+
+    token = aws_auth.poll_once(_device_auth())
+
+    assert token == aws_auth.SsoToken(access_token="sso-access-token", expires_in=3600)
+
+
+def test_poll_once_raises_on_expired_code(monkeypatch):
+    expired_error = ClientError({"Error": {"Code": "ExpiredTokenException"}}, "CreateToken")
+    fake_client = _FakeSsoOidcClient(token_responses=[expired_error])
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+
+    with pytest.raises(DeployError, match="expired"):
+        aws_auth.poll_once(_device_auth())
+
+
 # ---------------------------------------------------------------------------
 # Account/role listing + session materialization
 # ---------------------------------------------------------------------------

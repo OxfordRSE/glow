@@ -312,11 +312,12 @@ def terraform_apply(config: Config, ami_id: str) -> dict[str, Any]:
         Path(tfvars_path).write_text(json.dumps(tfvars, indent=2))
 
         if config.dry_run:
-            run_command(
+            result = run_command(
                 [terraform, "plan", f"-var-file={tfvars_path}"],
                 cwd=TERRAFORM_DIR,
                 env=env,
             )
+            write_line(result.stdout)
             return {}
 
         run_command(
@@ -751,6 +752,13 @@ def update(config: Config) -> None:
 
     outputs = read_terraform_outputs(env=_subprocess_env(config.session))
     instance_id = outputs["runner_instance_id"]
+
+    if config.dry_run:
+        write_line(
+            f"[deploy] Would update instance {instance_id} to "
+            f"{config.git_ref} ({config.git_commit})"
+        )
+        return
 
     wait_for_ssm_online(instance_id, config.aws_region, config.session)
     wait_for_runner_bootstrap_completion(

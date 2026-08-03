@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Glow Deploy — {{ deployment.domain }} logs</title>
+</head>
+<body>
+  <h1>{{ deployment.domain }} — status</h1>
+  <p><a href="/deployments/{{ deployment.domain }}">Back</a></p>
+
+  {% if error %}
+    <p role="alert">{{ error }}</p>
+  {% elif status %}
+    <p>Health: <pre>{{ status.health }}</pre></p>
+    <p>Deployed git ref: {{ status.git_ref }} ({{ status.git_commit }})</p>
+  {% endif %}
+</body>
+</html>

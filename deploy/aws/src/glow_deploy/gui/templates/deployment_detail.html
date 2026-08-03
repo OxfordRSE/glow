@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Glow Deploy — {{ deployment.domain }}</title>
+</head>
+<body>
+  <h1>{{ deployment.domain }}</h1>
+  <p>State: {{ deployment.state }} — {{ deployment.git_ref }} ({{ (deployment.git_commit or "")[:8] }})</p>
+  <p>
+    <a href="/deployments/{{ deployment.domain }}/logs">Status &amp; logs</a> |
+    <a href="/deployments/{{ deployment.domain }}/advanced">Advanced</a> |
+    <a href="/deployments">Back to deployments</a>
+  </p>
+
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+
+  <h2>Update</h2>
+  <form method="post" action="/deployments/{{ deployment.domain }}/update/plan">
+    <label>Git repository URL <input type="url" name="git_repo_url" value="{{ deployment.git_repo_url or '' }}" required></label>
+    <label>Git ref (branch/tag) <input type="text" name="git_ref" value="{{ deployment.git_ref or 'main' }}" required></label>
+    <button type="submit">Review update</button>
+  </form>
+</body>
+</html>

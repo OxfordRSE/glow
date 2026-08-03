@@ -1,0 +1,57 @@
+"""JobManager: background execution, progress-line capture, and error surfacing."""
+
+from __future__ import annotations
+
+import time
+
+from glow_deploy.errors import DeployError
+from glow_deploy.gui.jobs import JobManager
+
+
+def _wait_until_terminal(manager: JobManager, job_id: str, timeout: float = 2.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        job = manager.get(job_id)
+        if job.status not in ("pending", "running"):
+            return job
+        time.sleep(0.01)
+    raise AssertionError("job did not finish in time")
+
+
+def test_submit_runs_fn_and_records_success_and_meta():
+    manager = JobManager()
+
+    def fn():
+        from glow_deploy import core
+
+        core.write_line("step 1")
+        core.write_inline("spinner...")
+        core.write_inline("spinner done")
+        return 42
+
+    job_id = manager.submit(fn, meta={"kind": "test"})
+    job = _wait_until_terminal(manager, job_id)
+
+    assert job.status == "succeeded"
+    assert job.result == 42
+    assert job.meta == {"kind": "test"}
+    # the two inline updates collapse into the same line, not two separate lines
+    assert job.lines == ["step 1", "spinner done"]
+
+
+def test_submit_records_deploy_error_as_failure():
+    manager = JobManager()
+
+    def fn():
+        raise DeployError("boom")
+
+    job_id = manager.submit(fn)
+    job = _wait_until_terminal(manager, job_id)
+
+    assert job.status == "failed"
+    assert job.error == "boom"
+
+
+def test_get_returns_none_for_unknown_job_id():
+    manager = JobManager()
+    assert manager.get("does-not-exist") is None

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Glow Deploy — Sign in</title>
+  {% if not accounts %}<meta http-equiv="refresh" content="3">{% endif %}
+</head>
+<body>
+  {% if error %}
+    <p role="alert">{{ error }}</p>
+    <p><a href="/signin">Start over</a></p>
+  {% elif accounts %}
+    <h1>Choose an account</h1>
+    <ul>
+      {% for account in accounts %}
+      <li>
+        <form method="post" action="/signin/sso/select" style="display:inline">
+          <input type="hidden" name="account_id" value="{{ account.account_id }}">
+          <input type="hidden" name="role_name" value="{{ account.role_name }}">
+          <input type="hidden" name="account_name" value="{{ account.account_name }}">
+          <button type="submit">{{ account.account_name }} ({{ account.account_id }}) — {{ account.role_name }}</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <h1>Finish signing in</h1>
+    <p>Open <a href="{{ device_auth.verification_uri_complete }}">{{ device_auth.verification_uri }}</a>
+       and enter code: <strong>{{ device_auth.user_code }}</strong></p>
+    <p>Waiting for sign-in to complete… <a href="/signin/sso/poll">Check now</a></p>
+  {% endif %}
+</body>
+</html>

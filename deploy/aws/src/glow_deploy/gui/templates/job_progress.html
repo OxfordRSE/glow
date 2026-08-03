@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Glow Deploy — Job {{ job.id }}</title>
+  {% if job.status in ("pending", "running") %}<meta http-equiv="refresh" content="3">{% endif %}
+</head>
+<body>
+  <h1>Job {{ job.id }}</h1>
+  <p>Status: <strong>{{ job.status }}</strong></p>
+
+  <details open>
+    <summary>Advanced / raw output</summary>
+    <pre>{{ job.lines | join('\n') }}</pre>
+  </details>
+
+  {% if job.error %}<p role="alert">{{ job.error }}</p>{% endif %}
+
+  {% if job.status == "succeeded" and job.meta.get("apply_action") %}
+    <h2>Review</h2>
+    <p>Resolved commit: <code>{{ job.meta.config.git_commit }}</code></p>
+    <form method="post" action="{{ job.meta.apply_action }}">
+      {% for key, value in job.meta.config.items() %}
+      <input type="hidden" name="{{ key }}" value="{{ value }}">
+      {% endfor %}
+      <button type="submit">Confirm &amp; Deploy</button>
+    </form>
+  {% elif job.status == "succeeded" and job.meta.get("domain") %}
+    <p><a href="/deployments/{{ job.meta.domain }}">View deployment</a></p>
+  {% endif %}
+</body>
+</html>

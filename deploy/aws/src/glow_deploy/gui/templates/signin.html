@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Glow Deploy — Sign in</title>
+</head>
+<body>
+  <h1>Sign in to AWS</h1>
+
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+
+  <section>
+    <h2>Sign in with AWS SSO</h2>
+    <form method="post" action="/signin/sso/start">
+      <label>SSO start URL <input type="url" name="start_url" required placeholder="https://my-org.awsapps.com/start"></label>
+      <label>Region <input type="text" name="region" value="eu-west-2" required></label>
+      <button type="submit">Sign in</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Advanced: manual access keys</h2>
+    <form method="post" action="/signin/manual">
+      <label>Access key ID <input type="text" name="access_key" required></label>
+      <label>Secret access key <input type="password" name="secret_key" required></label>
+      <label>Session token (optional) <input type="password" name="session_token"></label>
+      <label>Region <input type="text" name="region" value="eu-west-2" required></label>
+      <button type="submit">Sign in</button>
+    </form>
+  </section>
+</body>
+</html>

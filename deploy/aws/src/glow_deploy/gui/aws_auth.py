@@ -94,6 +94,35 @@ class SsoToken:
 _PENDING_ERROR_CODES = {"AuthorizationPendingException", "SlowDownException"}
 
 
+def poll_once(device_authorization: DeviceAuthorization) -> SsoToken | None:
+    """Make a single CreateToken attempt, for callers that poll via repeated
+    HTTP requests (the GUI) rather than blocking one request for minutes.
+
+    Returns None while the user hasn't finished signing in yet. Raises
+    DeployError if the code expired or access was denied.
+    """
+    from botocore.exceptions import ClientError
+
+    oidc = boto3.client("sso-oidc", region_name=device_authorization.region)
+    try:
+        token = oidc.create_token(
+            clientId=device_authorization.client_id,
+            clientSecret=device_authorization.client_secret,
+            grantType="urn:ietf:params:oauth:grant-type:device_code",
+            deviceCode=device_authorization.device_code,
+        )
+        return SsoToken(access_token=token["accessToken"], expires_in=token["expiresIn"])
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+        if error_code in _PENDING_ERROR_CODES:
+            return None
+        if error_code == "ExpiredTokenException":
+            raise DeployError("SSO sign-in code expired; start over") from exc
+        if error_code == "AccessDeniedException":
+            raise DeployError("SSO sign-in was denied") from exc
+        raise DeployError(f"SSO sign-in failed: {error_code or exc}") from exc
+
+
 def poll_for_token(device_authorization: DeviceAuthorization, timeout: int = 300) -> SsoToken:
     """Poll CreateToken until the user completes sign-in in their browser.
 
