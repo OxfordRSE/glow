@@ -1,32 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Glow Deploy — Job {{ job.id }}</title>
-  {% if job.status in ("pending", "running") %}<meta http-equiv="refresh" content="3">{% endif %}
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Job {{ job.id }} — Glow Deploy{% endblock %}
+{% block head %}
+  {% if job.status in ("pending", "running") %}<noscript><meta http-equiv="refresh" content="3"></noscript>{% endif %}
+{% endblock %}
+{% block content %}
   <h1>Job {{ job.id }}</h1>
-  <p>Status: <strong>{{ job.status }}</strong></p>
+  <p>Status: <span id="job-status" class="badge badge-{{ job.status }}">{{ job.status }}</span></p>
 
   <details open>
     <summary>Advanced / raw output</summary>
-    <pre>{{ job.lines | join('\n') }}</pre>
+    <pre id="job-lines">{{ job.lines | join('\n') }}</pre>
   </details>
 
-  {% if job.error %}<p role="alert">{{ job.error }}</p>{% endif %}
+  {% if job.error %}<p id="job-error" class="alert" role="alert">{{ job.error }}</p>{% else %}<p id="job-error" hidden></p>{% endif %}
 
   {% if job.status == "succeeded" and job.meta.get("apply_action") %}
     <h2>Review</h2>
     <p>Resolved commit: <code>{{ job.meta.config.git_commit }}</code></p>
-    <form method="post" action="{{ job.meta.apply_action }}">
+    <form method="post" action="{{ job.meta.apply_action }}" class="card">
       {% for key, value in job.meta.config.items() %}
       <input type="hidden" name="{{ key }}" value="{{ value }}">
       {% endfor %}
-      <button type="submit">Confirm &amp; Deploy</button>
+      <button type="submit" class="button">Confirm &amp; Deploy</button>
     </form>
   {% elif job.status == "succeeded" and job.meta.get("domain") %}
-    <p><a href="/deployments/{{ job.meta.domain }}">View deployment</a></p>
+    <p><a href="/deployments/{{ job.meta.domain }}" class="button">View deployment</a></p>
   {% endif %}
-</body>
-</html>
+
+  <script type="module" src="/static/js/job-status.js"></script>
+{% endblock %}

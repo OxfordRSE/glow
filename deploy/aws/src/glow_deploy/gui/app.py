@@ -7,7 +7,10 @@ SSO device-authorization attempt.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from glow_deploy.gui import secret_store
 from glow_deploy.gui.aws_auth import session_from_stored_credentials
@@ -15,10 +18,12 @@ from glow_deploy.gui.jobs import JobManager
 from glow_deploy.gui.routes import auth, deployments, jobs, logs
 
 _PROFILE = "default"
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Glow Deploy")
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     app.state.region = "eu-west-2"
     app.state.job_manager = JobManager()

@@ -1,3 +1,6 @@
 .venv/
 .pytest_cache/
 terraform/.terraform/
+src/glow_deploy/gui/static/js/*.js
+src/glow_deploy/gui/static/js/*.js.map
+src/glow_deploy/gui/frontend/node_modules/

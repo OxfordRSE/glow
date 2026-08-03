@@ -1,18 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Glow Deploy — {{ deployment.domain }} logs</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}{{ deployment.domain }} status — Glow Deploy{% endblock %}
+{% block content %}
   <h1>{{ deployment.domain }} — status</h1>
-  <p><a href="/deployments/{{ deployment.domain }}">Back</a></p>
+  <p class="links"><a href="/deployments/{{ deployment.domain }}">Back</a></p>
 
   {% if error %}
-    <p role="alert">{{ error }}</p>
+    <p class="alert" role="alert">{{ error }}</p>
   {% elif status %}
-    <p>Health: <pre>{{ status.health }}</pre></p>
-    <p>Deployed git ref: {{ status.git_ref }} ({{ status.git_commit }})</p>
+    <div class="card">
+      <p>Health:</p>
+      <pre>{{ status.health }}</pre>
+      <p>Deployed git ref: {{ status.git_ref }} ({{ status.git_commit }})</p>
+    </div>
   {% endif %}
-</body>
-</html>
+{% endblock %}

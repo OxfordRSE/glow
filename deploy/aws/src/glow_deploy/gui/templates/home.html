@@ -1,24 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Glow Deploy</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Deployments — Glow Deploy{% endblock %}
+{% block content %}
   <h1>Deployments</h1>
-  <p><a href="/deployments/new">New deployment</a> | <form method="post" action="/signin/out" style="display:inline"><button type="submit">Sign out</button></form></p>
+  <p class="links"><a href="/deployments/new" class="button">New deployment</a></p>
 
   {% if not deployments %}
     <p>No deployments found in this account/region.</p>
   {% else %}
-    <ul>
+    <ul class="list-plain">
       {% for deployment in deployments %}
-      <li>
+      <li class="card deployment-row">
         <a href="/deployments/{{ deployment.domain }}">{{ deployment.domain }}</a>
-        — {{ deployment.state }} — {{ deployment.git_ref }} ({{ (deployment.git_commit or "")[:8] }})
+        <span class="badge">{{ deployment.state }} — {{ deployment.git_ref }} ({{ (deployment.git_commit or "")[:8] }})</span>
       </li>
       {% endfor %}
     </ul>
   {% endif %}
-</body>
-</html>
+{% endblock %}

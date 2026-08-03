@@ -1,18 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Glow Deploy — {{ deployment.domain }} advanced</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}{{ deployment.domain }} advanced — Glow Deploy{% endblock %}
+{% block content %}
   <h1>{{ deployment.domain }} — advanced</h1>
-  <p><a href="/deployments/{{ deployment.domain }}">Back</a></p>
-  <dl>
+  <p class="links"><a href="/deployments/{{ deployment.domain }}">Back</a></p>
+  <dl class="card">
     <dt>Instance ID</dt><dd>{{ deployment.instance_id }}</dd>
     <dt>State</dt><dd>{{ deployment.state }}</dd>
     <dt>Git ref</dt><dd>{{ deployment.git_ref }}</dd>
     <dt>Git commit</dt><dd>{{ deployment.git_commit }}</dd>
     <dt>Launch time</dt><dd>{{ deployment.launch_time }}</dd>
   </dl>
-</body>
-</html>
+{% endblock %}
