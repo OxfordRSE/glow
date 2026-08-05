@@ -594,12 +594,11 @@ def _compute_period_slice(
         # Build cell with coordinates
         cell = {"mean": _safe_mean(group_df[variable]), "n": n}
 
-        # Add dimension coordinates
-        if len(valid_dimensions) == 1:
-            group_coords = (group_coords,)
-
+        # Add dimension coordinates. groupby(list-of-columns) always
+        # returns tuple keys, even for a single dimension.
         for i, dim in enumerate(valid_dimensions):
-            cell[dim] = group_coords[i]
+            coord = group_coords[i]
+            cell[dim] = None if pd.isna(coord) else coord
 
         cells.append(cell)
 

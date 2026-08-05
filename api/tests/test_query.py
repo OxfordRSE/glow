@@ -295,6 +295,30 @@ class TestNewQueryExecution:
         assert "dimensions" in result
         assert result["dimensions"] == ["d_sex"]
 
+    def test_query_dimension_missing_value_is_json_safe(self):
+        """Missing dimension values must serialize as null, not NaN."""
+        import json
+        from glow_api.query_execution import execute_query
+        from glow_api.canonical_query import normalize_query
+        import pandas as pd
+
+        df = pd.DataFrame(
+            {
+                "uid": [f"S{i}" for i in range(5)],
+                "school": ["School A"] * 5,
+                "period_id": ["2023-2024"] * 5,
+                "d_sex": [None] * 5,
+                "bw_wbeing_1": [3, 4, 5, 2, 3],
+            }
+        )
+
+        query = normalize_query(v=["bw_wbeing_1"], d=["d_sex"])
+        result = execute_query(df, query, min_n=5)
+
+        cell = result["variables"][0]["periods"]["2023-2024"]["cells"][0]
+        assert cell["d_sex"] is None
+        json.dumps(result)  # raises ValueError on NaN
+
     def test_query_period_organized_results(self):
         """Test that results are organized by period within each variable."""
         from glow_api.query_execution import execute_query
