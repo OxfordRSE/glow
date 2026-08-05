@@ -133,7 +133,10 @@ def query_get(
 
         # Filter data to this school
         df = dfwl.df
-        df = df[df["school"] == school.name]
+        if "school" in df.columns:
+            df = df[df["school"] == school.name]
+        else:
+            df = df.iloc[0:0]  # no data loaded yet; nothing belongs to any school
         school_name = school.name
     else:
         # Dataset-scoped query

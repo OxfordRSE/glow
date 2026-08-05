@@ -138,6 +138,18 @@ def tiny_df():
     return _make_df(TINY_CSV)
 
 
+@pytest.fixture(scope="function")
+def empty_df():
+    """Mimics datastore state before the first successful ODK sync.
+
+    Normalized (has period_id) but has no "school" column, since no
+    submissions have been loaded yet.
+    """
+    mock_client = MockODKClient()
+    ds = DataStore(odk_client=mock_client, refresh_hours=0)
+    return ds._process_loaded_data(pd.DataFrame())
+
+
 def _make_mock_datastore(df: pd.DataFrame, metadata: dict = None) -> DataStore:
     """Helper to create a mock DataStore with pre-loaded data.
 
@@ -210,6 +222,28 @@ def auth_client(db_session, sample_user, sample_schools, sample_df):
     from glow_api.data import get_datastore
 
     fake_store = _make_mock_datastore(sample_df)
+
+    def override_get_datastore():
+        return fake_store
+
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_datastore] = override_get_datastore
+
+    with TestClient(app, raise_server_exceptions=True) as c:
+        yield c
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(scope="function")
+def auth_client_empty_data(db_session, sample_user, sample_schools, empty_df):
+    """TestClient with real JWT auth flow, backed by a datastore with no data loaded yet."""
+    from glow_api.data import get_datastore
+
+    fake_store = _make_mock_datastore(empty_df)
 
     def override_get_datastore():
         return fake_store
