@@ -453,6 +453,7 @@ class TestDataStore:
         mock_client = MockODKClient(submissions_df=df, metadata={})
         ds = DataStore(odk_client=mock_client, refresh_hours=0)
         ds.startup()
+        assert ds._initial_load_complete.wait(timeout=5)
 
         results = []
         errors = []
@@ -496,8 +497,9 @@ class TestDataStore:
         # Verify data is not loaded yet
         assert ds._df.empty
 
-        # Startup should load data
+        # Startup schedules the initial refresh in the background (non-blocking)
         ds.startup()
+        assert ds._initial_load_complete.wait(timeout=5)
         assert not ds._df.empty
         assert len(ds._df) == 1
 
@@ -519,10 +521,11 @@ class TestDataStore:
         ds = DataStore(odk_client=mock_client, refresh_hours=0)
         ds.startup()
 
-        # Verify data is loaded
+        # Verify data is loaded once the background refresh completes
+        assert ds._initial_load_complete.wait(timeout=5)
         assert not ds._df.empty
 
-        # Verify scheduler is not running
+        # Verify scheduler is not running (no recurring job scheduled)
         assert not ds._scheduler.running
 
     def test_startup_odk_error_logs_warning_and_keeps_empty_dataframe(
@@ -545,6 +548,7 @@ class TestDataStore:
 
         ds.startup()
 
+        assert ds._initial_load_complete.wait(timeout=5)
         assert ds._df.empty
         assert len(warnings) == 1
         assert (

@@ -51,6 +51,7 @@ class DataStore:
         self._categorical_whitelist: List[str] = []
         self._numerical_whitelist: List[str] = []
         self._observed_periods: Dict[Optional[str], List[str]] = {}
+        self._initial_load_complete = threading.Event()
 
     def _load(self) -> pd.DataFrame:
         with log_duration("Load data from ODK Central") as log_data:
@@ -475,7 +476,15 @@ class DataStore:
                 "Loaded from cache: %d rows, %d columns", len(df), len(df.columns)
             )
 
-        self._scheduler.add_job(self.refresh, id="data_refresh_initial")
+        def _initial_refresh() -> None:
+            try:
+                self.refresh()
+            finally:
+                self._initial_load_complete.set()
+
+        threading.Thread(
+            target=_initial_refresh, daemon=True, name="datastore-initial-refresh"
+        ).start()
 
         if self._refresh_hours > 0:
             self._scheduler.add_job(
@@ -485,8 +494,7 @@ class DataStore:
                 id="data_refresh",
             )
             logger.info("Data refresh scheduled every %d hour(s)", self._refresh_hours)
-
-        self._scheduler.start()
+            self._scheduler.start()
 
     def shutdown(self) -> None:
         """Stop the background scheduler."""
