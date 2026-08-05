@@ -100,9 +100,21 @@ def normalize_submissions(df: pd.DataFrame) -> pd.DataFrame:
             df_normalized["createdAt"], utc=True
         )
 
-        # Derive period_id for each row
-        df_normalized["period_id"] = df_normalized["createdAt_parsed"].apply(
-            derive_period_id
+        # Derive period_id for all rows at once: convert to deployment
+        # timezone, then compare month/day/year against the cutoff.
+        local = df_normalized["createdAt_parsed"].dt.tz_convert(
+            ZoneInfo(settings.PERIOD_TIMEZONE)
+        )
+        cutoff_month = settings.PERIOD_CUTOFF_MONTH
+        cutoff_day = settings.PERIOD_CUTOFF_DAY
+        before_cutoff = (local.dt.month < cutoff_month) | (
+            (local.dt.month == cutoff_month) & (local.dt.day < cutoff_day)
+        )
+        start_year = local.dt.year.where(~before_cutoff, local.dt.year - 1)
+        df_normalized["period_id"] = (
+            start_year.astype("Int64").astype(str)
+            + "-"
+            + (start_year + 1).astype("Int64").astype(str)
         )
 
         # Drop the temporary parsed column

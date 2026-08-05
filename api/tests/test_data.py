@@ -759,6 +759,41 @@ class TestDataStore:
         assert materialized.loc[0, "bewell_questionnaire__bw_wbeing_1"] == 3
         assert materialized.loc[0, "phq9_questionnaire__phq9_1"] == 2
 
+    def test_collapse_latest_non_null_picks_latest_competing_value(self):
+        """Test that a column with multiple non-null candidates in a group
+        takes the value from the most recent createdAt, and a column that
+        doesn't exist in the input is filled with None."""
+        df = pd.DataFrame(
+            {
+                "uid": ["a", "a", "a", "b"],
+                "createdAt": pd.to_datetime(
+                    [
+                        "2024-01-01T10:00:00Z",  # a, earliest
+                        "2024-01-03T10:00:00Z",  # a, latest
+                        "2024-01-02T10:00:00Z",  # a, middle
+                        "2024-01-01T10:00:00Z",  # b, only row
+                    ],
+                    utc=True,
+                ),
+                "x": [1, None, 5, 9],
+                "y": [None, "late", "mid", "solo"],
+            }
+        )
+
+        collapsed = DataStore._collapse_latest_non_null(
+            df, group_keys=["uid"], value_columns=["x", "y", "missing_col"]
+        )
+        collapsed = collapsed.set_index("uid")
+
+        # x: latest row (a) has x=None, so the next-latest non-null (5) wins.
+        assert collapsed.loc["a", "x"] == 5
+        # y: latest row (a) already has a non-null value ("late"), so it wins.
+        assert collapsed.loc["a", "y"] == "late"
+        assert collapsed.loc["b", "x"] == 9
+        assert collapsed.loc["b", "y"] == "solo"
+        assert collapsed.loc["a", "missing_col"] is None
+        assert collapsed.loc["b", "missing_col"] is None
+
 
 class TestDataStoreIntegration:
     """Integration tests using the sample_df fixture from conftest."""
