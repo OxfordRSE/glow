@@ -526,6 +526,12 @@ def _execute_variable_query(
     }
 
 
+def _safe_mean(series: pd.Series) -> float | None:
+    """Compute a mean, mapping NaN (e.g. all-missing group) to None for JSON compliance."""
+    mean_value = series.mean()
+    return None if pd.isna(mean_value) else float(mean_value)
+
+
 def _compute_period_slice(
     period_df: pd.DataFrame,
     variable: str,
@@ -553,10 +559,9 @@ def _compute_period_slice(
                 "cells": None,
             }
 
-        mean_value = period_df[variable].mean()
         return {
             "suppressed": False,
-            "cells": [{"mean": float(mean_value), "n": n}],
+            "cells": [{"mean": _safe_mean(period_df[variable]), "n": n}],
         }
 
     # Group by dimensions
@@ -573,10 +578,9 @@ def _compute_period_slice(
                 "cells": None,
             }
 
-        mean_value = period_df[variable].mean()
         return {
             "suppressed": False,
-            "cells": [{"mean": float(mean_value), "n": n}],
+            "cells": [{"mean": _safe_mean(period_df[variable]), "n": n}],
         }
 
     # Group and aggregate
@@ -586,10 +590,9 @@ def _compute_period_slice(
     cells = []
     for group_coords, group_df in grouped:
         n = len(group_df)
-        mean_value = group_df[variable].mean()
 
         # Build cell with coordinates
-        cell = {"mean": float(mean_value), "n": n}
+        cell = {"mean": _safe_mean(group_df[variable]), "n": n}
 
         # Add dimension coordinates
         if len(valid_dimensions) == 1:

@@ -466,6 +466,8 @@ class DataStore:
         cached = self._load_cache()
         if cached:
             df, etags = cached
+            self._extract_whitelists(df)
+            self._compute_observed_periods(df)
             with self._lock:
                 self._df = df
                 self._response_etags = etags

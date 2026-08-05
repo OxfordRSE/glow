@@ -595,6 +595,51 @@ class TestDataStore:
             assert len(cached_df) == 2
             assert cached_etags == {"bewell_questionnaire": "test-etag"}
 
+    def test_startup_from_cache_populates_whitelists(self):
+        """Startup loading from cache must populate whitelists, not just the DataFrame.
+
+        Regression test: previously only a live ODK refresh called
+        _extract_whitelists/_compute_observed_periods, so a cache-only startup
+        left numerical/categorical whitelists empty and /dimensions returned nothing.
+        """
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S002"],
+                "wave": [1, 1],
+                "school": ["School A", "School A"],
+                "sex": ["M", "F"],
+                "bw_wbeing_1": [3, 4],
+                "bw_wbeing_2": [4, 3],
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "cache.parquet"
+
+            mock_client = MockODKClient(
+                submissions_df=df, metadata={}, etag="test-etag"
+            )
+            ds = DataStore(
+                odk_client=mock_client, refresh_hours=0, cache_path=cache_path
+            )
+            ds._load()  # populates cache on disk
+
+            # Simulate a fresh process starting up with ODK unreachable: cache
+            # loads, but the scheduled refresh job fails, so only cache data is used.
+            class ErrorODKClient(MockODKClient):
+                def fetch_submissions(self, etags=None):
+                    raise RuntimeError("ODK Central connection failed")
+
+            ds2 = DataStore(
+                odk_client=ErrorODKClient(), refresh_hours=0, cache_path=cache_path
+            )
+            ds2.startup()
+
+            assert not ds2._df.empty
+            assert ds2._numerical_whitelist, "numerical whitelist empty after cache load"
+            assert ds2._categorical_whitelist, "categorical whitelist empty after cache load"
+            assert ds2._observed_periods, "observed periods empty after cache load"
+
     def test_load_from_multiple_forms(self):
         """Test loading and materializing submissions across multiple forms."""
         bewell_df = pd.DataFrame(
