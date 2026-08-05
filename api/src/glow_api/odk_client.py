@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from json import JSONDecodeError
 from typing import Any, Dict, Optional
 import re
@@ -56,7 +56,7 @@ class ODKClient:
         self._try_login()
 
     def _try_login(self) -> bool:
-        if self.token_expires is not None and self.token_expires > datetime.now():
+        if self.token_expires is not None and self.token_expires > datetime.now(timezone.utc):
             return True
         # Authenticate with ODK Central
         try:
