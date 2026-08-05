@@ -473,7 +473,7 @@ class DataStore:
                 "Loaded from cache: %d rows, %d columns", len(df), len(df.columns)
             )
 
-        self.refresh()
+        self._scheduler.add_job(self.refresh, id="data_refresh_initial")
 
         if self._refresh_hours > 0:
             self._scheduler.add_job(
@@ -482,8 +482,9 @@ class DataStore:
                 hours=self._refresh_hours,
                 id="data_refresh",
             )
-            self._scheduler.start()
             logger.info("Data refresh scheduled every %d hour(s)", self._refresh_hours)
+
+        self._scheduler.start()
 
     def shutdown(self) -> None:
         """Stop the background scheduler."""

@@ -65,6 +65,7 @@ class ODKClient:
                 json={"email": self.username, "password": self.password},
                 headers=self.default_headers,
                 verify=self.verify_ssl,
+                timeout=10,
             )
             response.raise_for_status()
         except requests.exceptions.RequestException as err:
@@ -91,6 +92,7 @@ class ODKClient:
         if "headers" in kwargs:
             headers.update(kwargs["headers"])
         kwargs["headers"] = headers
+        kwargs.setdefault("timeout", 30)
 
         request = requests.get(*args, auth=(self.username, self.password), **kwargs)
         request.raise_for_status()
@@ -102,69 +104,33 @@ class ODKClient:
         response = self.get(url)
         return response.json()
 
-    def _fetch_form_submission_list(
+    def _fetch_form_odata(
         self,
         form_id: str,
         etag: Optional[str] = None,
     ) -> tuple[Optional[list[dict[str, Any]]], Optional[str]]:
-        """Fetch the JSON submission listing for one form."""
-        url = (
-            f"{self.base_url}/v1/projects/{self.project_id}/forms/{form_id}/submissions"
-        )
-        response = self.get(url, headers={"If-None-Match": etag})
+        """Fetch all submissions for one form via OData, following pagination."""
+        url = f"{self.base_url}/v1/projects/{self.project_id}/forms/{form_id}.svc/Submissions"
+        response = self.get(url, headers={"If-None-Match": etag} if etag else {})
         if response.status_code == 304:
             return None, etag
-        return response.json(), response.headers.get("etag")
+        payload = response.json()
+        new_etag = response.headers.get("etag")
 
-    def _download_submission_xml(self, form_id: str, instance_id: str) -> str:
-        """Download one submission XML payload."""
-        url = (
-            f"{self.base_url}/v1/projects/{self.project_id}/forms/"
-            f"{form_id}/submissions/{instance_id}.xml"
-        )
-        response = self.get(url)
-        return response.text
-
-    def _parse_submission_xml(self, xml_content: str) -> dict[str, Any]:
-        """Parse one submission XML into a flat row dict with __version."""
-        root = ET.fromstring(xml_content)
-        row: dict[str, Any] = {
-            "__xmlFormId": root.attrib.get("id", ""),
-            "__version": root.attrib.get("version", ""),
-        }
-
-        for child in root:
-            tag = child.tag.split("}")[-1]
-            if tag == "meta":
-                for meta_child in child:
-                    meta_tag = meta_child.tag.split("}")[-1]
-                    if meta_tag == "instanceID":
-                        row["instanceId"] = meta_child.text or ""
-                continue
-            row[tag] = child.text or ""
-
-        return row
+        records: list[dict[str, Any]] = payload.get("value", [])
+        while payload.get("@odata.nextLink"):
+            response = self.get(payload["@odata.nextLink"])
+            payload = response.json()
+            records.extend(payload.get("value", []))
+        return records, new_etag
 
     def _build_form_submissions_dataframe(
         self,
         form_id: str,
-        submissions: list[dict[str, Any]],
+        records: list[dict[str, Any]],
     ) -> pd.DataFrame:
-        """Build a DataFrame by combining submission listing data with XML payloads."""
-        rows: list[dict[str, Any]] = []
-        for submission in submissions:
-            instance_id = submission["instanceId"]
-            xml_content = self._download_submission_xml(
-                form_id=form_id, instance_id=instance_id
-            )
-            row = self._parse_submission_xml(xml_content)
-            row["instanceId"] = instance_id
-            row["createdAt"] = submission.get("createdAt")
-            row["updatedAt"] = submission.get("updatedAt")
-            row["SubmissionDate"] = submission.get("createdAt")
-            rows.append(row)
-
-        if not rows:
+        """Build a DataFrame from OData submission records, flattening groups."""
+        if not records:
             return pd.DataFrame(
                 columns=[
                     "__xmlFormId",
@@ -175,7 +141,14 @@ class ODKClient:
                     "SubmissionDate",
                 ]
             )
-        return pd.DataFrame(rows)
+        df = pd.json_normalize(records, sep="/")
+        df["__xmlFormId"] = form_id
+        df["__version"] = df.get("__system/formVersion")
+        df["instanceId"] = df["__id"]
+        df["createdAt"] = df["__system/submissionDate"]
+        df["updatedAt"] = df.get("__system/updatedAt")
+        df["SubmissionDate"] = df["createdAt"]
+        return df
 
     def fetch_form_submissions(
         self,
@@ -188,14 +161,10 @@ class ODKClient:
             self.project_id,
             form_id,
         )
-        submissions, new_etag = self._fetch_form_submission_list(
-            form_id=form_id, etag=etag
-        )
-        if submissions is None:
+        records, new_etag = self._fetch_form_odata(form_id=form_id, etag=etag)
+        if records is None:
             return None, new_etag
-        df = self._build_form_submissions_dataframe(
-            form_id=form_id, submissions=submissions
-        )
+        df = self._build_form_submissions_dataframe(form_id=form_id, records=records)
         return df, new_etag
 
     def fetch_submissions(
