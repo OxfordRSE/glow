@@ -70,6 +70,12 @@ python3 scripts/odk/seed_smoke_data.py \
   --email "$ODK_API_EMAIL" \
   --password "$ODK_API_PASSWORD"
 
+# compose.yml's default GLOW_ODK_API_URL (http://odk-service:8383, internal
+# plain HTTP) is rejected by ODK Central for Basic Auth ("This authentication
+# method is only available over HTTPS", 401.3) - must go through nginx's TLS
+# termination instead, same as dev's .env does for local dev.
+export GLOW_ODK_API_URL="https://nginx"
+export GLOW_ODK_VERIFY_SSL="false"
 export GLOW_ODK_API_EMAIL="$ODK_API_EMAIL"
 export GLOW_ODK_API_PASSWORD="$ODK_API_PASSWORD"
 export GLOW_ODK_PROJECT_ID="$PROJECT_ID"
