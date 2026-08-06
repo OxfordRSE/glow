@@ -75,6 +75,25 @@ export GLOW_ODK_API_PASSWORD="$ODK_API_PASSWORD"
 export GLOW_ODK_PROJECT_ID="$PROJECT_ID"
 docker compose -f compose.yml -f compose.test.yml up -d --wait api dashboard
 
+# api's /health is liveness-only and doesn't reflect DataStore's background
+# initial ODK fetch (data.py DataStore.startup() loads async in a daemon
+# thread; ODK Central's OData submissions endpoint can be slow to
+# materialize for a freshly-created form/project). Poll /dimensions instead
+# of trusting the healthcheck for data readiness.
+echo "Waiting for /dimensions to reflect seeded ODK data..."
+for i in $(seq 1 60); do
+  VARS=$(curl -s http://127.0.0.1:8000/dimensions | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('variables', [])))" 2>/dev/null || echo 0)
+  if [ "$VARS" -gt 0 ] 2>/dev/null; then
+    echo "/dimensions ready ($VARS variables) after ${i}s"
+    break
+  fi
+  if [ "$i" -eq 60 ]; then
+    echo "Timed out waiting for /dimensions to report seeded variables" >&2
+    exit 1
+  fi
+  sleep 1
+done
+
 python3 - <<'PY'
 import json
 import urllib.parse
