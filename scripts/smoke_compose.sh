@@ -89,6 +89,8 @@ for i in $(seq 1 60); do
   fi
   if [ "$i" -eq 60 ]; then
     echo "Timed out waiting for /dimensions to report seeded variables" >&2
+    echo "--- api logs ---" >&2
+    docker compose -f compose.yml -f compose.test.yml logs api >&2
     exit 1
   fi
   sleep 1
