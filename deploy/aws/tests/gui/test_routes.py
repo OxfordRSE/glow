@@ -121,6 +121,90 @@ def test_manual_signin_shows_error_on_rejected_credentials(client, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# SSO device-authorization flow
+# ---------------------------------------------------------------------------
+
+
+def _start_sso(client: TestClient, device_auth) -> None:
+    client.app.state.pending_device_auth = device_auth
+    client.app.state.sso_token = aws_auth.SsoToken(access_token="token", expires_in=3600)
+
+
+def test_sso_start_shows_error_when_device_authorization_fails(client, monkeypatch):
+    monkeypatch.setattr(
+        aws_auth,
+        "start_device_authorization",
+        lambda *a, **k: (_ for _ in ()).throw(DeployError("start SSO sign-in failed")),
+    )
+
+    response = client.post(
+        "/signin/sso/start",
+        data={"start_url": "https://ox-lza-master.awsapps.com/start/#/", "region": "eu-west-2"},
+    )
+
+    assert response.status_code == 200
+    assert "start SSO sign-in failed" in response.text
+
+
+def test_sso_poll_shows_error_when_listing_accounts_fails(client, monkeypatch):
+    device_auth = aws_auth.DeviceAuthorization(
+        verification_uri="https://device.sso.example/",
+        verification_uri_complete="https://device.sso.example/?user_code=ABCD",
+        user_code="ABCD",
+        device_code="device-code",
+        interval=0,
+        expires_in=600,
+        client_id="client-id",
+        client_secret="client-secret",
+        region="eu-west-2",
+    )
+    client.app.state.pending_device_auth = device_auth
+    monkeypatch.setattr(
+        aws_auth, "poll_once", lambda *a, **k: aws_auth.SsoToken("token", 3600)
+    )
+    monkeypatch.setattr(
+        aws_auth,
+        "list_accounts_and_roles",
+        lambda *a, **k: (_ for _ in ()).throw(DeployError("could not list AWS accounts")),
+    )
+
+    response = client.get("/signin/sso/poll")
+
+    assert response.status_code == 200
+    assert "could not list AWS accounts" in response.text
+    assert client.app.state.pending_device_auth is None
+
+
+def test_sso_select_shows_error_when_role_exchange_fails(client, monkeypatch):
+    device_auth = aws_auth.DeviceAuthorization(
+        verification_uri="https://device.sso.example/",
+        verification_uri_complete="https://device.sso.example/?user_code=ABCD",
+        user_code="ABCD",
+        device_code="device-code",
+        interval=0,
+        expires_in=600,
+        client_id="client-id",
+        client_secret="client-secret",
+        region="eu-west-2",
+    )
+    _start_sso(client, device_auth)
+    monkeypatch.setattr(
+        aws_auth,
+        "session_from_sso_role",
+        lambda *a, **k: (_ for _ in ()).throw(DeployError("could not get role credentials")),
+    )
+
+    response = client.post(
+        "/signin/sso/select",
+        data={"account_id": "111111111111", "role_name": "AdministratorAccess"},
+    )
+
+    assert response.status_code == 200
+    assert "could not get role credentials" in response.text
+    assert client.app.state.session is None
+
+
+# ---------------------------------------------------------------------------
 # Home / deployment listing
 # ---------------------------------------------------------------------------
 

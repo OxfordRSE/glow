@@ -13,6 +13,8 @@ import webbrowser
 from dataclasses import dataclass
 
 import boto3
+from botocore import UNSIGNED
+from botocore.config import Config
 
 from glow_deploy.errors import DeployError
 from glow_deploy.gui import secret_store
@@ -20,6 +22,14 @@ from glow_deploy.gui import secret_store
 _CLIENT_NAME = "glow-deploy"
 _CLIENT_TYPE = "public"
 _SCOPES = ["sso:account:access"]
+
+# sso-oidc's device-flow calls and sso's bearer-token calls need no IAM
+# credentials at all — building these clients unsigned means construction
+# doesn't touch the local credential chain, so a machine with a broken or
+# unusual AWS credential setup (e.g. an SSO "login" provider that needs an
+# optional `botocore[crt]` dependency this app doesn't bundle) can't crash a
+# sign-in flow that was never going to use any of those credentials anyway.
+_UNSIGNED = Config(signature_version=UNSIGNED)
 
 
 @dataclass
@@ -44,19 +54,31 @@ def start_device_authorization(start_url: str, region: str) -> DeviceAuthorizati
     display; the user completes sign-in in their browser, then the caller
     polls `poll_for_token` until it succeeds.
     """
-    oidc = boto3.client("sso-oidc", region_name=region)
+    from botocore.exceptions import BotoCoreError, ClientError
 
-    registration = oidc.register_client(
-        clientName=_CLIENT_NAME,
-        clientType=_CLIENT_TYPE,
-        scopes=_SCOPES,
-    )
+    try:
+        oidc = boto3.client("sso-oidc", region_name=region, config=_UNSIGNED)
 
-    device_auth = oidc.start_device_authorization(
-        clientId=registration["clientId"],
-        clientSecret=registration["clientSecret"],
-        startUrl=start_url,
-    )
+        registration = oidc.register_client(
+            clientName=_CLIENT_NAME,
+            clientType=_CLIENT_TYPE,
+            scopes=_SCOPES,
+        )
+
+        device_auth = oidc.start_device_authorization(
+            clientId=registration["clientId"],
+            clientSecret=registration["clientSecret"],
+            startUrl=start_url,
+        )
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+        raise DeployError(
+            f"Couldn't start SSO sign-in ({error_code or exc}). "
+            "Check the start URL and that the region matches your "
+            "Identity Center instance's home region."
+        ) from exc
+    except BotoCoreError as exc:
+        raise DeployError(f"Couldn't start SSO sign-in: {exc}") from exc
 
     return DeviceAuthorization(
         verification_uri=device_auth["verificationUri"],
@@ -103,7 +125,7 @@ def poll_once(device_authorization: DeviceAuthorization) -> SsoToken | None:
     """
     from botocore.exceptions import ClientError
 
-    oidc = boto3.client("sso-oidc", region_name=device_authorization.region)
+    oidc = boto3.client("sso-oidc", region_name=device_authorization.region, config=_UNSIGNED)
     try:
         token = oidc.create_token(
             clientId=device_authorization.client_id,
@@ -130,7 +152,7 @@ def poll_for_token(device_authorization: DeviceAuthorization, timeout: int = 300
     """
     from botocore.exceptions import ClientError
 
-    oidc = boto3.client("sso-oidc", region_name=device_authorization.region)
+    oidc = boto3.client("sso-oidc", region_name=device_authorization.region, config=_UNSIGNED)
     interval = device_authorization.interval
     start = time.time()
 
@@ -176,27 +198,32 @@ def list_accounts_and_roles(sso_token: SsoToken, region: str) -> list[SsoAccount
     Most orgs deploying Glow will have a single account/role; the GUI can
     auto-select when there's only one and only show a picker otherwise.
     """
-    sso = boto3.client("sso", region_name=region)
+    from botocore.exceptions import BotoCoreError, ClientError
+
+    sso = boto3.client("sso", region_name=region, config=_UNSIGNED)
     roles: list[SsoAccountRole] = []
 
-    accounts_paginator = sso.get_paginator("list_accounts")
-    for accounts_page in accounts_paginator.paginate(accessToken=sso_token.access_token):
-        for account in accounts_page.get("accountList", []):
-            account_id = account["accountId"]
-            account_name = account.get("accountName", account_id)
+    try:
+        accounts_paginator = sso.get_paginator("list_accounts")
+        for accounts_page in accounts_paginator.paginate(accessToken=sso_token.access_token):
+            for account in accounts_page.get("accountList", []):
+                account_id = account["accountId"]
+                account_name = account.get("accountName", account_id)
 
-            roles_paginator = sso.get_paginator("list_account_roles")
-            for roles_page in roles_paginator.paginate(
-                accessToken=sso_token.access_token, accountId=account_id
-            ):
-                for role in roles_page.get("roleList", []):
-                    roles.append(
-                        SsoAccountRole(
-                            account_id=account_id,
-                            account_name=account_name,
-                            role_name=role["roleName"],
+                roles_paginator = sso.get_paginator("list_account_roles")
+                for roles_page in roles_paginator.paginate(
+                    accessToken=sso_token.access_token, accountId=account_id
+                ):
+                    for role in roles_page.get("roleList", []):
+                        roles.append(
+                            SsoAccountRole(
+                                account_id=account_id,
+                                account_name=account_name,
+                                role_name=role["roleName"],
+                            )
                         )
-                    )
+    except (ClientError, BotoCoreError) as exc:
+        raise DeployError(f"Couldn't list AWS accounts/roles: {exc}") from exc
 
     return roles
 
@@ -205,12 +232,17 @@ def session_from_sso_role(
     sso_token: SsoToken, account_role: SsoAccountRole, region: str
 ) -> boto3.Session:
     """Exchange an SSO access token + chosen account/role for a boto3.Session."""
-    sso = boto3.client("sso", region_name=region)
-    role_credentials = sso.get_role_credentials(
-        roleName=account_role.role_name,
-        accountId=account_role.account_id,
-        accessToken=sso_token.access_token,
-    )["roleCredentials"]
+    from botocore.exceptions import BotoCoreError, ClientError
+
+    sso = boto3.client("sso", region_name=region, config=_UNSIGNED)
+    try:
+        role_credentials = sso.get_role_credentials(
+            roleName=account_role.role_name,
+            accountId=account_role.account_id,
+            accessToken=sso_token.access_token,
+        )["roleCredentials"]
+    except (ClientError, BotoCoreError) as exc:
+        raise DeployError(f"Couldn't get role credentials: {exc}") from exc
 
     return boto3.Session(
         aws_access_key_id=role_credentials["accessKeyId"],

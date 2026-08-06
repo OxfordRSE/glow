@@ -60,7 +60,7 @@ def test_start_device_authorization_registers_client_and_returns_user_code(monke
             "expiresIn": 600,
         },
     )
-    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None, config=None: fake_client)
 
     result = aws_auth.start_device_authorization("https://my-sso.awsapps.com/start", "eu-west-2")
 
@@ -71,6 +71,37 @@ def test_start_device_authorization_registers_client_and_returns_user_code(monke
     assert result.client_id == "client-id"
     assert result.client_secret == "client-secret"
     assert result.interval == 5
+
+
+def test_start_device_authorization_raises_deploy_error_on_client_error(monkeypatch):
+    class _FailingSsoOidcClient:
+        def register_client(self, **kwargs):
+            return {"clientId": "client-id", "clientSecret": "client-secret"}
+
+        def start_device_authorization(self, **kwargs):
+            raise ClientError(
+                {"Error": {"Code": "InvalidRequestException", "Message": "bad start url"}},
+                "StartDeviceAuthorization",
+            )
+
+    monkeypatch.setattr(
+        aws_auth.boto3, "client", lambda service, region_name=None, config=None: _FailingSsoOidcClient()
+    )
+
+    with pytest.raises(DeployError, match="InvalidRequestException"):
+        aws_auth.start_device_authorization("https://my-sso.awsapps.com/start/#/", "eu-west-2")
+
+
+def test_start_device_authorization_raises_deploy_error_on_botocore_error(monkeypatch):
+    from botocore.exceptions import NoRegionError
+
+    def _raise_no_region(service, region_name=None, config=None):
+        raise NoRegionError()
+
+    monkeypatch.setattr(aws_auth.boto3, "client", _raise_no_region)
+
+    with pytest.raises(DeployError):
+        aws_auth.start_device_authorization("https://my-sso.awsapps.com/start/#/", "eu-west-2")
 
 
 def test_open_verification_url_tolerates_no_browser(monkeypatch):
@@ -94,7 +125,7 @@ def test_poll_for_token_retries_while_authorization_pending(monkeypatch):
     fake_client = _FakeSsoOidcClient(
         token_responses=[pending_error, {"accessToken": "sso-access-token", "expiresIn": 3600}]
     )
-    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None, config=None: fake_client)
     monkeypatch.setattr(aws_auth.time, "sleep", lambda seconds: None)
 
     token = aws_auth.poll_for_token(_device_auth())
@@ -106,7 +137,7 @@ def test_poll_for_token_retries_while_authorization_pending(monkeypatch):
 def test_poll_for_token_raises_on_expired_code(monkeypatch):
     expired_error = ClientError({"Error": {"Code": "ExpiredTokenException"}}, "CreateToken")
     fake_client = _FakeSsoOidcClient(token_responses=[expired_error])
-    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None, config=None: fake_client)
 
     with pytest.raises(DeployError, match="expired"):
         aws_auth.poll_for_token(_device_auth())
@@ -115,7 +146,7 @@ def test_poll_for_token_raises_on_expired_code(monkeypatch):
 def test_poll_for_token_raises_on_access_denied(monkeypatch):
     denied_error = ClientError({"Error": {"Code": "AccessDeniedException"}}, "CreateToken")
     fake_client = _FakeSsoOidcClient(token_responses=[denied_error])
-    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None, config=None: fake_client)
 
     with pytest.raises(DeployError, match="denied"):
         aws_auth.poll_for_token(_device_auth())
@@ -123,7 +154,7 @@ def test_poll_for_token_raises_on_access_denied(monkeypatch):
 
 def test_poll_for_token_times_out(monkeypatch):
     fake_client = _FakeSsoOidcClient()
-    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None, config=None: fake_client)
 
     times = iter([0, 400])  # start, then first elapsed check already past timeout
     monkeypatch.setattr(aws_auth.time, "time", lambda: next(times))
@@ -138,7 +169,7 @@ def test_poll_once_returns_none_while_pending(monkeypatch):
         {"Error": {"Code": "AuthorizationPendingException"}}, "CreateToken"
     )
     fake_client = _FakeSsoOidcClient(token_responses=[pending_error])
-    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None, config=None: fake_client)
 
     assert aws_auth.poll_once(_device_auth()) is None
 
@@ -147,7 +178,7 @@ def test_poll_once_returns_token_on_success(monkeypatch):
     fake_client = _FakeSsoOidcClient(
         token_responses=[{"accessToken": "sso-access-token", "expiresIn": 3600}]
     )
-    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None, config=None: fake_client)
 
     token = aws_auth.poll_once(_device_auth())
 
@@ -157,7 +188,7 @@ def test_poll_once_returns_token_on_success(monkeypatch):
 def test_poll_once_raises_on_expired_code(monkeypatch):
     expired_error = ClientError({"Error": {"Code": "ExpiredTokenException"}}, "CreateToken")
     fake_client = _FakeSsoOidcClient(token_responses=[expired_error])
-    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None, config=None: fake_client)
 
     with pytest.raises(DeployError, match="expired"):
         aws_auth.poll_once(_device_auth())
@@ -210,7 +241,7 @@ def test_list_accounts_and_roles_flattens_accounts_and_roles(monkeypatch):
             "111111111111": [{"roleList": [{"roleName": "AdministratorAccess"}]}]
         },
     )
-    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None, config=None: fake_client)
 
     roles = aws_auth.list_accounts_and_roles(
         aws_auth.SsoToken(access_token="sso-access-token", expires_in=3600), "eu-west-2"
@@ -233,7 +264,7 @@ def test_session_from_sso_role_exchanges_token_for_session_credentials(monkeypat
             "sessionToken": "token",
         }
     )
-    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None: fake_client)
+    monkeypatch.setattr(aws_auth.boto3, "client", lambda service, region_name=None, config=None: fake_client)
 
     session = aws_auth.session_from_sso_role(
         aws_auth.SsoToken(access_token="sso-access-token", expires_in=3600),

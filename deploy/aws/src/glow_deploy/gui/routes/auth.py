@@ -64,10 +64,18 @@ def sso_poll(request: Request):
         )
 
     request.app.state.sso_token = token
-    accounts = aws_auth.list_accounts_and_roles(token, device_auth.region)
+    try:
+        accounts = aws_auth.list_accounts_and_roles(token, device_auth.region)
+    except DeployError as exc:
+        request.app.state.pending_device_auth = None
+        return templates.TemplateResponse(request, "signin.html", {"error": str(exc)})
 
     if len(accounts) == 1:
-        return _complete_sso_signin(request, accounts[0], device_auth.region)
+        try:
+            return _complete_sso_signin(request, accounts[0], device_auth.region)
+        except DeployError as exc:
+            request.app.state.pending_device_auth = None
+            return templates.TemplateResponse(request, "signin.html", {"error": str(exc)})
 
     return templates.TemplateResponse(request, "sso_poll.html", {"device_auth": device_auth, "accounts": accounts, "error": None},
     )
@@ -88,7 +96,11 @@ def sso_select(
     account_role = aws_auth.SsoAccountRole(
         account_id=account_id, account_name=account_name, role_name=role_name
     )
-    return _complete_sso_signin(request, account_role, device_auth.region)
+    try:
+        return _complete_sso_signin(request, account_role, device_auth.region)
+    except DeployError as exc:
+        request.app.state.pending_device_auth = None
+        return templates.TemplateResponse(request, "signin.html", {"error": str(exc)})
 
 
 def _complete_sso_signin(
