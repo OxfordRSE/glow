@@ -8,6 +8,7 @@ SSO device-authorization attempt.
 from __future__ import annotations
 
 import threading
+import time
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -16,7 +17,7 @@ from glow_deploy.gui import secret_store, update_check, version
 from glow_deploy.gui.aws_auth import session_from_stored_credentials
 from glow_deploy.gui.jobs import JobManager
 from glow_deploy.gui.paths import gui_dir
-from glow_deploy.gui.routes import auth, deployments, jobs, logs
+from glow_deploy.gui.routes import auth, deployments, heartbeat, jobs, logs
 
 _PROFILE = "default"
 
@@ -31,6 +32,9 @@ def create_app() -> FastAPI:
     app.state.sso_token = None
     app.state.current_version = version.CURRENT_VERSION
     app.state.latest_release = None
+    # Set at startup (not left at 0) so the watcher thread doesn't see a stale
+    # timestamp and quit before the browser tab's first heartbeat lands.
+    app.state.last_heartbeat = time.time()
 
     stored = secret_store.load_credentials(_PROFILE)
     app.state.session = session_from_stored_credentials(stored) if stored else None
@@ -39,6 +43,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(deployments.router)
+    app.include_router(heartbeat.router)
     app.include_router(jobs.router)
     app.include_router(logs.router)
 

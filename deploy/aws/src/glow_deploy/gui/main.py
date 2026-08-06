@@ -2,15 +2,31 @@
 
 A frozen build has no visible console — this is also how the app is run from
 source for local dev/manual smoke-testing (`uv run glow-deploy-gui`).
+
+There's no native window here, just a browser tab pointed at a local server,
+so two lifecycle gaps need covering by hand:
+
+- Relaunching while an instance is already running used to just exit
+  silently (the single-instance lock refused the bind, the print went
+  nowhere in a frozen build). Now the running instance's port is read back
+  out of a state file and the browser is reopened at it instead.
+- Closing the browser tab left the server running forever with no UI to
+  bring it back. A heartbeat pinged from every page (see heartbeat.ts) lets
+  a watcher thread notice the tab is gone and quit — but never while a
+  provision/update job is still running (see jobs.JobManager), since that's
+  a `terraform apply` a hard kill would leave state-locked.
 """
 
 from __future__ import annotations
 
+import json
 import socket
 import sys
+import tempfile
 import threading
 import time
 import webbrowser
+from pathlib import Path
 
 import uvicorn
 
@@ -21,9 +37,17 @@ _HOST = "127.0.0.1"
 # server below still runs on a separate, freshly allocated port.
 _SINGLE_INSTANCE_LOCK_PORT = 47632
 
+_STATE_FILE = Path(tempfile.gettempdir()) / "glow-deploy-gui-state.json"
 
-def _acquire_single_instance_lock() -> socket.socket:
-    """Bind a fixed local port as a mutex; a second launch fails here and exits.
+# How long without a heartbeat before the watcher treats the tab as closed.
+# Pings arrive every 3s (heartbeat.ts) — this tolerates a couple of missed
+# pings (page navigation, brief system hiccup) without quitting early.
+_HEARTBEAT_TIMEOUT = 10.0
+_WATCHER_INTERVAL = 2.0
+
+
+def _acquire_single_instance_lock() -> socket.socket | None:
+    """Bind a fixed local port as a mutex; a second launch fails here.
 
     ponytail: a bound-socket mutex, not a PID-file with staleness handling —
     good enough for a single local desktop app; revisit if a crashed process
@@ -33,9 +57,23 @@ def _acquire_single_instance_lock() -> socket.socket:
     try:
         lock_socket.bind((_HOST, _SINGLE_INSTANCE_LOCK_PORT))
     except OSError:
-        print("Glow Deploy is already running.", file=sys.stderr)
-        sys.exit(1)
+        lock_socket.close()
+        return None
     return lock_socket
+
+
+def _reopen_running_instance() -> None:
+    try:
+        state = json.loads(_STATE_FILE.read_text())
+        webbrowser.open(f"http://{_HOST}:{state['port']}")
+    except (OSError, ValueError, KeyError):
+        print(
+            "Glow Deploy is already running, but its window could not be found. "
+            "Check your task manager / activity monitor for a stuck 'glow-deploy' "
+            "process and close it manually.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 def _free_port() -> int:
@@ -55,18 +93,37 @@ def _open_browser_when_ready(host: str, port: int, url: str, timeout: float = 10
     webbrowser.open(url)
 
 
+def _watch_for_closed_tab(app, server: uvicorn.Server) -> None:
+    while not server.should_exit:
+        time.sleep(_WATCHER_INTERVAL)
+        idle_for = time.time() - app.state.last_heartbeat
+        if idle_for > _HEARTBEAT_TIMEOUT and not app.state.job_manager.has_running_jobs():
+            server.should_exit = True
+
+
 def main() -> None:
     lock_socket = _acquire_single_instance_lock()
+    if lock_socket is None:
+        _reopen_running_instance()
+        return
+
     try:
         port = _free_port()
         url = f"http://{_HOST}:{port}"
+        _STATE_FILE.write_text(json.dumps({"port": port}))
         app = create_app()
+
+        config = uvicorn.Config(app, host=_HOST, port=port, log_level="info")
+        server = uvicorn.Server(config)
 
         threading.Thread(
             target=_open_browser_when_ready, args=(_HOST, port, url), daemon=True
         ).start()
-        uvicorn.run(app, host=_HOST, port=port, log_level="info")
+        threading.Thread(target=_watch_for_closed_tab, args=(app, server), daemon=True).start()
+
+        server.run()
     finally:
+        _STATE_FILE.unlink(missing_ok=True)
         lock_socket.close()
 
 

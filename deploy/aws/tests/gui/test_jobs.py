@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 
 from glow_deploy.errors import DeployError
@@ -55,3 +56,26 @@ def test_submit_records_deploy_error_as_failure():
 def test_get_returns_none_for_unknown_job_id():
     manager = JobManager()
     assert manager.get("does-not-exist") is None
+
+
+def test_has_running_jobs_true_while_a_job_is_in_flight():
+    manager = JobManager()
+    started = threading.Event()
+    release = threading.Event()
+
+    def fn():
+        started.set()
+        release.wait(timeout=2.0)
+
+    job_id = manager.submit(fn)
+    started.wait(timeout=2.0)
+    assert manager.has_running_jobs() is True
+
+    release.set()
+    _wait_until_terminal(manager, job_id)
+    assert manager.has_running_jobs() is False
+
+
+def test_has_running_jobs_false_with_no_jobs():
+    manager = JobManager()
+    assert manager.has_running_jobs() is False

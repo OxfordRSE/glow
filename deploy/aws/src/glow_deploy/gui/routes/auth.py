@@ -21,6 +21,12 @@ router = APIRouter()
 _PROFILE = "default"
 
 
+@router.get("/")
+def root(request: Request):
+    dest = "/deployments" if request.app.state.session else "/signin"
+    return RedirectResponse(dest, status_code=303)
+
+
 @router.get("/signin", response_class=HTMLResponse)
 def signin_page(request: Request):
     return templates.TemplateResponse(request, "signin.html", {"error": None})

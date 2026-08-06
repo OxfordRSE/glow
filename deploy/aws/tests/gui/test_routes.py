@@ -60,6 +60,26 @@ def test_protected_routes_redirect_to_signin_when_signed_out(client):
     assert response.headers["location"] == "/signin"
 
 
+def test_root_redirects_to_signin_when_signed_out(client):
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/signin"
+
+
+def test_root_redirects_to_deployments_when_signed_in(client):
+    _sign_in(client)
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/deployments"
+
+
+def test_heartbeat_updates_last_heartbeat_timestamp(client):
+    client.app.state.last_heartbeat = 0.0
+    response = client.post("/heartbeat")
+    assert response.status_code == 204
+    assert client.app.state.last_heartbeat > 0.0
+
+
 # ---------------------------------------------------------------------------
 # Manual sign-in
 # ---------------------------------------------------------------------------

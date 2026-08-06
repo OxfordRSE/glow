@@ -44,6 +44,9 @@ class JobManager:
     def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)
 
+    def has_running_jobs(self) -> bool:
+        return any(job.status in ("pending", "running") for job in self._jobs.values())
+
     def _run(self, job: Job, fn: Callable[[], Any]) -> None:
         job.status = "running"
         token = core.set_progress_sink(
