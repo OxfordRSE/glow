@@ -76,7 +76,8 @@ EOF
   cat > "${RUNTIME_ENV}" <<EOF
 GLOW_SECRET_KEY=${glow_secret}
 GLOW_MIN_N=5
-GLOW_ODK_API_URL=http://odk-service:8383
+GLOW_ODK_API_URL=https://nginx
+GLOW_ODK_VERIFY_SSL=false
 GLOW_ODK_API_EMAIL=${api_email}
 GLOW_ODK_API_PASSWORD=${odk_api_password}
 GLOW_ODK_PROJECT_ID=1
