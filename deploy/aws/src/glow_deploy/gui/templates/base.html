@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Glow Deploy{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/deployments">Glow Deploy</a>
+    {% if request.app.state.session %}
+    <form method="post" action="/signin/out">
+      <button type="submit" class="button button-ghost">Sign out</button>
+    </form>
+    {% endif %}
+  </header>
+  <main class="container">
+    {% if request.app.state.latest_release %}
+    <p class="alert" role="status">
+      A newer version ({{ request.app.state.latest_release }}) is available.
+      <a href="https://github.com/OxfordRSE/glow/releases/latest">Download it</a>.
+    </p>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

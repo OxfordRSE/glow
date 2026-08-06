@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Deployments — Glow Deploy{% endblock %}
+{% block content %}
+  <h1>Deployments</h1>
+  <p class="links"><a href="/deployments/new" class="button">New deployment</a></p>
+
+  {% if not deployments %}
+    <p>No deployments found in this account/region.</p>
+  {% else %}
+    <ul class="list-plain">
+      {% for deployment in deployments %}
+      <li class="card deployment-row">
+        <a href="/deployments/{{ deployment.domain }}">{{ deployment.domain }}</a>
+        <span class="badge">{{ deployment.state }} — {{ deployment.git_ref }} ({{ (deployment.git_commit or "")[:8] }})</span>
+      </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endblock %}

@@ -1,8 +1,8 @@
 FROM python:3.12-slim
 
 # Install system dependencies and AWS CLI tools
+# (no `git` package needed: glow-deploy resolves git refs via the GitHub API)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
     curl \
     unzip \
     ca-certificates \
@@ -28,15 +28,11 @@ RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tm
     && /tmp/aws/install \
     && rm -rf /tmp/aws /tmp/awscliv2.zip
 
-# Install Python dependencies
-RUN pip install --no-cache-dir boto3>=1.35.0
-
-# Copy only the deploy/aws directory into the image
+# Copy only the deploy/aws directory into the image, then install it as a
+# package (this is what provides the `glow-deploy` console script).
 WORKDIR /opt/glow
 COPY deploy/aws /opt/glow/deploy/aws
-
-# Ensure deploy script is executable
-RUN chmod +x /opt/glow/deploy/aws/deploy.py
+RUN pip install --no-cache-dir /opt/glow/deploy/aws
 
 # Copy entrypoint script
 COPY deploy/aws/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

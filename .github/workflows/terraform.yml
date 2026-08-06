@@ -4,14 +4,12 @@ on:
   pull_request:
     paths:
       - 'deploy/aws/terraform/**'
-      - 'deploy/aws/terraform_bootstrap/**'
       - '.github/workflows/terraform.yml'
   push:
     branches:
       - main
     paths:
       - 'deploy/aws/terraform/**'
-      - 'deploy/aws/terraform_bootstrap/**'
       - '.github/workflows/terraform.yml'
 
 jobs:
@@ -29,17 +27,7 @@ jobs:
           terraform_version: '1.6.0'
 
       - name: Terraform Format Check
-        run: |
-          terraform -chdir=deploy/aws/terraform fmt -check -recursive
-          terraform -chdir=deploy/aws/terraform_bootstrap fmt -check -recursive
-
-      - name: Terraform Init and Validate
-        if: false  # requires a key?
-        run: |
-          terraform -chdir=deploy/aws/terraform init -backend=false
-          terraform -chdir=deploy/aws/terraform validate -no-color
-          terraform -chdir=deploy/aws/terraform_bootstrap init -backend=false
-          terraform -chdir=deploy/aws/terraform_bootstrap validate -no-color
+        run: terraform -chdir=deploy/aws/terraform fmt -check -recursive
 
   tflint:
     name: TFLint
@@ -60,10 +48,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run TFLint (main)
+      - name: Run TFLint
         run: tflint --format compact
         working-directory: deploy/aws/terraform
-
-      - name: Run TFLint (bootstrap)
-        run: tflint --format compact
-        working-directory: deploy/aws/terraform_bootstrap

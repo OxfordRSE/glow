@@ -1,5 +1,12 @@
 .venv/
 .pytest_cache/
 terraform/.terraform/
-terraform_bootstrap/.terraform/
-src/glow_aws_deploy/__pycache__/
+src/glow_deploy/gui/static/js/*.js
+src/glow_deploy/gui/static/js/*.js.map
+src/glow_deploy/gui/frontend/node_modules/
+src/glow_deploy/gui/VERSION
+src/glow_deploy/gui/bin/
+
+# Hand-authored, not a PyInstaller-generated boilerplate spec — override the
+# repo-wide `*.spec` ignore above.
+!src/glow_deploy/gui/pyinstaller.spec

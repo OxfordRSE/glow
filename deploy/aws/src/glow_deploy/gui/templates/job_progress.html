@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Job {{ job.id }} — Glow Deploy{% endblock %}
+{% block head %}
+  {% if job.status in ("pending", "running") %}<noscript><meta http-equiv="refresh" content="3"></noscript>{% endif %}
+{% endblock %}
+{% block content %}
+  <h1>Job {{ job.id }}</h1>
+  <p>Status: <span id="job-status" class="badge badge-{{ job.status }}">{{ job.status }}</span></p>
+
+  <details open>
+    <summary>Advanced / raw output</summary>
+    <pre id="job-lines">{{ job.lines | join('\n') }}</pre>
+  </details>
+
+  {% if job.error %}<p id="job-error" class="alert" role="alert">{{ job.error }}</p>{% else %}<p id="job-error" hidden></p>{% endif %}
+
+  {% if job.status == "succeeded" and job.meta.get("apply_action") %}
+    <h2>Review</h2>
+    <p>Resolved commit: <code>{{ job.meta.config.git_commit }}</code></p>
+    <form method="post" action="{{ job.meta.apply_action }}" class="card">
+      {% for key, value in job.meta.config.items() %}
+      <input type="hidden" name="{{ key }}" value="{{ value }}">
+      {% endfor %}
+      <button type="submit" class="button">Confirm &amp; Deploy</button>
+    </form>
+  {% elif job.status == "succeeded" and job.meta.get("domain") %}
+    <p><a href="/deployments/{{ job.meta.domain }}" class="button">View deployment</a></p>
+  {% endif %}
+
+  <script type="module" src="/static/js/job-status.js"></script>
+{% endblock %}

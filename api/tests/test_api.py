@@ -436,6 +436,30 @@ def test_dimensions_school_scope_unauthorized(auth_client, sample_schools):
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+def test_dimensions_school_scope_no_data_loaded(auth_client_empty_data, sample_schools):
+    """GET /dimensions?school_id=X should return empty results, not 500, when the
+    datastore hasn't loaded any submissions yet (e.g. ODK Central unreachable at
+    startup) and the analytic frame has no "school" column."""
+    login_response = auth_client_empty_data.post(
+        "/auth/login",
+        data={"username": "testuser", "password": "testpass"},
+    )
+    assert login_response.status_code == status.HTTP_200_OK
+    token = login_response.json()["access_token"]
+
+    school_id = sample_schools["Focus School Academy"].id
+    response = auth_client_empty_data.get(
+        f"/dimensions?school_id={school_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["school_id"] == school_id
+    assert data["variables"] == []
+    assert data["dimensions"] == []
+
+
 # ---------------------------------------------------------------------------
 # Schools and Legacy Tests
 # ---------------------------------------------------------------------------
@@ -603,3 +627,22 @@ def test_query_get_school_scope_unauthorized(auth_client, sample_schools):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_query_get_school_scope_no_data_loaded(auth_client_empty_data, sample_schools):
+    """GET /query?school_id=X should return an empty result, not 500, when the
+    datastore hasn't loaded any submissions yet and the analytic frame has no
+    "school" column."""
+    login_response = auth_client_empty_data.post(
+        "/auth/login",
+        data={"username": "testuser", "password": "testpass"},
+    )
+    assert login_response.status_code == status.HTTP_200_OK
+    token = login_response.json()["access_token"]
+
+    school_id = sample_schools["Focus School Academy"].id
+    response = auth_client_empty_data.get(
+        f"/query?school_id={school_id}&v=bw_wbeing_1",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == status.HTTP_200_OK

@@ -205,14 +205,14 @@ docker run --rm -it \
 
 Quick start:
 ```bash
-uv run --project deploy/aws deploy/aws/deploy.py \
+uv run --project deploy/aws glow-deploy \
   --domain eu.glow-project.org \
   --certificate-arn arn:aws:acm:...
 ```
 
 Update existing deployment:
 ```bash
-uv run --project deploy/aws deploy/aws/deploy.py \
+uv run --project deploy/aws glow-deploy \
   --domain eu.glow-project.org \
   --git-ref v1.2.3 \
   --update

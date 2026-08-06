@@ -249,3 +249,8 @@ data/*
 
 .cache.*
 **/.cache.*
+
+.agents/*
+.opencode/*
+.github/copilot-instructions.md
+skills-lock.json

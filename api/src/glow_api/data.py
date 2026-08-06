@@ -51,6 +51,7 @@ class DataStore:
         self._categorical_whitelist: List[str] = []
         self._numerical_whitelist: List[str] = []
         self._observed_periods: Dict[Optional[str], List[str]] = {}
+        self._initial_load_complete = threading.Event()
 
     def _load(self) -> pd.DataFrame:
         with log_duration("Load data from ODK Central") as log_data:
@@ -324,20 +325,20 @@ class DataStore:
         if df.empty:
             return pd.DataFrame(columns=group_keys + value_columns)
 
-        ordered = df.sort_values("createdAt", ascending=False)
-        rows: list[dict] = []
-        for group_key, group in ordered.groupby(group_keys, dropna=False, sort=False):
-            if not isinstance(group_key, tuple):
-                group_key = (group_key,)
-            collapsed = dict(zip(group_keys, group_key, strict=True))
-            for col in value_columns:
-                if col not in group.columns:
-                    collapsed[col] = None
-                    continue
-                non_null = group[col].dropna()
-                collapsed[col] = non_null.iloc[0] if not non_null.empty else None
-            rows.append(collapsed)
-        return pd.DataFrame(rows)
+        ordered = df.sort_values("createdAt", ascending=False, kind="stable")
+        present = [col for col in value_columns if col in ordered.columns]
+        missing = [col for col in value_columns if col not in ordered.columns]
+
+        grouped = ordered.groupby(group_keys, dropna=False, sort=False)
+        if present:
+            collapsed = grouped[present].first().reset_index()
+        else:
+            collapsed = grouped.size().reset_index()[group_keys]
+
+        for col in missing:
+            collapsed[col] = None
+
+        return collapsed[group_keys + value_columns]
 
     def _compute_derived_scores(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add derived score columns to the DataFrame.
@@ -466,6 +467,8 @@ class DataStore:
         cached = self._load_cache()
         if cached:
             df, etags = cached
+            self._extract_whitelists(df)
+            self._compute_observed_periods(df)
             with self._lock:
                 self._df = df
                 self._response_etags = etags
@@ -473,7 +476,15 @@ class DataStore:
                 "Loaded from cache: %d rows, %d columns", len(df), len(df.columns)
             )
 
-        self.refresh()
+        def _initial_refresh() -> None:
+            try:
+                self.refresh()
+            finally:
+                self._initial_load_complete.set()
+
+        threading.Thread(
+            target=_initial_refresh, daemon=True, name="datastore-initial-refresh"
+        ).start()
 
         if self._refresh_hours > 0:
             self._scheduler.add_job(
@@ -482,8 +493,8 @@ class DataStore:
                 hours=self._refresh_hours,
                 id="data_refresh",
             )
-            self._scheduler.start()
             logger.info("Data refresh scheduled every %d hour(s)", self._refresh_hours)
+            self._scheduler.start()
 
     def shutdown(self) -> None:
         """Stop the background scheduler."""

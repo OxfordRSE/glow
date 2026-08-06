@@ -23,14 +23,23 @@ test("admin can log in, run a query, and use the admin screen", async ({
 }) => {
   await login(page, adminUser, adminPassword);
 
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Explore Data" }),
+  ).toBeVisible();
 
-  // Test dashboard query functionality
-  await expect(page.getByRole("button", { name: "Run Query" })).toBeVisible();
+  // Admin defaults to whichever school comes first alphabetically, which may
+  // have no seeded data - select the school we actually seeded explicitly.
+  await page.getByLabel("School").selectOption({ label: scopedSchool });
+
+  // Test dashboard query functionality - phq9_1 is guaranteed to have data;
+  // other variables (e.g. bw_wbeing_1) exist in the form but were never seeded.
+  await page.getByRole("checkbox", { name: /phq9_1/ }).check();
+  await expect(page.getByRole("button", { name: "Run Query" })).toBeEnabled();
   await page.getByRole("button", { name: "Run Query" }).click();
 
-  // Wait for query results to appear
-  await expect(page.locator(".chart-container")).toBeVisible({
+  // Wait for query results to appear - ChartCard renders a <canvas> via
+  // svelte-chartjs, there is no ".chart-container" class in the app.
+  await expect(page.locator("canvas")).toBeVisible({
     timeout: 10000,
   });
 
@@ -50,14 +59,19 @@ test("admin can log in, run a query, and use the admin screen", async ({
 test("scoped user can log in and run queries", async ({ page }) => {
   await login(page, scopedUser, scopedPassword);
 
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Explore Data" }),
+  ).toBeVisible();
 
-  // Test dashboard query functionality
-  await expect(page.getByRole("button", { name: "Run Query" })).toBeVisible();
+  // Test dashboard query functionality - phq9_1 is guaranteed to have data;
+  // other variables (e.g. bw_wbeing_1) exist in the form but were never seeded.
+  await page.getByRole("checkbox", { name: /phq9_1/ }).check();
+  await expect(page.getByRole("button", { name: "Run Query" })).toBeEnabled();
   await page.getByRole("button", { name: "Run Query" }).click();
 
-  // Wait for query results to appear
-  await expect(page.locator(".chart-container")).toBeVisible({
+  // Wait for query results to appear - ChartCard renders a <canvas> via
+  // svelte-chartjs, there is no ".chart-container" class in the app.
+  await expect(page.locator("canvas")).toBeVisible({
     timeout: 10000,
   });
 });

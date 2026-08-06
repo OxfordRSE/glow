@@ -99,7 +99,10 @@ def get_dimensions(
         # Get data scoped to this school
         dfwl = datastore.to_frozen()
         df = dfwl.df
-        df = df[df["school"] == school.name]
+        if "school" in df.columns:
+            df = df[df["school"] == school.name]
+        else:
+            df = df.iloc[0:0]  # no data loaded yet; nothing belongs to any school
     else:
         # Dataset-scoped query - use full dataset
         dfwl = datastore.to_frozen()

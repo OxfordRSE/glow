@@ -453,6 +453,7 @@ class TestDataStore:
         mock_client = MockODKClient(submissions_df=df, metadata={})
         ds = DataStore(odk_client=mock_client, refresh_hours=0)
         ds.startup()
+        assert ds._initial_load_complete.wait(timeout=5)
 
         results = []
         errors = []
@@ -496,8 +497,9 @@ class TestDataStore:
         # Verify data is not loaded yet
         assert ds._df.empty
 
-        # Startup should load data
+        # Startup schedules the initial refresh in the background (non-blocking)
         ds.startup()
+        assert ds._initial_load_complete.wait(timeout=5)
         assert not ds._df.empty
         assert len(ds._df) == 1
 
@@ -519,10 +521,11 @@ class TestDataStore:
         ds = DataStore(odk_client=mock_client, refresh_hours=0)
         ds.startup()
 
-        # Verify data is loaded
+        # Verify data is loaded once the background refresh completes
+        assert ds._initial_load_complete.wait(timeout=5)
         assert not ds._df.empty
 
-        # Verify scheduler is not running
+        # Verify scheduler is not running (no recurring job scheduled)
         assert not ds._scheduler.running
 
     def test_startup_odk_error_logs_warning_and_keeps_empty_dataframe(
@@ -545,6 +548,7 @@ class TestDataStore:
 
         ds.startup()
 
+        assert ds._initial_load_complete.wait(timeout=5)
         assert ds._df.empty
         assert len(warnings) == 1
         assert (
@@ -594,6 +598,51 @@ class TestDataStore:
             cached_df, cached_etags = cached
             assert len(cached_df) == 2
             assert cached_etags == {"bewell_questionnaire": "test-etag"}
+
+    def test_startup_from_cache_populates_whitelists(self):
+        """Startup loading from cache must populate whitelists, not just the DataFrame.
+
+        Regression test: previously only a live ODK refresh called
+        _extract_whitelists/_compute_observed_periods, so a cache-only startup
+        left numerical/categorical whitelists empty and /dimensions returned nothing.
+        """
+        df = pd.DataFrame(
+            {
+                "uid": ["S001", "S002"],
+                "wave": [1, 1],
+                "school": ["School A", "School A"],
+                "sex": ["M", "F"],
+                "bw_wbeing_1": [3, 4],
+                "bw_wbeing_2": [4, 3],
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "cache.parquet"
+
+            mock_client = MockODKClient(
+                submissions_df=df, metadata={}, etag="test-etag"
+            )
+            ds = DataStore(
+                odk_client=mock_client, refresh_hours=0, cache_path=cache_path
+            )
+            ds._load()  # populates cache on disk
+
+            # Simulate a fresh process starting up with ODK unreachable: cache
+            # loads, but the scheduled refresh job fails, so only cache data is used.
+            class ErrorODKClient(MockODKClient):
+                def fetch_submissions(self, etags=None):
+                    raise RuntimeError("ODK Central connection failed")
+
+            ds2 = DataStore(
+                odk_client=ErrorODKClient(), refresh_hours=0, cache_path=cache_path
+            )
+            ds2.startup()
+
+            assert not ds2._df.empty
+            assert ds2._numerical_whitelist, "numerical whitelist empty after cache load"
+            assert ds2._categorical_whitelist, "categorical whitelist empty after cache load"
+            assert ds2._observed_periods, "observed periods empty after cache load"
 
     def test_load_from_multiple_forms(self):
         """Test loading and materializing submissions across multiple forms."""
@@ -758,6 +807,41 @@ class TestDataStore:
         assert materialized.loc[0, "d_sex"] == "F"
         assert materialized.loc[0, "bewell_questionnaire__bw_wbeing_1"] == 3
         assert materialized.loc[0, "phq9_questionnaire__phq9_1"] == 2
+
+    def test_collapse_latest_non_null_picks_latest_competing_value(self):
+        """Test that a column with multiple non-null candidates in a group
+        takes the value from the most recent createdAt, and a column that
+        doesn't exist in the input is filled with None."""
+        df = pd.DataFrame(
+            {
+                "uid": ["a", "a", "a", "b"],
+                "createdAt": pd.to_datetime(
+                    [
+                        "2024-01-01T10:00:00Z",  # a, earliest
+                        "2024-01-03T10:00:00Z",  # a, latest
+                        "2024-01-02T10:00:00Z",  # a, middle
+                        "2024-01-01T10:00:00Z",  # b, only row
+                    ],
+                    utc=True,
+                ),
+                "x": [1, None, 5, 9],
+                "y": [None, "late", "mid", "solo"],
+            }
+        )
+
+        collapsed = DataStore._collapse_latest_non_null(
+            df, group_keys=["uid"], value_columns=["x", "y", "missing_col"]
+        )
+        collapsed = collapsed.set_index("uid")
+
+        # x: latest row (a) has x=None, so the next-latest non-null (5) wins.
+        assert collapsed.loc["a", "x"] == 5
+        # y: latest row (a) already has a non-null value ("late"), so it wins.
+        assert collapsed.loc["a", "y"] == "late"
+        assert collapsed.loc["b", "x"] == 9
+        assert collapsed.loc["b", "y"] == "solo"
+        assert collapsed.loc["a", "missing_col"] is None
+        assert collapsed.loc["b", "missing_col"] is None
 
 
 class TestDataStoreIntegration:

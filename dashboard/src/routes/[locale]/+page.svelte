@@ -51,7 +51,7 @@
         
         // Pre-select user's first school if available
         if ($currentSchools && $currentSchools.length > 0) {
-          selectedSchoolId = Number($currentSchools[0]);
+          selectedSchoolId = $currentSchools[0].id;
         } else if (schools.length > 0) {
           selectedSchoolId = schools[0].id;
         }

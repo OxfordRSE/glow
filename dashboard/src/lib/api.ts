@@ -1,5 +1,7 @@
 // Can be overridden by setting PUBLIC_API_BASE env var (e.g. http://localhost:8000)
-const API_BASE = import.meta.env.PUBLIC_API_BASE ?? "/api";
+import { env } from "$env/dynamic/public";
+
+const API_BASE = env.PUBLIC_API_BASE ?? "/api";
 
 // Target backend version - update this when making breaking changes to API surface
 export const TARGET_BACKEND_VERSION = "0.1.0";
