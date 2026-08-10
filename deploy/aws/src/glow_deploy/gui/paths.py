@@ -10,6 +10,7 @@ filesystem location, so templates/static must be looked up relative to
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 
 _GUI_DIR = Path(__file__).resolve().parent
@@ -20,3 +21,7 @@ def gui_dir() -> Path:
     if frozen_meipass:
         return Path(frozen_meipass) / "glow_deploy" / "gui"
     return _GUI_DIR
+
+
+def log_file() -> Path:
+    return Path(tempfile.gettempdir()) / "glow-deploy-gui.log"

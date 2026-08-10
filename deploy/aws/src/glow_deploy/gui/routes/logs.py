@@ -7,13 +7,18 @@ via SSM (see core.get_runner_status).
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
 from glow_deploy import core
 from glow_deploy.errors import DeployError
 from glow_deploy.gui.deps import find_deployment, require_session
+from glow_deploy.gui.paths import log_file
 from glow_deploy.gui.templating import templates
+
+logger = logging.getLogger("glow_deploy.gui")
 
 router = APIRouter()
 
@@ -28,7 +33,12 @@ def logs(request: Request, domain: str, session=Depends(require_session)):
             deployment["instance_id"], request.app.state.region, session
         )
     except DeployError as exc:
-        error = str(exc)
+        logger.error("Failed to fetch runner status for %s: %s", domain, exc, exc_info=exc)
+        error = (
+            "Couldn't reach the server to check its status. "
+            "It may still be starting up, or a service on it may be unhealthy. Try again shortly. "
+            f"(Details logged to {log_file()})"
+        )
 
     return templates.TemplateResponse(request, "deployment_logs.html", {"deployment": deployment, "status": status, "error": error},
     )

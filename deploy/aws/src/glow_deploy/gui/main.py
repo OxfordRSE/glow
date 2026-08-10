@@ -20,6 +20,7 @@ so two lifecycle gaps need covering by hand:
 from __future__ import annotations
 
 import json
+import logging
 import socket
 import sys
 import tempfile
@@ -31,6 +32,7 @@ from pathlib import Path
 import uvicorn
 
 from glow_deploy.gui.app import create_app
+from glow_deploy.gui.paths import log_file
 
 _HOST = "127.0.0.1"
 # Arbitrary fixed port bound purely as a single-instance mutex — the actual
@@ -102,6 +104,15 @@ def _watch_for_closed_tab(app, server: uvicorn.Server) -> None:
 
 
 def main() -> None:
+    # A frozen build has no visible console (see module docstring), so
+    # errors logged from route handlers would otherwise go to a stderr
+    # nobody can see. File the same messages here instead.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        filename=log_file(),
+    )
+
     lock_socket = _acquire_single_instance_lock()
     if lock_socket is None:
         _reopen_running_instance()
