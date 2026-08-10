@@ -41,7 +41,8 @@ async function poll(jobId: string): Promise<void> {
   if (statusEl) statusEl.textContent = job.status;
   // job.lines is pre-rendered HTML (ANSI colour codes turned into <span>s server-side).
   if (linesEl) linesEl.innerHTML = job.lines.join("\n");
-  if (errorEl) errorEl.textContent = job.error ?? "";
+  // job.error is pre-rendered HTML (ANSI colour codes turned into <span>s server-side).
+  if (errorEl) errorEl.innerHTML = job.error ?? "";
 
   if (job.status === "succeeded" || job.status === "failed") {
     // The terminal-state page (confirm form / "view deployment" link) is

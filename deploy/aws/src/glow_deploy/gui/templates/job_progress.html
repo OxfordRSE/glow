@@ -13,7 +13,7 @@
     <pre id="job-lines">{{ job.lines | join('\n') | safe }}</pre>
   </details>
 
-  {% if job.error %}<p id="job-error" class="alert" role="alert">{{ job.error }}</p>{% else %}<p id="job-error" hidden></p>{% endif %}
+  {% if job.error %}<p id="job-error" class="alert" role="alert">{{ job.error | safe }}</p>{% else %}<p id="job-error" hidden></p>{% endif %}
 
   {% if job.status == "succeeded" and job.meta.get("apply_action") %}
     <h2>Review</h2>

@@ -57,10 +57,10 @@ class JobManager:
             job.result = fn()
             job.status = "succeeded"
         except DeployError as exc:
-            job.error = str(exc)
+            job.error = ansi_to_html(str(exc))
             job.status = "failed"
         except Exception as exc:  # surface to the GUI instead of hanging the job forever
-            job.error = str(exc)
+            job.error = ansi_to_html(str(exc))
             job.status = "failed"
         finally:
             core.reset_progress_sink(token)
