@@ -54,6 +54,11 @@ The simplest way to deploy is using Docker Compose with profiles. Use `--profile
 
 #### Initial Provision
 
+If this AWS account hosts a public Route 53 hosted zone for the domain (or a parent of it), the ACM certificate and
+DNS records are created and validated automatically — no extra flags needed. Deploying on a domain hosted elsewhere
+(the common case when hosting on someone else's domain) requires an existing ACM certificate for it, passed via
+`--certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123`.
+
 **Using AWS SSO (for individual users):**
 
 ```bash
@@ -66,8 +71,7 @@ cd deploy/aws
 
 # Run deployment with SSO profile
 docker compose --profile sso run --rm deploy \
-  --domain eu.glow-project.org \
-  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+  --domain eu.glow-project.org
 ```
 
 **Using environment credentials (for CI or temporary credentials):**
@@ -77,8 +81,7 @@ cd deploy/aws
 
 # Run deployment with env profile
 docker compose --profile env run --rm deploy-env \
-  --domain eu.glow-project.org \
-  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+  --domain eu.glow-project.org
 ```
 
 Note: Ensure `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optionally `AWS_SESSION_TOKEN` are set in your
@@ -136,8 +139,7 @@ docker run --rm -it \
   -e AWS_REGION=eu-west-2 \
   -v "$HOME/.aws:/aws-host:ro" \
   glow-launcher \
-  --domain eu.glow-project.org \
-  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+  --domain eu.glow-project.org
 ```
 
 **Using environment credentials (for CI or temporary credentials):**
@@ -149,8 +151,7 @@ docker run --rm -it \
   -e AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
   -e AWS_REGION=eu-west-2 \
   glow-launcher \
-  --domain eu.glow-project.org \
-  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+  --domain eu.glow-project.org
 ```
 
 This will:
@@ -203,8 +204,7 @@ If you prefer to install dependencies locally:
 
 ```bash
 uv run --project deploy/aws glow-deploy \
-  --domain eu.glow-project.org \
-  --certificate-arn arn:aws:acm:eu-west-2:123456789012:certificate/abc123
+  --domain eu.glow-project.org
 ```
 
 #### Subsequent Updates
@@ -219,7 +219,7 @@ uv run --project deploy/aws glow-deploy \
 ### Command-Line Flags
 
 - `--domain` (required): deployment domain
-- `--certificate-arn`: ACM certificate ARN (if omitted, must exist in account)
+- `--certificate-arn`: existing ACM certificate ARN, required only when this account has no Route 53 hosted zone for the domain (or a parent of it)
 - `--git-ref`: git tag/branch/commit to deploy (default: main)
 - `--aws-region`: AWS region (default: eu-west-2 or AWS_REGION env var)
 - `--runner-instance-type`: EC2 instance type (default: t3.medium)
@@ -273,13 +273,15 @@ terraform init \
 ```
 
 **Variables** (all required except `runner_root_volume_size_gb`, which
-defaults to `100`):
+defaults to `100`, and `certificate_arn`/`hosted_zone_id`, of which exactly
+one should be set):
 
 | Variable | Meaning |
 | --- | --- |
 | `app_name` | Deployment name tag (matches CLI's `--app-name`, default `glow-core`) |
 | `aws_region` | AWS region |
-| `certificate_arn` | ACM certificate ARN for the ALB listener |
+| `hosted_zone_id` | Route 53 hosted zone ID to auto-manage the certificate and DNS in; leave unset if using `certificate_arn` |
+| `certificate_arn` | Existing ACM certificate ARN for the ALB listener; leave unset if using `hosted_zone_id` |
 | `domain_name` | Deployment domain |
 | `git_repo_url` | Git repository to check out on the runner |
 | `git_ref` | Branch/tag to record (informational — the actual checkout uses `git_checkout_ref`) |
@@ -347,7 +349,5 @@ AMI rebuilds are only needed for:
 
 ## Notes
 
-- DNS is assumed to be managed externally
-- ACM certificate must be issued before deployment
-- The deploy script prints DNS routing records for the external DNS owner
+- If this account has a public Route 53 hosted zone for the domain (or a parent of it), the ACM certificate and the dashboard/api/odk DNS records are created and validated automatically; otherwise pass `--certificate-arn` and manage DNS externally
 - Backups via AWS Backup or EBS snapshots are recommended

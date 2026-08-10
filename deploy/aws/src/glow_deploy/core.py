@@ -53,7 +53,6 @@ ProgressSink = Callable[[str, bool], None]
 @dataclass
 class Config:
     domain_name: str
-    certificate_arn: str
     git_repo_url: str
     git_ref: str
     git_commit: str
@@ -63,6 +62,7 @@ class Config:
     runner_root_volume_size_gb: int
     dry_run: bool
     force_rebuild_ami: bool
+    certificate_arn: str = ""
     session: boto3.Session | None = None
 
 
@@ -263,6 +263,36 @@ def ensure_state_bucket(
     return bucket_name
 
 
+def find_hosted_zone_id(
+    domain_name: str, region: str, session: boto3.Session | None = None
+) -> str | None:
+    """Find the public Route 53 hosted zone that owns ``domain_name``.
+
+    Walks up from the full domain to find the most specific public zone in
+    the account (so a zone for the parent domain is used when deploying a
+    subdomain of it), rather than requiring the exact domain to have its own
+    zone. Returns ``None`` when no such zone exists in the account (e.g. the
+    domain is hosted elsewhere), in which case a pasted-in certificate ARN
+    is required instead.
+    """
+    route53 = _client(session, "route53", region)
+    best_id: str | None = None
+    best_name_length = -1
+
+    paginator = route53.get_paginator("list_hosted_zones")
+    for page in paginator.paginate():
+        for zone in page["HostedZones"]:
+            if zone.get("Config", {}).get("PrivateZone"):
+                continue
+            zone_name = zone["Name"].rstrip(".")
+            if domain_name == zone_name or domain_name.endswith(f".{zone_name}"):
+                if len(zone_name) > best_name_length:
+                    best_name_length = len(zone_name)
+                    best_id = zone["Id"].rsplit("/", 1)[-1]
+
+    return best_id
+
+
 def terraform_init(
     bucket: str, region: str, session: boto3.Session | None = None
 ) -> None:
@@ -292,9 +322,28 @@ def read_terraform_outputs(env: dict[str, str] | None = None) -> dict[str, Any]:
 
 def terraform_apply(config: Config, ami_id: str) -> dict[str, Any]:
     """Apply Terraform configuration."""
+    # A pasted certificate ARN always wins: it's how someone hosting on a
+    # domain outside this AWS account opts out of auto-DNS, even if this
+    # account happens to also have a matching hosted zone.
+    hosted_zone_id = ""
+    if not config.certificate_arn:
+        hosted_zone_id = find_hosted_zone_id(
+            config.domain_name, config.aws_region, config.session
+        )
+        if hosted_zone_id:
+            write_line(f"[deploy] Using Route 53 hosted zone: {hosted_zone_id}")
+        else:
+            raise DeployError(
+                f"no public Route 53 hosted zone found for {config.domain_name!r} "
+                "in this account, and no certificate ARN was provided. Either "
+                "host this domain's DNS here, or paste an existing ACM "
+                "certificate ARN for it."
+            )
+
     tfvars = {
         "app_name": config.app_name,
         "aws_region": config.aws_region,
+        "hosted_zone_id": hosted_zone_id,
         "certificate_arn": config.certificate_arn,
         "domain_name": config.domain_name,
         "git_ref": config.git_ref,
@@ -790,12 +839,14 @@ def update(config: Config) -> None:
 def destroy(config: Config) -> None:
     """Tear down all Terraform-managed infrastructure for a deployment.
 
-    Only certificate_arn is read back from the deployment's own state (it's
-    a terraform output); app_name/runner_instance_type/
-    runner_root_volume_size_gb/runner_ami_id only affect resource naming and
-    tags here, not resource identity (no count/for_each keyed on them), so
-    a destroy plan deletes the real resources by their state addresses
-    regardless of these placeholder values.
+    app_name/runner_instance_type/runner_root_volume_size_gb/runner_ami_id
+    only affect resource naming and tags here, not resource identity, so a
+    destroy plan deletes the real resources by their state addresses
+    regardless of these placeholder values. hosted_zone_id/certificate_arn
+    do gate which resources exist in config (the auto-DNS vs. pasted-cert
+    path), but ``terraform destroy`` tears down everything already in state
+    regardless of what the current config would create, so placeholders are
+    safe here too.
     """
     write_line(f"[deploy] Destroying {config.domain_name}")
 
@@ -805,15 +856,12 @@ def destroy(config: Config) -> None:
     terraform_init(bucket, config.aws_region, config.session)
 
     env = _subprocess_env(config.session)
-    try:
-        certificate_arn = read_terraform_outputs(env=env).get("certificate_arn") or config.certificate_arn
-    except DeployError:
-        certificate_arn = config.certificate_arn
 
     tfvars = {
         "app_name": config.app_name,
         "aws_region": config.aws_region,
-        "certificate_arn": certificate_arn,
+        "hosted_zone_id": "",
+        "certificate_arn": "",
         "domain_name": config.domain_name,
         "git_ref": config.git_ref,
         "git_repo_url": config.git_repo_url,
@@ -852,7 +900,15 @@ def destroy(config: Config) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--domain", required=True, dest="domain_name")
-    parser.add_argument("--certificate-arn", default="")
+    parser.add_argument(
+        "--certificate-arn",
+        default="",
+        help=(
+            "Existing ACM certificate ARN, required only when this AWS "
+            "account has no Route 53 hosted zone for the domain (or a "
+            "parent of it)"
+        ),
+    )
     parser.add_argument("--git-ref", default="")
     parser.add_argument("--git-repo-url", default=DEFAULT_GIT_REPO_URL)
     parser.add_argument(

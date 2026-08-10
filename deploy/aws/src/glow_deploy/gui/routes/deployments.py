@@ -10,7 +10,7 @@ hidden inputs.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from glow_deploy import core, github_api
 from glow_deploy.errors import DeployError
@@ -40,6 +40,22 @@ def new_deployment_form(request: Request, _session=Depends(require_session)):
             },
         },
     )
+
+
+@router.get("/deployments/check-domain")
+def check_domain(request: Request, domain: str, session=Depends(require_session)):
+    """Report whether ``domain`` can have its certificate/DNS auto-managed.
+
+    Polled by the new-deployment form's JS to decide whether to show the
+    "Certificate ARN" field or a "this domain can be configured
+    automatically" notice instead.
+    """
+    zone_id = None
+    if domain:
+        zone_id = core.find_hosted_zone_id(
+            domain, request.app.state.region, session
+        )
+    return JSONResponse({"auto": zone_id is not None})
 
 
 @router.post("/deployments/new/plan", response_class=HTMLResponse)
@@ -156,7 +172,6 @@ def update_plan(
 
     config_fields = dict(
         domain_name=domain,
-        certificate_arn="",
         git_repo_url=git_repo_url,
         git_ref=git_ref,
         git_commit=git_commit,
@@ -185,7 +200,6 @@ def update_apply(
     domain: str,
     session=Depends(require_session),
     domain_name: str = Form(...),
-    certificate_arn: str = Form(""),
     git_repo_url: str = Form(...),
     git_ref: str = Form(...),
     git_commit: str = Form(...),
@@ -199,7 +213,6 @@ def update_apply(
         session=session,
         dry_run=False,
         domain_name=domain_name,
-        certificate_arn=certificate_arn,
         git_repo_url=git_repo_url,
         git_ref=git_ref,
         git_commit=git_commit,
@@ -223,12 +236,6 @@ def destroy(request: Request, domain: str, session=Depends(require_session)):
         session=session,
         dry_run=False,
         domain_name=domain,
-        # certificate_arn is re-read from the deployment's own terraform
-        # state in core.destroy() — the rest only affect resource naming/
-        # tags, not resource identity, so placeholders are safe for tearing
-        # down infrastructure that already exists (same reasoning the
-        # update flow above already relies on).
-        certificate_arn="",
         git_repo_url=core.DEFAULT_GIT_REPO_URL,
         git_ref=deployment.get("git_ref") or "",
         git_commit=deployment.get("git_commit") or "",

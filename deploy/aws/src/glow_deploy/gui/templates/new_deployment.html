@@ -6,11 +6,15 @@
 
   <form method="post" action="/deployments/new/plan" class="card">
     <label>Domain
-      <input type="text" name="domain" required placeholder="example.com">
+      <input type="text" name="domain" id="domain-input" required placeholder="example.com">
     </label>
-    <label>Certificate ARN
-      <input type="text" name="certificate_arn">
-    </label>
+    <p id="auto-dns-notice" class="text-muted" hidden>✓ This domain can be configured automatically by your AWS account (certificate + DNS via Route 53).</p>
+    <div id="cert-arn-field">
+      <label>Certificate ARN
+        <input type="text" name="certificate_arn" id="certificate-arn-input">
+      </label>
+      <p class="text-muted">Only needed if this AWS account doesn't host the domain's DNS — paste an existing ACM certificate ARN for it instead.</p>
+    </div>
     <label>Git repository URL
       <input type="url" name="git_repo_url" value="{{ defaults.git_repo_url }}" required>
     </label>
@@ -32,4 +36,5 @@
     <label><input type="checkbox" name="force_rebuild_ami" value="true"> Force rebuild AMI</label>
     <button type="submit" class="button">Start deployment</button>
   </form>
+  <script type="module" src="/static/js/domain-check.js"></script>
 {% endblock %}

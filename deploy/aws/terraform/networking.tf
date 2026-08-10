@@ -121,6 +121,72 @@ resource "aws_lb_target_group" "dashboard" {
   tags = local.tags
 }
 
+locals {
+  # A hosted zone was found in this account for the domain (or a parent of
+  # it): the certificate and DNS records can be fully managed here. Without
+  # one (domain hosted elsewhere), fall back to a pasted-in certificate ARN
+  # and leave DNS to whoever owns that domain.
+  auto_dns        = var.hosted_zone_id != ""
+  certificate_arn = local.auto_dns ? try(one(values(aws_acm_certificate_validation.main)).certificate_arn, "") : var.certificate_arn
+}
+
+resource "aws_acm_certificate" "main" {
+  for_each = local.auto_dns ? toset(["main"]) : toset([])
+
+  domain_name       = var.domain_name
+  validation_method = "DNS"
+
+  subject_alternative_names = [
+    "api.${var.domain_name}",
+    "odk.${var.domain_name}",
+  ]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = local.tags
+}
+
+resource "aws_route53_record" "cert_validation" {
+  for_each = {
+    for dvo in try(one(values(aws_acm_certificate.main)).domain_validation_options, []) : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      record = dvo.resource_record_value
+    }
+  }
+
+  zone_id         = var.hosted_zone_id
+  name            = each.value.name
+  type            = each.value.type
+  records         = [each.value.record]
+  ttl             = 60
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "main" {
+  for_each = local.auto_dns ? toset(["main"]) : toset([])
+
+  certificate_arn         = one(values(aws_acm_certificate.main)).arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
+
+resource "aws_route53_record" "app" {
+  for_each = local.auto_dns ? toset(["", "api.", "odk."]) : toset([])
+
+  zone_id         = var.hosted_zone_id
+  name            = "${each.key}${var.domain_name}"
+  type            = "A"
+  allow_overwrite = true
+
+  alias {
+    name                   = aws_lb.main.dns_name
+    zone_id                = aws_lb.main.zone_id
+    evaluate_target_health = true
+  }
+}
+
 resource "aws_lb_target_group" "odk" {
   name        = "${var.app_name}-odk-tg"
   port        = 8080
@@ -159,7 +225,7 @@ resource "aws_lb_listener" "https" {
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = var.certificate_arn
+  certificate_arn   = local.certificate_arn
 
   default_action {
     type = "fixed-response"

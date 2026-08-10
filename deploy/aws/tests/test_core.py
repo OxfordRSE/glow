@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -228,6 +229,97 @@ def test_list_deployments_maps_tags_from_terraform_managed_instances(monkeypatch
         "Name": "tag:Component",
         "Values": ["glow-runner"],
     }
+
+
+class _FakeRoute53Client:
+    def __init__(self, zones):
+        self._zones = zones
+
+    def get_paginator(self, operation_name):
+        assert operation_name == "list_hosted_zones"
+        return self
+
+    def paginate(self):
+        yield {"HostedZones": self._zones}
+
+
+def _zone(name, zone_id, private=False):
+    return {
+        "Name": name,
+        "Id": f"/hostedzone/{zone_id}",
+        "Config": {"PrivateZone": private},
+    }
+
+
+def test_find_hosted_zone_id_picks_the_most_specific_matching_zone(monkeypatch):
+    fake_route53 = _FakeRoute53Client(
+        [_zone("oxrse.uk.", "Z_PARENT"), _zone("glow.oxrse.uk.", "Z_CHILD")]
+    )
+    monkeypatch.setattr(core, "_client", lambda session, service, region: fake_route53)
+
+    assert core.find_hosted_zone_id("glow.oxrse.uk", "eu-west-2") == "Z_CHILD"
+
+
+def test_find_hosted_zone_id_falls_back_to_a_parent_zone(monkeypatch):
+    fake_route53 = _FakeRoute53Client([_zone("oxrse.uk.", "Z_PARENT")])
+    monkeypatch.setattr(core, "_client", lambda session, service, region: fake_route53)
+
+    assert core.find_hosted_zone_id("glow.oxrse.uk", "eu-west-2") == "Z_PARENT"
+
+
+def test_find_hosted_zone_id_ignores_private_zones(monkeypatch):
+    fake_route53 = _FakeRoute53Client([_zone("oxrse.uk.", "Z_PRIVATE", private=True)])
+    monkeypatch.setattr(core, "_client", lambda session, service, region: fake_route53)
+
+    assert core.find_hosted_zone_id("glow.oxrse.uk", "eu-west-2") is None
+
+
+def test_find_hosted_zone_id_returns_none_for_an_unrelated_domain(monkeypatch):
+    fake_route53 = _FakeRoute53Client([_zone("example.com.", "Z_OTHER")])
+    monkeypatch.setattr(core, "_client", lambda session, service, region: fake_route53)
+
+    assert core.find_hosted_zone_id("glow.oxrse.uk", "eu-west-2") is None
+
+
+def test_terraform_apply_requires_a_hosted_zone_or_a_pasted_certificate_arn(
+    monkeypatch,
+):
+    monkeypatch.setattr(core, "find_hosted_zone_id", lambda domain, region, session=None: None)
+    config = _make_config(domain_name="example.com", certificate_arn="")
+
+    with pytest.raises(core.DeployError, match="no public Route 53 hosted zone"):
+        core.terraform_apply(config, "ami-12345678")
+
+
+def test_terraform_apply_prefers_a_pasted_certificate_arn_over_auto_dns(monkeypatch):
+    """A pasted ARN is how someone hosting on another registrar's domain opts
+    out of auto-DNS — it must win even if this account also has a matching
+    hosted zone, and the lookup should be skipped entirely (no AWS call)."""
+    lookup_calls = []
+    monkeypatch.setattr(
+        core,
+        "find_hosted_zone_id",
+        lambda domain, region, session=None: lookup_calls.append(domain) or "Z_FOUND",
+    )
+    monkeypatch.setattr(core.binaries, "terraform_binary", lambda: "terraform")
+
+    captured_tfvars = {}
+
+    def fake_run_command(args, **kwargs):
+        tfvars_path = next(a for a in args if a.startswith("-var-file=")).split("=", 1)[1]
+        captured_tfvars.update(json.loads(Path(tfvars_path).read_text()))
+        return SimpleNamespace(stdout="plan output")
+
+    monkeypatch.setattr(core, "run_command", fake_run_command)
+
+    config = _make_config(
+        domain_name="example.com", certificate_arn="arn:aws:acm:...", dry_run=True
+    )
+    core.terraform_apply(config, "ami-12345678")
+
+    assert lookup_calls == []
+    assert captured_tfvars["hosted_zone_id"] == ""
+    assert captured_tfvars["certificate_arn"] == "arn:aws:acm:..."
 
 
 # ---------------------------------------------------------------------------
@@ -476,7 +568,6 @@ def test_get_git_ref_script_reads_runner_environment_file():
 def _make_config(**overrides) -> core.Config:
     defaults = dict(
         domain_name="example.com",
-        certificate_arn="",
         git_repo_url="https://example.com/glow.git",
         git_ref="main",
         git_commit="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",

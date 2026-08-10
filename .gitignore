@@ -252,5 +252,6 @@ data/*
 
 .agents/*
 .opencode/*
+.claude/
 .github/copilot-instructions.md
 skills-lock.json

@@ -251,7 +251,6 @@ def test_new_deployment_plan_then_apply_provisions(client, monkeypatch):
         "/deployments/new/plan",
         data={
             "domain": "example.com",
-            "certificate_arn": "arn:aws:acm:...",
             "git_repo_url": "https://github.com/OxfordRSE/glow.git",
             "git_ref": "main",
             "aws_region": "eu-west-2",
@@ -277,7 +276,6 @@ def test_new_deployment_plan_then_apply_provisions(client, monkeypatch):
         "/deployments/new/apply",
         data={
             "domain_name": "example.com",
-            "certificate_arn": "arn:aws:acm:...",
             "git_repo_url": "https://github.com/OxfordRSE/glow.git",
             "git_ref": "main",
             "git_commit": "c" * 40,
@@ -318,6 +316,30 @@ def test_new_deployment_plan_surfaces_git_ref_errors(client, monkeypatch):
 
     assert response.status_code == 200
     assert "ref not found" in response.text
+
+
+def test_check_domain_reports_true_when_a_hosted_zone_is_found(client, monkeypatch):
+    _sign_in(client)
+    monkeypatch.setattr(
+        core, "find_hosted_zone_id", lambda domain, region, session=None: "Z_FOUND"
+    )
+
+    response = client.get("/deployments/check-domain", params={"domain": "glow.oxrse.uk"})
+
+    assert response.status_code == 200
+    assert response.json() == {"auto": True}
+
+
+def test_check_domain_reports_false_when_no_hosted_zone_is_found(client, monkeypatch):
+    _sign_in(client)
+    monkeypatch.setattr(
+        core, "find_hosted_zone_id", lambda domain, region, session=None: None
+    )
+
+    response = client.get("/deployments/check-domain", params={"domain": "example.com"})
+
+    assert response.status_code == 200
+    assert response.json() == {"auto": False}
 
 
 # ---------------------------------------------------------------------------

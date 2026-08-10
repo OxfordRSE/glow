@@ -5,3 +5,8 @@ export interface JobStatus {
   lines: string[];
   error: string | null;
 }
+
+// Mirrors the JSON shape returned by GET /deployments/check-domain.
+export interface DomainCheckResult {
+  auto: boolean;
+}

@@ -7,7 +7,7 @@ output "runner_instance_id" {
 }
 
 output "certificate_arn" {
-  value = var.certificate_arn
+  value = local.certificate_arn
 }
 
 output "dashboard_url" {

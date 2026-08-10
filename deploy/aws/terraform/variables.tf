@@ -6,8 +6,14 @@ variable "aws_region" {
   type = string
 }
 
+variable "hosted_zone_id" {
+  type    = string
+  default = ""
+}
+
 variable "certificate_arn" {
-  type = string
+  type    = string
+  default = ""
 }
 
 variable "domain_name" {
