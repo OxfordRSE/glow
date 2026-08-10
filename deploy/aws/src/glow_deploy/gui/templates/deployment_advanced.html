@@ -10,4 +10,13 @@
     <dt>Git commit</dt><dd>{{ deployment.git_commit }}</dd>
     <dt>Launch time</dt><dd>{{ deployment.launch_time }}</dd>
   </dl>
+
+  <div class="danger-zone">
+    <h2>Danger zone</h2>
+    <p>Permanently tears down all AWS infrastructure for this deployment (instance, load balancer, data). This cannot be undone.</p>
+    <form method="post" action="/deployments/{{ deployment.domain }}/destroy"
+          onsubmit="return confirm('Destroy {{ deployment.domain }}? This permanently deletes its AWS infrastructure and cannot be undone.')">
+      <button type="submit" class="button button-danger">Destroy deployment</button>
+    </form>
+  </div>
 {% endblock %}

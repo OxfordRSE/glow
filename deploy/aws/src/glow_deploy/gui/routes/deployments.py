@@ -214,3 +214,32 @@ def update_apply(
         meta={"kind": "update_apply", "domain": domain_name},
     )
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+
+@router.post("/deployments/{domain}/destroy", response_class=HTMLResponse)
+def destroy(request: Request, domain: str, session=Depends(require_session)):
+    deployment = find_deployment(request, domain)
+    config = core.Config(
+        session=session,
+        dry_run=False,
+        domain_name=domain,
+        # certificate_arn is re-read from the deployment's own terraform
+        # state in core.destroy() — the rest only affect resource naming/
+        # tags, not resource identity, so placeholders are safe for tearing
+        # down infrastructure that already exists (same reasoning the
+        # update flow above already relies on).
+        certificate_arn="",
+        git_repo_url=core.DEFAULT_GIT_REPO_URL,
+        git_ref=deployment.get("git_ref") or "",
+        git_commit=deployment.get("git_commit") or "",
+        aws_region=request.app.state.region,
+        app_name="glow-core",
+        runner_instance_type="",
+        runner_root_volume_size_gb=0,
+        force_rebuild_ami=False,
+    )
+    job_id = request.app.state.job_manager.submit(
+        lambda: core.destroy(config),
+        meta={"kind": "destroy_apply", "domain": domain},
+    )
+    return RedirectResponse(f"/jobs/{job_id}", status_code=303)

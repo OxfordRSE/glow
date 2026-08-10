@@ -787,6 +787,68 @@ def update(config: Config) -> None:
     write_line("[deploy] Update complete!")
 
 
+def destroy(config: Config) -> None:
+    """Tear down all Terraform-managed infrastructure for a deployment.
+
+    Only certificate_arn is read back from the deployment's own state (it's
+    a terraform output); app_name/runner_instance_type/
+    runner_root_volume_size_gb/runner_ami_id only affect resource naming and
+    tags here, not resource identity (no count/for_each keyed on them), so
+    a destroy plan deletes the real resources by their state addresses
+    regardless of these placeholder values.
+    """
+    write_line(f"[deploy] Destroying {config.domain_name}")
+
+    bucket = ensure_state_bucket(
+        config.aws_region, config.domain_name, config.session
+    )
+    terraform_init(bucket, config.aws_region, config.session)
+
+    env = _subprocess_env(config.session)
+    try:
+        certificate_arn = read_terraform_outputs(env=env).get("certificate_arn") or config.certificate_arn
+    except DeployError:
+        certificate_arn = config.certificate_arn
+
+    tfvars = {
+        "app_name": config.app_name,
+        "aws_region": config.aws_region,
+        "certificate_arn": certificate_arn,
+        "domain_name": config.domain_name,
+        "git_ref": config.git_ref,
+        "git_repo_url": config.git_repo_url,
+        "git_checkout_ref": config.git_commit,
+        "runner_ami_id": "ami-00000000000000000",
+        "runner_instance_type": config.runner_instance_type,
+        "runner_root_volume_size_gb": config.runner_root_volume_size_gb,
+    }
+
+    fd, tfvars_path = tempfile.mkstemp(suffix=".tfvars.json")
+    terraform = binaries.terraform_binary()
+    try:
+        Path(tfvars_path).write_text(json.dumps(tfvars, indent=2))
+
+        if config.dry_run:
+            result = run_command(
+                [terraform, "plan", "-destroy", f"-var-file={tfvars_path}"],
+                cwd=TERRAFORM_DIR,
+                env=env,
+            )
+            write_line(result.stdout)
+            return
+
+        run_command(
+            [terraform, "destroy", "-auto-approve", f"-var-file={tfvars_path}"],
+            cwd=TERRAFORM_DIR,
+            env=env,
+        )
+    finally:
+        os.close(fd)
+        Path(tfvars_path).unlink(missing_ok=True)
+
+    write_line(f"[deploy] {config.domain_name} destroyed")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--domain", required=True, dest="domain_name")
