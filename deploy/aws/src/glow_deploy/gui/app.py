@@ -7,19 +7,25 @@ SSO device-authorization attempt.
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 
-from fastapi import FastAPI
+from botocore.exceptions import ClientError
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
+from glow_deploy.errors import DeployError
 from glow_deploy.gui import secret_store, update_check, version
 from glow_deploy.gui.aws_auth import session_from_stored_credentials
 from glow_deploy.gui.jobs import JobManager
 from glow_deploy.gui.paths import gui_dir
 from glow_deploy.gui.routes import auth, deployments, heartbeat, jobs, logs
+from glow_deploy.gui.templating import templates
 
 _PROFILE = "default"
+
+logger = logging.getLogger("glow_deploy.gui")
 
 
 def create_app() -> FastAPI:
@@ -47,12 +53,44 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router)
     app.include_router(logs.router)
 
+    app.add_exception_handler(ClientError, _handle_client_error)
+    app.add_exception_handler(DeployError, _handle_deploy_error)
+    app.add_exception_handler(Exception, _handle_unexpected_error)
+
     # Skipped entirely for source/dev runs ("dev" has nothing to compare
     # against) — see version.py.
     if app.state.current_version != "dev":
         threading.Thread(target=_check_for_update, args=(app,), daemon=True).start()
 
     return app
+
+
+def _render_error(request: Request, message: str):
+    return templates.TemplateResponse(request, "error.html", {"message": message}, status_code=500)
+
+
+def _handle_client_error(request: Request, exc: ClientError):
+    """An AWS API call failed — most commonly the signed-in role lacking a
+    permission the tool needs (e.g. EC2 describe/SSM), which boto3 raises as
+    a bare ClientError with no route-level handling to turn it into a
+    friendly message."""
+    code = exc.response.get("Error", {}).get("Code", "Unknown")
+    logger.error("AWS request failed on %s %s: %s", request.method, request.url.path, exc, exc_info=exc)
+    return _render_error(
+        request,
+        f"AWS rejected this request ({code}). The signed-in role may be missing "
+        "a required permission — check with whoever manages your AWS account.",
+    )
+
+
+def _handle_deploy_error(request: Request, exc: DeployError):
+    logger.error("Deploy error on %s %s: %s", request.method, request.url.path, exc, exc_info=exc)
+    return _render_error(request, str(exc))
+
+
+def _handle_unexpected_error(request: Request, exc: Exception):
+    logger.error("Unhandled error on %s %s: %s", request.method, request.url.path, exc, exc_info=exc)
+    return _render_error(request, "Something went wrong. Please try again or restart the app.")
 
 
 def _check_for_update(app: FastAPI) -> None:

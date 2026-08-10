@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Error — Glow Deploy{% endblock %}
+{% block content %}
+  <h1>Something went wrong</h1>
+  <p class="alert" role="alert">{{ message }}</p>
+  <p><a href="/deployments">Back to deployments</a></p>
+{% endblock %}
