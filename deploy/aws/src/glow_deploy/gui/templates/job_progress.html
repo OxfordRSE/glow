@@ -23,9 +23,12 @@
       {% endfor %}
       <button type="submit" class="button">Confirm &amp; Deploy</button>
     </form>
+  {% elif job.status == "succeeded" and job.meta.get("kind") == "destroy_apply" %}
+    <p>{{ job.meta.domain }} destroyed.</p>
+    <p><a href="/deployments" class="button">Back to deployments</a></p>
   {% elif job.status == "succeeded" and job.meta.get("domain") %}
     <p><a href="/deployments/{{ job.meta.domain }}" class="button">View deployment</a></p>
   {% endif %}
 
-  <script type="module" src="/static/js/job-status.js"></script>
+  <script type="module" src="/static/js/job-status.js" data-status="{{ job.status }}"></script>
 {% endblock %}

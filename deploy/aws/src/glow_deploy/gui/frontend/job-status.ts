@@ -40,4 +40,8 @@ async function poll(jobId: string): Promise<void> {
 }
 
 const jobId = jobIdFromPath();
-if (jobId) void poll(jobId);
+const scriptEl = document.currentScript as HTMLScriptElement | null;
+const initialStatus = scriptEl?.dataset.status;
+// Terminal-state pages carry their own final render; polling here would
+// just reload the page again on every load, looping forever.
+if (jobId && initialStatus !== "succeeded" && initialStatus !== "failed") void poll(jobId);
