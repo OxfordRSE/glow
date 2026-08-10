@@ -39,7 +39,8 @@ async function poll(jobId: string): Promise<void> {
   const linesEl = document.getElementById("job-lines");
   const errorEl = document.getElementById("job-error");
   if (statusEl) statusEl.textContent = job.status;
-  if (linesEl) linesEl.textContent = job.lines.join("\n");
+  // job.lines is pre-rendered HTML (ANSI colour codes turned into <span>s server-side).
+  if (linesEl) linesEl.innerHTML = job.lines.join("\n");
   if (errorEl) errorEl.textContent = job.error ?? "";
 
   if (job.status === "succeeded" || job.status === "failed") {

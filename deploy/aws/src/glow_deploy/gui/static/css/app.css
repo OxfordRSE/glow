@@ -198,6 +198,75 @@ code {
   padding: 0.1rem 0.3rem;
 }
 
+.ansi-bold {
+  font-weight: 600;
+}
+
+.ansi-underline {
+  text-decoration: underline;
+}
+
+.ansi-fg-black,
+.ansi-fg-white {
+  color: var(--color-text);
+}
+
+.ansi-fg-red {
+  color: #cf222e;
+}
+
+.ansi-fg-green {
+  color: #116329;
+}
+
+.ansi-fg-yellow {
+  color: #9a6700;
+}
+
+.ansi-fg-blue {
+  color: #0969da;
+}
+
+.ansi-fg-magenta {
+  color: #8250df;
+}
+
+.ansi-fg-cyan {
+  color: #1b7c83;
+}
+
+.ansi-fg-bright-black {
+  color: var(--color-text-muted);
+}
+
+.ansi-fg-bright-red {
+  color: #e5534b;
+}
+
+.ansi-fg-bright-green {
+  color: #1a7f42;
+}
+
+.ansi-fg-bright-yellow {
+  color: #bf8700;
+}
+
+.ansi-fg-bright-blue {
+  color: #218bff;
+}
+
+.ansi-fg-bright-magenta {
+  color: #a475f9;
+}
+
+.ansi-fg-bright-cyan {
+  color: #3192aa;
+}
+
+.ansi-fg-bright-white {
+  color: var(--color-text);
+}
+
 dl {
   display: grid;
   grid-template-columns: max-content 1fr;

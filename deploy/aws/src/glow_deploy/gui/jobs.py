@@ -14,6 +14,7 @@ from typing import Any, Callable
 
 from glow_deploy.errors import DeployError
 from glow_deploy import core
+from glow_deploy.gui.ansi import ansi_to_html
 
 
 @dataclass
@@ -66,8 +67,9 @@ class JobManager:
 
     @staticmethod
     def _append_line(job: Job, message: str, inline: bool) -> None:
+        html_message = ansi_to_html(message)
         if inline and job.lines and job._last_inline:
-            job.lines[-1] = message
+            job.lines[-1] = html_message
         else:
-            job.lines.append(message)
+            job.lines.append(html_message)
         job._last_inline = inline
