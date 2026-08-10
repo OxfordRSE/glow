@@ -8,8 +8,8 @@
     <option name="env">
       <map />
     </option>
-    <option name="runType" value="SCRIPT" />
-    <option name="scriptOrModule" value="glow-deploy-gui" />
+    <option name="runType" value="MODULE" />
+    <option name="scriptOrModule" value="glow_deploy.gui.main" />
     <option name="uvArgs">
       <list>
         <option value="--directory" />

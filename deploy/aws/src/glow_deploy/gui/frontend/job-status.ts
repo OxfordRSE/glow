@@ -54,8 +54,10 @@ async function poll(jobId: string): Promise<void> {
 }
 
 const jobId = jobIdFromPath();
-const scriptEl = document.currentScript as HTMLScriptElement | null;
-const initialStatus = scriptEl?.dataset.status;
+// document.currentScript is always null for type="module" scripts, so the
+// initial status can't ride in via a dataset attribute on this script tag —
+// read it off the server-rendered status badge instead.
+const initialStatus = document.getElementById("job-status")?.textContent?.trim();
 // Terminal-state pages carry their own final render; polling here would
 // just reload the page again on every load, looping forever.
 if (jobId && initialStatus !== "succeeded" && initialStatus !== "failed") {
