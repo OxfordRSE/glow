@@ -5,7 +5,8 @@
 {% endblock %}
 {% block content %}
   <h1>Job {{ job.id }}</h1>
-  <p>Status: <span id="job-status" class="badge badge-{{ job.status }}">{{ job.status }}</span></p>
+  <p>Status: <span id="job-status" class="badge badge-{{ job.status }}">{{ job.status }}</span>
+    {% if job.status in ("pending", "running") %}<span id="job-elapsed" class="text-muted"></span>{% endif %}</p>
 
   <details open>
     <summary>Advanced / raw output</summary>

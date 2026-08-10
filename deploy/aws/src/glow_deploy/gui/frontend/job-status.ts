@@ -6,6 +6,20 @@ import { debugLog } from "./debug.js";
 
 const POLL_INTERVAL_MS = 1500;
 
+function startElapsedTimer(): void {
+  const el = document.getElementById("job-elapsed");
+  if (!el) return;
+  const startedAt = Date.now();
+  const tick = () => {
+    const totalSeconds = Math.floor((Date.now() - startedAt) / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    el.textContent = `(still running, ${minutes}:${String(seconds).padStart(2, "0")} elapsed)`;
+  };
+  tick();
+  window.setInterval(tick, 1000);
+}
+
 function jobIdFromPath(): string | null {
   const match = window.location.pathname.match(/^\/jobs\/([^/]+)$/);
   return match ? match[1] : null;
@@ -44,4 +58,7 @@ const scriptEl = document.currentScript as HTMLScriptElement | null;
 const initialStatus = scriptEl?.dataset.status;
 // Terminal-state pages carry their own final render; polling here would
 // just reload the page again on every load, looping forever.
-if (jobId && initialStatus !== "succeeded" && initialStatus !== "failed") void poll(jobId);
+if (jobId && initialStatus !== "succeeded" && initialStatus !== "failed") {
+  void poll(jobId);
+  startElapsedTimer();
+}
