@@ -10,3 +10,17 @@ export interface JobStatus {
 export interface DomainCheckResult {
   auto: boolean;
 }
+
+// Mirrors the JSON shape returned by GET /deployments/{domain}/logs/status.
+export interface RunnerStatusResult {
+  status: { health: string; git_ref: string; git_commit: string } | null;
+  error: string | null;
+  containers: Record<string, string[]> | null;
+  containers_error: string | null;
+}
+
+// Mirrors the JSON shape returned by GET /deployments/{domain}/logs/containers/{container}/tail.
+export interface ContainerTailResult {
+  lines: string[] | null;
+  error: string | null;
+}

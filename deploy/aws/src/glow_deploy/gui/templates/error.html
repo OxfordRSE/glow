@@ -3,5 +3,9 @@
 {% block content %}
   <h1>Something went wrong</h1>
   <p class="alert" role="alert">{{ message }}</p>
+  {% if signin_again %}
+  <p><a href="/signin">Sign in again</a></p>
+  {% else %}
   <p><a href="/deployments">Back to deployments</a></p>
+  {% endif %}
 {% endblock %}

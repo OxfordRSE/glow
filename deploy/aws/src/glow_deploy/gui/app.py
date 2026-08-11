@@ -25,6 +25,10 @@ from glow_deploy.gui.templating import templates
 
 _PROFILE = "default"
 
+# boto3 error codes AWS uses for a signed-in session that has aged out —
+# distinct from a role missing a permission, which is a different fix.
+_EXPIRED_CREDENTIAL_CODES = {"ExpiredToken", "RequestExpired", "ExpiredTokenException"}
+
 logger = logging.getLogger("glow_deploy.gui")
 
 
@@ -65,17 +69,27 @@ def create_app() -> FastAPI:
     return app
 
 
-def _render_error(request: Request, message: str):
-    return templates.TemplateResponse(request, "error.html", {"message": message}, status_code=500)
+def _render_error(request: Request, message: str, *, signin_again: bool = False, status_code: int = 500):
+    return templates.TemplateResponse(
+        request, "error.html", {"message": message, "signin_again": signin_again}, status_code=status_code
+    )
 
 
 def _handle_client_error(request: Request, exc: ClientError):
     """An AWS API call failed — most commonly the signed-in role lacking a
     permission the tool needs (e.g. EC2 describe/SSM), which boto3 raises as
     a bare ClientError with no route-level handling to turn it into a
-    friendly message."""
+    friendly message. A separate, common case is credentials that have aged
+    out (RequestExpired/ExpiredToken*) — that's not a permissions problem,
+    it's a "sign in again" prompt."""
     code = exc.response.get("Error", {}).get("Code", "Unknown")
     logger.error("AWS request failed on %s %s: %s", request.method, request.url.path, exc, exc_info=exc)
+    if code in _EXPIRED_CREDENTIAL_CODES:
+        request.app.state.session = None
+        secret_store.delete_credentials(_PROFILE)
+        return _render_error(
+            request, "Your AWS sign-in has expired.", signin_again=True, status_code=401
+        )
     return _render_error(
         request,
         f"AWS rejected this request ({code}). The signed-in role may be missing "

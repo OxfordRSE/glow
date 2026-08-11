@@ -11,6 +11,7 @@ from __future__ import annotations
 import time
 
 import pytest
+from botocore.exceptions import ClientError
 from starlette.testclient import TestClient
 
 from glow_deploy import core, github_api
@@ -232,6 +233,22 @@ def test_home_lists_deployments(client, monkeypatch):
     assert "example.com" in response.text
 
 
+def test_expired_credentials_prompt_signin_again(client, monkeypatch):
+    _sign_in(client)
+
+    def _raise(session, region):
+        raise ClientError({"Error": {"Code": "RequestExpired"}}, "DescribeInstances")
+
+    monkeypatch.setattr(core, "list_deployments", _raise)
+
+    response = client.get("/deployments")
+
+    assert response.status_code == 401
+    assert "expired" in response.text.lower()
+    assert 'href="/signin"' in response.text
+    assert client.app.state.session is None
+
+
 # ---------------------------------------------------------------------------
 # New deployment: plan -> apply
 # ---------------------------------------------------------------------------
@@ -437,11 +454,21 @@ def test_logs_route_surfaces_runner_status(client, monkeypatch):
             "git_commit": "a" * 40,
         },
     )
+    monkeypatch.setattr(
+        core,
+        "get_container_logs",
+        lambda instance_id, domain_name, region, session: {"glow-web-1": ["line one"]},
+    )
 
     response = client.get("/deployments/example.com/logs")
-
     assert response.status_code == 200
-    assert "ok" in response.text
+    assert "Checking server status" in response.text
+
+    status_response = client.get("/deployments/example.com/logs/status")
+    assert status_response.status_code == 200
+    body = status_response.json()
+    assert body["status"]["health"] == "ok"
+    assert body["containers"] == {"glow-web-1": ["line one"]}
 
 
 def test_logs_route_surfaces_deploy_errors(client, monkeypatch):
@@ -454,8 +481,51 @@ def test_logs_route_surfaces_deploy_errors(client, monkeypatch):
             DeployError("SSM offline")
         ),
     )
+    monkeypatch.setattr(
+        core,
+        "get_container_logs",
+        lambda instance_id, domain_name, region, session: (_ for _ in ()).throw(
+            DeployError("CloudWatch offline")
+        ),
+    )
 
-    response = client.get("/deployments/example.com/logs")
+    status_response = client.get("/deployments/example.com/logs/status")
+
+    assert status_response.status_code == 200
+    body = status_response.json()
+    assert "Couldn't reach the server" in body["error"]
+    assert "Couldn't fetch container logs" in body["containers_error"]
+
+
+def test_container_log_tail_route_returns_lines(client, monkeypatch):
+    _sign_in(client)
+    _stub_deployment(monkeypatch)
+    monkeypatch.setattr(
+        core,
+        "get_container_log_tail",
+        lambda instance_id, domain_name, container_name, region, session: ["new line"],
+    )
+
+    response = client.get("/deployments/example.com/logs/containers/glow-web-1/tail")
 
     assert response.status_code == 200
-    assert "SSM offline" in response.text
+    assert response.json() == {"lines": ["new line"], "error": None}
+
+
+def test_container_log_tail_route_surfaces_deploy_errors(client, monkeypatch):
+    _sign_in(client)
+    _stub_deployment(monkeypatch)
+    monkeypatch.setattr(
+        core,
+        "get_container_log_tail",
+        lambda instance_id, domain_name, container_name, region, session: (_ for _ in ()).throw(
+            DeployError("CloudWatch offline")
+        ),
+    )
+
+    response = client.get("/deployments/example.com/logs/containers/glow-web-1/tail")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["lines"] is None
+    assert "Couldn't fetch logs for glow-web-1" in body["error"]

@@ -149,18 +149,15 @@ resource "aws_acm_certificate" "main" {
 }
 
 resource "aws_route53_record" "cert_validation" {
-  for_each = {
-    for dvo in try(one(values(aws_acm_certificate.main)).domain_validation_options, []) : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      record = dvo.resource_record_value
-    }
-  }
+  # Keys must be statically known at plan time, so derive them from the
+  # domain names we already know (not from the certificate's
+  # domain_validation_options, which is unknown until apply).
+  for_each = local.auto_dns ? toset([var.domain_name, "api.${var.domain_name}", "odk.${var.domain_name}"]) : toset([])
 
   zone_id         = var.hosted_zone_id
-  name            = each.value.name
-  type            = each.value.type
-  records         = [each.value.record]
+  name            = one([for dvo in one(values(aws_acm_certificate.main)).domain_validation_options : dvo.resource_record_name if dvo.domain_name == each.key])
+  type            = one([for dvo in one(values(aws_acm_certificate.main)).domain_validation_options : dvo.resource_record_type if dvo.domain_name == each.key])
+  records         = [one([for dvo in one(values(aws_acm_certificate.main)).domain_validation_options : dvo.resource_record_value if dvo.domain_name == each.key])]
   ttl             = 60
   allow_overwrite = true
 }

@@ -293,6 +293,63 @@ def find_hosted_zone_id(
     return best_id
 
 
+def find_conflicting_dns_records(
+    hosted_zone_id: str,
+    domain_name: str,
+    region: str,
+    session: boto3.Session | None = None,
+) -> list[dict]:
+    """Find existing records at the app hostnames that aren't A records.
+
+    We own this hosted zone, so a leftover CNAME (or other record type) at
+    glow.example.com / api.example.com / odk.example.com from a previous
+    deploy or manual setup shouldn't permanently block us from pointing it at
+    the ALB — but Route 53 UPSERT can't change a record's type in place, so
+    the old record needs to be deleted first, and the caller decides whether
+    that's OK. Returns the raw record sets (as needed to delete them).
+    """
+    route53 = _client(session, "route53", region)
+    conflicts = []
+
+    for prefix in ("", "api.", "odk."):
+        name = f"{prefix}{domain_name}"
+        response = route53.list_resource_record_sets(
+            HostedZoneId=hosted_zone_id,
+            StartRecordName=name,
+            MaxItems="1",
+        )
+        record_sets = response["ResourceRecordSets"]
+        if not record_sets:
+            continue
+        record = record_sets[0]
+        if record["Name"].rstrip(".") == name and record["Type"] != "A":
+            conflicts.append(record)
+
+    return conflicts
+
+
+def delete_dns_records(
+    hosted_zone_id: str,
+    records: list[dict],
+    region: str,
+    session: boto3.Session | None = None,
+) -> None:
+    """Delete the given Route 53 record sets, as found by ``find_conflicting_dns_records``."""
+    route53 = _client(session, "route53", region)
+
+    for record in records:
+        write_line(
+            f"[deploy] Removing conflicting {record['Type']} record at "
+            f"{record['Name'].rstrip('.')}"
+        )
+        route53.change_resource_record_sets(
+            HostedZoneId=hosted_zone_id,
+            ChangeBatch={
+                "Changes": [{"Action": "DELETE", "ResourceRecordSet": record}]
+            },
+        )
+
+
 def terraform_init(
     bucket: str, region: str, session: boto3.Session | None = None
 ) -> None:
@@ -326,12 +383,31 @@ def terraform_apply(config: Config, ami_id: str) -> dict[str, Any]:
     # domain outside this AWS account opts out of auto-DNS, even if this
     # account happens to also have a matching hosted zone.
     hosted_zone_id = ""
+    dns_conflicts: list[dict] = []
     if not config.certificate_arn:
         hosted_zone_id = find_hosted_zone_id(
             config.domain_name, config.aws_region, config.session
         )
         if hosted_zone_id:
             write_line(f"[deploy] Using Route 53 hosted zone: {hosted_zone_id}")
+            dns_conflicts = find_conflicting_dns_records(
+                hosted_zone_id, config.domain_name, config.aws_region, config.session
+            )
+            if dns_conflicts:
+                names = ", ".join(
+                    f"{r['Name'].rstrip('.')} ({r['Type']})" for r in dns_conflicts
+                )
+                write_line(
+                    f"[deploy] Existing DNS record(s) at {names} will be deleted "
+                    "and replaced with records pointing at this app"
+                )
+                if not config.dry_run:
+                    delete_dns_records(
+                        hosted_zone_id,
+                        dns_conflicts,
+                        config.aws_region,
+                        config.session,
+                    )
         else:
             raise DeployError(
                 f"no public Route 53 hosted zone found for {config.domain_name!r} "
@@ -367,7 +443,12 @@ def terraform_apply(config: Config, ami_id: str) -> dict[str, Any]:
                 env=env,
             )
             write_line(result.stdout)
-            return {}
+            return {
+                "dns_conflicts": [
+                    {"name": r["Name"].rstrip("."), "type": r["Type"]}
+                    for r in dns_conflicts
+                ]
+            }
 
         run_command(
             [terraform, "apply", "-auto-approve", f"-var-file={tfvars_path}"],
@@ -660,6 +741,78 @@ def get_runner_status(
     }
 
 
+def get_container_logs(
+    instance_id: str,
+    domain_name: str,
+    region: str,
+    session: boto3.Session | None = None,
+    max_lines: int = 200,
+) -> dict[str, list[str]]:
+    """Fetch recent container logs from CloudWatch, grouped by container name.
+
+    Containers ship logs to the group terraform creates at
+    ``/glow/<domain>/containers``, one log stream per container named
+    ``<instance_id>-<container_name>`` (the docker awslogs "tag" option in
+    runner-userdata.sh.tpl). Filters to this instance's streams and strips
+    the instance-id prefix to recover the container name.
+    """
+    from botocore.exceptions import ClientError
+
+    logs_client = _client(session, "logs", region)
+    log_group = f"/glow/{domain_name}/containers"
+    prefix = f"{instance_id}-"
+
+    try:
+        streams = []
+        paginator = logs_client.get_paginator("describe_log_streams")
+        for page in paginator.paginate(logGroupName=log_group, logStreamNamePrefix=prefix):
+            streams.extend(page["logStreams"])
+    except ClientError as exc:
+        raise DeployError(f"couldn't list container log streams: {exc}") from exc
+
+    result: dict[str, list[str]] = {}
+    for stream in streams:
+        stream_name = stream["logStreamName"]
+        container = stream_name[len(prefix):]
+        result[container] = _get_log_stream_messages(logs_client, log_group, stream_name, max_lines)
+    return result
+
+
+def get_container_log_tail(
+    instance_id: str,
+    domain_name: str,
+    container_name: str,
+    region: str,
+    session: boto3.Session | None = None,
+    max_lines: int = 200,
+) -> list[str]:
+    """Fetch the most recent lines from a single container's log stream.
+
+    For the GUI's per-container "tail" polling — cheaper than
+    get_container_logs since it skips the describe_log_streams call, going
+    straight to the deterministic stream name.
+    """
+    logs_client = _client(session, "logs", region)
+    log_group = f"/glow/{domain_name}/containers"
+    stream_name = f"{instance_id}-{container_name}"
+    return _get_log_stream_messages(logs_client, log_group, stream_name, max_lines)
+
+
+def _get_log_stream_messages(logs_client, log_group: str, stream_name: str, max_lines: int) -> list[str]:
+    from botocore.exceptions import ClientError
+
+    try:
+        events = logs_client.get_log_events(
+            logGroupName=log_group,
+            logStreamName=stream_name,
+            limit=max_lines,
+            startFromHead=False,
+        )["events"]
+    except ClientError as exc:
+        raise DeployError(f"couldn't read logs for stream {stream_name}: {exc}") from exc
+    return [event["message"] for event in events]
+
+
 def verify_alb_routing(alb_dns: str, domain_name: str) -> None:
     """Verify ALB routing works with Host headers."""
     import http.client
@@ -722,7 +875,7 @@ def list_deployments(
     return deployments
 
 
-def provision(config: Config) -> None:
+def provision(config: Config) -> dict[str, Any] | None:
     """Initial provision: build AMI, apply Terraform, activate stack."""
     write_line(f"[deploy] Provisioning {config.domain_name}")
     write_line(f"[deploy] Git reference: {config.git_ref} ({config.git_commit[:8]})")
@@ -754,7 +907,7 @@ def provision(config: Config) -> None:
 
     if config.dry_run:
         write_line("[deploy] Dry-run complete")
-        return
+        return outputs
 
     instance_id = outputs["runner_instance_id"]
     alb_dns = outputs["alb_dns_name"]

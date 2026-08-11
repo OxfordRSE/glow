@@ -7,7 +7,8 @@ output "runner_instance_id" {
 }
 
 output "certificate_arn" {
-  value = local.certificate_arn
+  value     = local.certificate_arn
+  sensitive = true
 }
 
 output "dashboard_url" {

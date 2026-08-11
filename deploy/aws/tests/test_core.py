@@ -349,6 +349,68 @@ def test_get_runner_status_aggregates_health_and_git_ref(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# get_container_logs
+# ---------------------------------------------------------------------------
+
+
+class _FakeLogsClient:
+    def __init__(self, streams, events_by_stream):
+        self._streams = streams
+        self._events_by_stream = events_by_stream
+        self.describe_calls = []
+        self.get_events_calls = []
+
+    def get_paginator(self, name):
+        assert name == "describe_log_streams"
+        return self
+
+    def paginate(self, **kwargs):
+        self.describe_calls.append(kwargs)
+        yield {"logStreams": self._streams}
+
+    def get_log_events(self, **kwargs):
+        self.get_events_calls.append(kwargs)
+        return {"events": self._events_by_stream[kwargs["logStreamName"]]}
+
+
+def test_get_container_logs_groups_by_container_name(monkeypatch):
+    streams = [
+        {"logStreamName": "i-1234567890-glow-web-1"},
+        {"logStreamName": "i-1234567890-glow-worker-1"},
+    ]
+    events_by_stream = {
+        "i-1234567890-glow-web-1": [{"message": "web line"}],
+        "i-1234567890-glow-worker-1": [{"message": "worker line"}],
+    }
+    fake_logs = _FakeLogsClient(streams, events_by_stream)
+    monkeypatch.setattr(core, "_client", lambda session, service, region: fake_logs)
+
+    result = core.get_container_logs("i-1234567890", "example.com", "eu-west-2")
+
+    assert result == {
+        "glow-web-1": ["web line"],
+        "glow-worker-1": ["worker line"],
+    }
+    assert fake_logs.describe_calls[0]["logGroupName"] == "/glow/example.com/containers"
+    assert fake_logs.describe_calls[0]["logStreamNamePrefix"] == "i-1234567890-"
+
+
+def test_get_container_log_tail_reads_single_stream_directly(monkeypatch):
+    fake_logs = _FakeLogsClient(
+        streams=[],
+        events_by_stream={"i-1234567890-glow-web-1": [{"message": "web line"}]},
+    )
+    monkeypatch.setattr(core, "_client", lambda session, service, region: fake_logs)
+
+    result = core.get_container_log_tail("i-1234567890", "example.com", "glow-web-1", "eu-west-2")
+
+    assert result == ["web line"]
+    assert fake_logs.describe_calls == []
+    assert fake_logs.get_events_calls[0]["logGroupName"] == "/glow/example.com/containers"
+    assert fake_logs.get_events_calls[0]["logStreamName"] == "i-1234567890-glow-web-1"
+
+
+# ---------------------------------------------------------------------------
 # SSM command helpers
 # ---------------------------------------------------------------------------
 

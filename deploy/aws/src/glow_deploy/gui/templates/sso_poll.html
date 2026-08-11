@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Sign in — Glow Deploy{% endblock %}
 {% block head %}
-  {% if not accounts %}<noscript><meta http-equiv="refresh" content="3"></noscript>{% endif %}
+  {% if not accounts %}<meta http-equiv="refresh" content="{{ device_auth.interval }}">{% endif %}
 {% endblock %}
 {% block content %}
   {% if error %}

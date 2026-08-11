@@ -65,4 +65,12 @@ const initialStatus = document.getElementById("job-status")?.textContent?.trim()
 if (jobId && initialStatus !== "succeeded" && initialStatus !== "failed") {
   void poll(jobId);
   startElapsedTimer();
+} else if (initialStatus === "succeeded") {
+  // Scroll after layout/paint settles (details/pre content, fonts) — doing it
+  // immediately on module load lets a late reflow cut the smooth-scroll short.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.querySelector(".button")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
 }

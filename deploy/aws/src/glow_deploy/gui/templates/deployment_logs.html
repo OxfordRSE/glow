@@ -4,13 +4,18 @@
   <h1>{{ deployment.domain }} — status</h1>
   <p class="links"><a href="/deployments/{{ deployment.domain }}">Back</a></p>
 
-  {% if error %}
-    <p class="alert" role="alert">{{ error }}</p>
-  {% elif status %}
-    <div class="card">
-      <p>Health:</p>
-      <pre>{{ status.health }}</pre>
-      <p>Deployed git ref: {{ status.git_ref }} ({{ status.git_commit }})</p>
-    </div>
-  {% endif %}
+  <p id="status-loading" class="text-muted">Checking server status…</p>
+  <p id="status-error" class="alert" role="alert" hidden></p>
+  <div id="status-card" class="card" hidden>
+    <p>Health:</p>
+    <pre id="status-health"></pre>
+    <p>Deployed git ref: <span id="status-git-ref"></span> (<span id="status-git-commit"></span>)</p>
+  </div>
+
+  <h2>Container logs</h2>
+  <p id="containers-loading" class="text-muted">Fetching container logs…</p>
+  <p id="containers-error" class="alert" role="alert" hidden></p>
+  <div id="containers-section"></div>
+
+  <script type="module" src="/static/js/deployment-logs.js"></script>
 {% endblock %}
