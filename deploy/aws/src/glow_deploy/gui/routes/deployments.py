@@ -23,6 +23,10 @@ router = APIRouter()
 @router.get("/deployments", response_class=HTMLResponse)
 def home(request: Request, session=Depends(require_session)):
     deployments = core.list_deployments(session, request.app.state.region)
+    running_ids = [d["instance_id"] for d in deployments if d["state"] == "running"]
+    cpu = core.get_cpu_utilization(running_ids, request.app.state.region, session)
+    for deployment in deployments:
+        deployment["cpu_percent"] = cpu.get(deployment["instance_id"])
     return templates.TemplateResponse(request, "home.html", {"deployments": deployments}
     )
 

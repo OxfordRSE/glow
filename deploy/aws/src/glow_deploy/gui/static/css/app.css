@@ -121,6 +121,28 @@ input[type="number"] {
   color: #fff;
 }
 
+.button-danger-ghost {
+  background: transparent;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.button-block {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.flex-3 {
+  flex: 3 1 0%;
+  text-align: center;
+}
+
+.flex-1 {
+  flex: 1 1 0%;
+  text-align: center;
+}
+
 .danger-zone {
   border: 1px solid var(--color-danger);
   border-radius: var(--radius);
@@ -289,6 +311,14 @@ dt {
   font-size: 1.5rem;
   font-weight: 600;
   letter-spacing: 0.05em;
+}
+
+#containers-section details {
+  margin-bottom: var(--space-2);
+}
+
+#containers-section summary .button {
+  margin-left: var(--space-2);
 }
 
 .capitalize {

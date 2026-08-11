@@ -42,7 +42,9 @@ function renderContainers(domain: string, containers: Record<string, string[]>):
   for (const name of Object.keys(containers).sort()) {
     const details = document.createElement("details");
     const summary = document.createElement("summary");
-    summary.textContent = name;
+    const container_name = /^(glow-)(.+)(-\d+)$/.exec(name);
+    summary.textContent = container_name ? container_name[2] : name.replace(/[-_]/g, " ");
+    summary.classList.add('capitalize');
 
     const tailButton = document.createElement("button");
     tailButton.type = "button";

@@ -17,7 +17,7 @@
 1. `uv`
 2. `terraform`
 3. `packer`
-4. AWS credentials for EC2, ALB, ACM, S3, IAM, and SSM
+4. AWS credentials for EC2, ALB, ACM, S3, IAM, SSM, and CloudWatch
 5. Network access to `api.github.com` (used to resolve git tags/branches to commits — no local `git` needed)
 
 ## Initial Provision

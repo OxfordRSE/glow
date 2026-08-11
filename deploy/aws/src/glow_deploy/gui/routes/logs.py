@@ -91,10 +91,3 @@ def container_log_tail(
             "lines": None,
             "error": f"Couldn't fetch logs for {container}. (Details logged to {log_file()})",
         }
-
-
-@router.get("/deployments/{domain}/advanced", response_class=HTMLResponse)
-def advanced(request: Request, domain: str, _session=Depends(require_session)):
-    deployment = find_deployment(request, domain)
-    return templates.TemplateResponse(request, "deployment_advanced.html", {"deployment": deployment}
-    )

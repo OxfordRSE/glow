@@ -2,18 +2,40 @@
 {% block title %}Deployments — Glow Deploy{% endblock %}
 {% block content %}
   <h1>Deployments</h1>
-  <p class="links"><a href="/deployments/new" class="button">New deployment</a></p>
 
   {% if not deployments %}
     <p>No deployments found in this account/region.</p>
   {% else %}
     <ul class="list-plain">
       {% for deployment in deployments %}
-      <li class="card deployment-row">
-        <a href="/deployments/{{ deployment.domain }}">{{ deployment.domain }}</a>
-        <span class="badge">{{ deployment.state }} — {{ deployment.git_ref }} ({{ (deployment.git_commit or "")[:8] }})</span>
+      <li class="card">
+        <div class="deployment-row">
+          <strong>{{ deployment.domain }}</strong>
+          <span class="badge">{{ deployment.state }} — {{ deployment.git_ref }} ({{ (deployment.git_commit or "")[:8] }})</span>
+        </div>
+        <dl>
+          <dt>Instance ID</dt><dd>{{ deployment.instance_id }}</dd>
+          <dt>Launch time</dt><dd>{{ deployment.launch_time }}</dd>
+          <dt>CPU (last 15 min)</dt>
+          <dd>{{ "%.0f%%"|format(deployment.cpu_percent) if deployment.cpu_percent is not none else "—" }}</dd>
+        </dl>
+        <p class="links">
+          <a href="/deployments/{{ deployment.domain }}/logs" class="button flex-3">Status &amp; logs</a>
+          <a href="/deployments/{{ deployment.domain }}" class="button flex-1">Update</a>
+          <form method="post" action="/deployments/{{ deployment.domain }}/destroy"
+                onsubmit="return confirm('Destroy {{ deployment.domain }}? This permanently tears down all its AWS infrastructure (instance, load balancer, data) and cannot be undone.')">
+            <button type="submit" class="button button-danger-ghost">Destroy</button>
+          </form>
+        </p>
       </li>
       {% endfor %}
     </ul>
   {% endif %}
+
+  <p class="links"><a href="/deployments/new" class="button button-block{{ '' if not deployments else ' button-ghost' }}">Launch new deployment</a></p>
+{% endblock %}
+{% block head %}
+  <script>
+    setInterval(() => location.reload(), 30000);
+  </script>
 {% endblock %}

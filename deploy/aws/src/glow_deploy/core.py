@@ -875,6 +875,48 @@ def list_deployments(
     return deployments
 
 
+def get_cpu_utilization(
+    instance_ids: list[str], region: str, session: boto3.Session | None = None
+) -> dict[str, float | None]:
+    """Average CPU utilization over the last 15 minutes, per instance.
+
+    Uses EC2's built-in CloudWatch metric (no agent install needed) as a
+    cheap proxy for both current load and recent activity.
+    """
+    if not instance_ids:
+        return {}
+
+    from datetime import datetime, timedelta, timezone
+
+    cloudwatch = _client(session, "cloudwatch", region)
+    now = datetime.now(timezone.utc)
+    try:
+        response = cloudwatch.get_metric_data(
+            MetricDataQueries=[
+                {
+                    "Id": f"cpu{i}",
+                    "MetricStat": {
+                        "Metric": {
+                            "Namespace": "AWS/EC2",
+                            "MetricName": "CPUUtilization",
+                            "Dimensions": [{"Name": "InstanceId", "Value": iid}],
+                        },
+                        "Period": 900,
+                        "Stat": "Average",
+                    },
+                }
+                for i, iid in enumerate(instance_ids)
+            ],
+            StartTime=now - timedelta(minutes=15),
+            EndTime=now,
+        )
+    except Exception:
+        return {iid: None for iid in instance_ids}
+
+    results = {r["Id"]: r["Values"][0] if r["Values"] else None for r in response["MetricDataResults"]}
+    return {iid: results.get(f"cpu{i}") for i, iid in enumerate(instance_ids)}
+
+
 def provision(config: Config) -> dict[str, Any] | None:
     """Initial provision: build AMI, apply Terraform, activate stack."""
     write_line(f"[deploy] Provisioning {config.domain_name}")
