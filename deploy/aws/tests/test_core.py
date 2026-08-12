@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
 
 import glow_deploy.core as core
@@ -181,13 +182,17 @@ def test_read_terraform_outputs_parses_terraform_json(monkeypatch):
 
 
 class _FakeEc2Client:
-    def __init__(self, response):
+    def __init__(self, response=None):
         self._response = response
         self.describe_instances_calls: list[dict] = []
+        self.create_tags_calls: list[dict] = []
 
     def describe_instances(self, **kwargs):
         self.describe_instances_calls.append(kwargs)
         return self._response
+
+    def create_tags(self, **kwargs):
+        self.create_tags_calls.append(kwargs)
 
 
 def test_list_deployments_maps_tags_from_terraform_managed_instances(monkeypatch):
@@ -346,6 +351,67 @@ def test_get_runner_status_aggregates_health_and_git_ref(monkeypatch):
         "git_ref": "main",
         "git_commit": "deadbeef",
     }
+
+
+# ---------------------------------------------------------------------------
+# get_deployed_version
+# ---------------------------------------------------------------------------
+
+
+class _FakeHttpResponse:
+    def __init__(self, status_code=200, json_data=None, raise_exc=None):
+        self.status_code = status_code
+        self._json_data = json_data or {}
+        self._raise_exc = raise_exc
+
+    def raise_for_status(self):
+        if self._raise_exc:
+            raise self._raise_exc
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+    def json(self):
+        return self._json_data
+
+
+def test_get_deployed_version_returns_version_from_live_api(monkeypatch):
+    captured = {}
+
+    def fake_get(url, timeout=None):
+        captured["url"] = url
+        captured["timeout"] = timeout
+        return _FakeHttpResponse(json_data={"version": "v1.2.3"})
+
+    monkeypatch.setattr(core.httpx, "get", fake_get)
+
+    assert core.get_deployed_version("example.com") == "v1.2.3"
+    assert captured["url"] == "https://api.example.com/"
+    assert captured["timeout"] == 5.0
+
+
+def test_get_deployed_version_returns_none_on_http_error(monkeypatch):
+    monkeypatch.setattr(
+        core.httpx, "get", lambda url, timeout=None: _FakeHttpResponse(status_code=500)
+    )
+
+    assert core.get_deployed_version("example.com") is None
+
+
+def test_get_deployed_version_returns_none_on_missing_version_key(monkeypatch):
+    monkeypatch.setattr(
+        core.httpx, "get", lambda url, timeout=None: _FakeHttpResponse(json_data={})
+    )
+
+    assert core.get_deployed_version("example.com") is None
+
+
+def test_get_deployed_version_returns_none_on_timeout(monkeypatch):
+    def fake_get(url, timeout=None):
+        raise httpx.TimeoutException("timed out")
+
+    monkeypatch.setattr(core.httpx, "get", fake_get)
+
+    assert core.get_deployed_version("example.com") is None
 
 
 # ---------------------------------------------------------------------------
@@ -588,6 +654,19 @@ def test_activate_stack_writes_requested_git_ref_and_commit_to_metadata():
     assert '"git_commit": "${checkout_ref}"' in script
 
 
+def test_activate_stack_computes_app_version_from_git_describe():
+    script_path = AWS_DEPLOY_DIR / "runtime" / "activate-stack.sh"
+    script = script_path.read_text()
+
+    assert "compute_app_version" in script
+    assert (
+        "git -C \"${WORK_DIR}\" describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*'"
+        in script
+    )
+    assert "export APP_VERSION" in script
+    assert "  compute_app_version\n  start_stack" in script
+
+
 def test_activate_stack_uses_odk_domain_for_helper_host_header_and_ping():
     script_path = AWS_DEPLOY_DIR / "runtime" / "activate-stack.sh"
     script = script_path.read_text()
@@ -692,6 +771,8 @@ def test_update_prepares_repository_before_rerunning_userdata(monkeypatch):
         "verify_runner_health",
         lambda instance_id, region, session=None: calls.append(("verify", instance_id)),
     )
+    fake_ec2 = _FakeEc2Client()
+    monkeypatch.setattr(core, "_client", lambda session, service, region: fake_ec2)
 
     core.update(_make_config())
 
@@ -716,6 +797,15 @@ def test_update_prepares_repository_before_rerunning_userdata(monkeypatch):
             },
         ),
         ("verify", "i-1234567890"),
+    ]
+    assert fake_ec2.create_tags_calls == [
+        {
+            "Resources": ["i-1234567890"],
+            "Tags": [
+                {"Key": "GitRef", "Value": "main"},
+                {"Key": "GitCommit", "Value": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"},
+            ],
+        }
     ]
 
 

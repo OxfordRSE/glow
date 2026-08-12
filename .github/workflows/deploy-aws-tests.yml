@@ -47,3 +47,9 @@ jobs:
 
       - name: Type check
         run: npm run check
+
+      - name: Build test bundle
+        run: npx tsc -p tsconfig.test.json
+
+      - name: Test
+        run: node --test "test/*.test.js"

@@ -147,3 +147,80 @@ def test_parse_owner_repo_handles_https_and_scp_style_urls(repo_url, expected):
 def test_parse_owner_repo_rejects_urls_without_a_repo_path():
     with pytest.raises(github_api.DeployError, match="could not parse owner/repo"):
         github_api._parse_owner_repo("https://github.com/OxfordRSE")
+
+
+# ---------------------------------------------------------------------------
+# list_tags_with_prefix
+# ---------------------------------------------------------------------------
+
+
+def test_list_tags_with_prefix_returns_matching_clean_tags(monkeypatch):
+    _install_fake_responses(
+        monkeypatch,
+        {
+            "/repos/OxfordRSE/glow/git/matching-refs/tags/v": _FakeResponse(
+                200,
+                [
+                    {"ref": "refs/tags/v1.0.0", "object": {"sha": "a" * 40}},
+                    {"ref": "refs/tags/v1.2.3", "object": {"sha": "b" * 40}},
+                ],
+            ),
+        },
+    )
+
+    assert github_api.list_tags_with_prefix(REPO, "v") == ["v1.0.0", "v1.2.3"]
+
+
+def test_list_tags_with_prefix_filters_out_dirty_or_unparseable_tags(monkeypatch):
+    _install_fake_responses(
+        monkeypatch,
+        {
+            "/repos/OxfordRSE/glow/git/matching-refs/tags/v": _FakeResponse(
+                200,
+                [
+                    {"ref": "refs/tags/v1.0.0", "object": {"sha": "a" * 40}},
+                    {"ref": "refs/tags/v1.0.0-rc1", "object": {"sha": "b" * 40}},
+                ],
+            ),
+        },
+    )
+
+    assert github_api.list_tags_with_prefix(REPO, "v") == ["v1.0.0"]
+
+
+def test_list_tags_with_prefix_does_not_leak_other_tag_families(monkeypatch):
+    """matching-refs prefix-matches the ref name itself, so a gui-v* tag never
+    shows up when listing v*, and vice versa — no exclusion logic needed."""
+    _install_fake_responses(
+        monkeypatch,
+        {
+            "/repos/OxfordRSE/glow/git/matching-refs/tags/gui-v": _FakeResponse(
+                200,
+                [{"ref": "refs/tags/gui-v0.0.2", "object": {"sha": "a" * 40}}],
+            ),
+        },
+    )
+
+    assert github_api.list_tags_with_prefix(REPO, "gui-v") == ["gui-v0.0.2"]
+
+
+def test_list_tags_with_prefix_returns_empty_list_on_empty_response(monkeypatch):
+    _install_fake_responses(
+        monkeypatch,
+        {"/repos/OxfordRSE/glow/git/matching-refs/tags/v": _FakeResponse(200, [])},
+    )
+
+    assert github_api.list_tags_with_prefix(REPO, "v") == []
+
+
+def test_list_tags_with_prefix_returns_empty_list_on_http_error(monkeypatch):
+    _install_fake_responses(
+        monkeypatch,
+        {"/repos/OxfordRSE/glow/git/matching-refs/tags/v": _FakeResponse(500)},
+    )
+
+    assert github_api.list_tags_with_prefix(REPO, "v") == []
+
+
+def test_list_tags_with_prefix_returns_empty_list_on_bad_repo_url():
+    assert github_api.list_tags_with_prefix("https://github.com/no-repo-path", "v") == []

@@ -18,8 +18,8 @@
     </form>
   </section>
 
-  <section class="card">
-    <h2>Advanced: manual access keys</h2>
+  <details class="card">
+    <summary>Advanced: manual access keys</summary>
     <form method="post" action="/signin/manual">
       <label>Access key ID
         <input type="text" name="access_key" required>
@@ -35,5 +35,5 @@
       </label>
       <button type="submit" class="button">Sign in</button>
     </form>
-  </section>
+  </details>
 {% endblock %}

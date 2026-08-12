@@ -15,12 +15,24 @@
       </label>
       <p class="text-muted">Only needed if this AWS account doesn't host the domain's DNS — paste an existing ACM certificate ARN for it instead.</p>
     </div>
-    <label>Git repository URL
-      <input type="url" name="git_repo_url" value="{{ defaults.git_repo_url }}" required>
+    <label>App version
+      <select name="git_ref">
+        {% for v in available_versions %}
+        <option value="{{ v }}" {{ "selected" if v == defaults.git_ref }}>{{ v }}</option>
+        {% endfor %}
+        {% if not available_versions %}<option value="main" selected>main (no releases found)</option>{% endif %}
+      </select>
     </label>
-    <label>Git ref (branch/tag)
-      <input type="text" name="git_ref" value="{{ defaults.git_ref }}" required>
-    </label>
+
+    <details class="card">
+      <summary>Advanced: custom git ref / repository</summary>
+      <label>Git repository URL
+        <input type="url" name="git_repo_url" value="{{ defaults.git_repo_url }}">
+      </label>
+      <label>Custom git ref (overrides version above — branch, tag, or commit SHA)
+        <input type="text" name="git_ref_override" placeholder="e.g. main, or a commit SHA">
+      </label>
+    </details>
     <label>AWS region
       <input type="text" name="aws_region" value="{{ defaults.aws_region }}" required>
     </label>

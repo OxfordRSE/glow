@@ -7,7 +7,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
-from glow_api import __version__
 from glow_api.canonical_query import normalize_query
 from glow_api.query_execution import execute_query, compute_query_etag
 from glow_api.data import DataStore, get_datastore
@@ -66,7 +65,7 @@ def query_get(
     etag = compute_query_etag(
         query=canonical,
         dataset_version=dataset_version,
-        api_version=__version__,
+        api_version=settings.APP_VERSION,
     )
 
     # Check If-None-Match

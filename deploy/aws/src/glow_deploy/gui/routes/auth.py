@@ -32,7 +32,7 @@ def signin_page(request: Request):
     return templates.TemplateResponse(request, "signin.html", {"error": None})
 
 
-@router.post("/signin/sso/start", response_class=HTMLResponse)
+@router.post("/signin/sso/start")
 def sso_start(request: Request, start_url: str = Form(...), region: str = Form("eu-west-2")):
     try:
         device_auth = aws_auth.start_device_authorization(start_url, region)
@@ -42,8 +42,7 @@ def sso_start(request: Request, start_url: str = Form(...), region: str = Form("
 
     aws_auth.open_verification_url(device_auth)
     request.app.state.pending_device_auth = device_auth
-    return templates.TemplateResponse(request, "sso_poll.html", {"device_auth": device_auth, "accounts": None, "error": None},
-    )
+    return RedirectResponse("/signin/sso/poll", status_code=303)
 
 
 @router.get("/signin/sso/poll", response_class=HTMLResponse)

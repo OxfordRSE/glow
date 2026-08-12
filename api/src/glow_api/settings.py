@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     PERIOD_CUTOFF_MONTH: int = 9  # September (academic year starts)
     PERIOD_CUTOFF_DAY: int = 1  # 1st of month
 
+    # Deployment
+    APP_VERSION: str = "dev"  # Set from the deployed git tag; "dev" outside the deploy pipeline
+
     # Security
     MIN_N: int = 5
     SECRET_KEY: str = "change-me-in-production"

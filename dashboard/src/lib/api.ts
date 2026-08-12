@@ -3,45 +3,6 @@ import { env } from "$env/dynamic/public";
 
 const API_BASE = env.PUBLIC_API_BASE ?? "/api";
 
-// Target backend version - update this when making breaking changes to API surface
-export const TARGET_BACKEND_VERSION = "0.1.0";
-
-export type VersionCompatibility =
-  | "compatible"
-  | "minor-mismatch"
-  | "major-mismatch"
-  | "unknown";
-
-/**
- * Compare semantic versions and determine compatibility status.
- * - compatible: versions match exactly or differ only in patch
- * - minor-mismatch: minor versions differ (warning)
- * - major-mismatch: major versions differ (error)
- * - unknown: cannot parse version
- */
-export function checkVersionCompatibility(
-  backendVersion: string,
-  targetVersion: string = TARGET_BACKEND_VERSION,
-): VersionCompatibility {
-  const parseVersion = (v: string): [number, number, number] | null => {
-    const match = v.match(/^(\d+)\.(\d+)\.(\d+)/);
-    if (!match) return null;
-    return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
-  };
-
-  const backend = parseVersion(backendVersion);
-  const target = parseVersion(targetVersion);
-
-  if (!backend || !target) return "unknown";
-
-  const [bMajor, bMinor] = backend;
-  const [tMajor, tMinor] = target;
-
-  if (bMajor !== tMajor) return "major-mismatch";
-  if (bMinor !== tMinor) return "minor-mismatch";
-  return "compatible";
-}
-
 export class ApiError extends Error {
   constructor(
     public status: number,

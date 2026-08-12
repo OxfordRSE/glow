@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from glow_api import __version__
 from glow_api.auth import authenticate_user, create_access_token
 from glow_api.data import get_datastore
 from glow_api.database import run_migrations, get_db
@@ -102,7 +101,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="GLOW API",
     description="Read-only API for GLOW longitudinal questionnaire data",
-    version=__version__,
+    version=settings.APP_VERSION,
     lifespan=lifespan,
     docs_url="/docs",
     openapi_url="/openapi.json",
@@ -128,7 +127,7 @@ app.include_router(query.router)
 
 @app.get("/health", tags=["health"])
 def health() -> dict:
-    return {"status": "ok", "version": __version__}
+    return {"status": "ok", "version": settings.APP_VERSION}
 
 
 @app.post("/token", response_model=Token, tags=["auth"])

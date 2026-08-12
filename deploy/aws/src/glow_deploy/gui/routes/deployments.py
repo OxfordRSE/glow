@@ -12,12 +12,40 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from glow_deploy import core, github_api
+from glow_deploy import core, github_api, versions
 from glow_deploy.errors import DeployError
+from glow_deploy.gui import deps
 from glow_deploy.gui.deps import find_deployment, require_session
 from glow_deploy.gui.templating import templates
 
 router = APIRouter()
+
+
+def _default_git_ref(request: Request) -> str:
+    tags = deps.get_cached_release_tags(request)
+    return versions.highest(tags, core.CORE_TAG_PREFIX) or "main"
+
+
+def _sorted_available_versions(request: Request) -> list[str]:
+    tags = deps.get_cached_release_tags(request)
+    return sorted(tags, key=lambda tag: versions.parse(tag, core.CORE_TAG_PREFIX), reverse=True)
+
+
+def _compute_version_info(domain: str, available: list[str]) -> dict:
+    """Three states for "what version is this deployment on":
+    - unreachable: the live API didn't respond (a bigger problem than a stale version)
+    - custom: it responded, but isn't running a clean vX.Y.Z tag (advanced/branch track)
+    - tracked: it's on a clean tag — update_to/upgrade_to may be non-None
+    """
+    deployed_version = core.get_deployed_version(domain)
+    if deployed_version is None:
+        return {"state": "unreachable", "status": None, "deployed_version": None}
+    status = versions.classify(deployed_version, available, core.CORE_TAG_PREFIX)
+    return {
+        "state": "tracked" if status else "custom",
+        "status": status,
+        "deployed_version": deployed_version,
+    }
 
 
 @router.get("/deployments", response_class=HTMLResponse)
@@ -25,8 +53,10 @@ def home(request: Request, session=Depends(require_session)):
     deployments = core.list_deployments(session, request.app.state.region)
     running_ids = [d["instance_id"] for d in deployments if d["state"] == "running"]
     cpu = core.get_cpu_utilization(running_ids, request.app.state.region, session)
+    available = deps.get_cached_release_tags(request)
     for deployment in deployments:
         deployment["cpu_percent"] = cpu.get(deployment["instance_id"])
+        deployment["version_info"] = _compute_version_info(deployment["domain"], available)
     return templates.TemplateResponse(request, "home.html", {"deployments": deployments}
     )
 
@@ -34,9 +64,10 @@ def home(request: Request, session=Depends(require_session)):
 @router.get("/deployments/new", response_class=HTMLResponse)
 def new_deployment_form(request: Request, _session=Depends(require_session)):
     return templates.TemplateResponse(request, "new_deployment.html", {"error": None,
+            "available_versions": _sorted_available_versions(request),
             "defaults": {
                 "git_repo_url": core.DEFAULT_GIT_REPO_URL,
-                "git_ref": "main",
+                "git_ref": _default_git_ref(request),
                 "aws_region": request.app.state.region,
                 "app_name": "glow-core",
                 "runner_instance_type": "t3.medium",
@@ -69,20 +100,23 @@ def new_deployment_plan(
     domain: str = Form(...),
     certificate_arn: str = Form(""),
     git_repo_url: str = Form(core.DEFAULT_GIT_REPO_URL),
-    git_ref: str = Form("main"),
+    git_ref: str = Form(""),
+    git_ref_override: str = Form(""),
     aws_region: str = Form(...),
     app_name: str = Form("glow-core"),
     runner_instance_type: str = Form("t3.medium"),
     runner_root_volume_size_gb: int = Form(100),
     force_rebuild_ami: bool = Form(False),
 ):
+    resolved_ref = git_ref_override.strip() or git_ref or _default_git_ref(request)
     try:
-        git_commit = github_api.resolve_git_commit_via_github(git_repo_url, git_ref)
+        git_commit = github_api.resolve_git_commit_via_github(git_repo_url, resolved_ref)
     except DeployError as exc:
         return templates.TemplateResponse(request, "new_deployment.html", {"error": str(exc),
+                "available_versions": _sorted_available_versions(request),
                 "defaults": {
                     "git_repo_url": git_repo_url,
-                    "git_ref": git_ref,
+                    "git_ref": resolved_ref,
                     "aws_region": aws_region,
                     "app_name": app_name,
                     "runner_instance_type": runner_instance_type,
@@ -95,7 +129,7 @@ def new_deployment_plan(
         domain_name=domain,
         certificate_arn=certificate_arn,
         git_repo_url=git_repo_url,
-        git_ref=git_ref,
+        git_ref=resolved_ref,
         git_commit=git_commit,
         aws_region=aws_region,
         app_name=app_name,
@@ -155,7 +189,17 @@ def new_deployment_apply(
 @router.get("/deployments/{domain}", response_class=HTMLResponse)
 def deployment_detail(request: Request, domain: str, _session=Depends(require_session)):
     deployment = find_deployment(request, domain)
-    return templates.TemplateResponse(request, "deployment_detail.html", {"deployment": deployment, "error": None}
+    available = deps.get_cached_release_tags(request)
+    return templates.TemplateResponse(request, "deployment_detail.html", {
+            "deployment": deployment,
+            "error": None,
+            "version_info": _compute_version_info(domain, available),
+            "available_versions": sorted(
+                available, key=lambda tag: versions.parse(tag, core.CORE_TAG_PREFIX), reverse=True
+            ),
+            "default_git_ref": _default_git_ref(request),
+            "default_git_repo_url": core.DEFAULT_GIT_REPO_URL,
+        },
     )
 
 
@@ -165,19 +209,31 @@ def update_plan(
     domain: str,
     session=Depends(require_session),
     git_repo_url: str = Form(core.DEFAULT_GIT_REPO_URL),
-    git_ref: str = Form("main"),
+    git_ref: str = Form(""),
+    git_ref_override: str = Form(""),
 ):
     deployment = find_deployment(request, domain)
+    resolved_ref = git_ref_override.strip() or git_ref or _default_git_ref(request)
     try:
-        git_commit = github_api.resolve_git_commit_via_github(git_repo_url, git_ref)
+        git_commit = github_api.resolve_git_commit_via_github(git_repo_url, resolved_ref)
     except DeployError as exc:
-        return templates.TemplateResponse(request, "deployment_detail.html", {"deployment": deployment, "error": str(exc)},
+        available = deps.get_cached_release_tags(request)
+        return templates.TemplateResponse(request, "deployment_detail.html", {
+                "deployment": deployment,
+                "error": str(exc),
+                "version_info": _compute_version_info(domain, available),
+                "available_versions": sorted(
+                    available, key=lambda tag: versions.parse(tag, core.CORE_TAG_PREFIX), reverse=True
+                ),
+                "default_git_ref": _default_git_ref(request),
+                "default_git_repo_url": core.DEFAULT_GIT_REPO_URL,
+            },
         )
 
     config_fields = dict(
         domain_name=domain,
         git_repo_url=git_repo_url,
-        git_ref=git_ref,
+        git_ref=resolved_ref,
         git_commit=git_commit,
         aws_region=request.app.state.region,
         app_name="glow-core",
@@ -186,6 +242,7 @@ def update_plan(
         force_rebuild_ami=False,
     )
     config = core.Config(session=session, dry_run=True, **config_fields)
+    currently_running = core.get_deployed_version(domain)
     job_id = request.app.state.job_manager.submit(
         lambda: core.update(config),
         meta={
@@ -193,6 +250,8 @@ def update_plan(
             "domain": domain,
             "apply_action": f"/deployments/{domain}/update/apply",
             "config": config_fields,
+            "currently_running": currently_running,
+            "deploying": resolved_ref,
         },
     )
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)

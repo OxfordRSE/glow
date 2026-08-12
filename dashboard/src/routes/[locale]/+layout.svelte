@@ -5,7 +5,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { onMount, onDestroy } from 'svelte';
-  import { checkHealth, checkVersionCompatibility, me, type VersionCompatibility } from '$lib/api';
+  import { checkHealth, me } from '$lib/api';
   import { createI18n, initializeLocale, locale, setLocale, type Locale } from '$lib/i18n';
 
   interface Props {
@@ -33,10 +33,9 @@
   });
 
   // API health and version state
-  type HealthStatus = 'unknown' | 'ok' | 'down' | 'version-warning' | 'version-error';
+  type HealthStatus = 'unknown' | 'ok' | 'down';
   let apiHealth = $state<HealthStatus>('unknown');
   let apiVersion = $state<string | null>(null);
-  let versionCompatibility = $state<VersionCompatibility>('unknown');
   let healthInterval: ReturnType<typeof setInterval> | null = null;
 
   async function pollHealth() {
@@ -44,21 +43,11 @@
     if (!health) {
       apiHealth = 'down';
       apiVersion = null;
-      versionCompatibility = 'unknown';
       return;
     }
 
     apiVersion = health.version;
-    versionCompatibility = checkVersionCompatibility(health.version);
-
-    // Determine overall health status based on connectivity and version compatibility
-    if (versionCompatibility === 'major-mismatch') {
-      apiHealth = 'version-error';
-    } else if (versionCompatibility === 'minor-mismatch') {
-      apiHealth = 'version-warning';
-    } else {
-      apiHealth = 'ok';
-    }
+    apiHealth = 'ok';
   }
 
   // Bootstrap: fetch user identity from /me endpoint
@@ -143,33 +132,15 @@
             <!-- API health indicator -->
             <span
               class="hidden sm:flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full
-                {apiHealth === 'ok' ? 'bg-green-50 text-green-700' : 
-                 apiHealth === 'version-warning' ? 'bg-yellow-50 text-yellow-700' :
-                 apiHealth === 'version-error' ? 'bg-red-50 text-red-700' :
-                 apiHealth === 'down' ? 'bg-red-50 text-red-700' : 
+                {apiHealth === 'ok' ? 'bg-green-50 text-green-700' :
+                 apiHealth === 'down' ? 'bg-red-50 text-red-700' :
                  'bg-gray-50 text-gray-400'}"
               title={apiHealth === 'ok' ? `API v${apiVersion}` :
-                     apiHealth === 'version-warning' ? `API version mismatch (minor): ${apiVersion}` :
-                     apiHealth === 'version-error' ? `API version mismatch (major): ${apiVersion}` :
                      apiHealth === 'down' ? 'API is unreachable' :
                      'Checking API status...'}
             >
               {#if apiHealth === 'ok'}
                 <span class="h-1.5 w-1.5 rounded-full bg-green-500 inline-block"></span>
-                {i18n.t('nav.api')}
-              {:else if apiHealth === 'version-warning'}
-                <!-- Warning icon -->
-                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                {i18n.t('nav.api')}
-              {:else if apiHealth === 'version-error'}
-                <!-- Error icon -->
-                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
                 {i18n.t('nav.api')}
               {:else if apiHealth === 'down'}
                 <!-- Unplugged icon -->
@@ -227,10 +198,6 @@
             {i18n.t('nav.api')}: 
             {#if apiHealth === 'ok'}
               {i18n.t('nav.online')} (v{apiVersion})
-            {:else if apiHealth === 'version-warning'}
-              {i18n.t('nav.online')} - version mismatch (minor)
-            {:else if apiHealth === 'version-error'}
-              {i18n.t('nav.online')} - version mismatch (major)
             {:else if apiHealth === 'down'}
               {i18n.t('nav.offline')}
             {:else}

@@ -11,7 +11,15 @@
       <li class="card">
         <div class="deployment-row">
           <strong>{{ deployment.domain }}</strong>
-          <span class="badge">{{ deployment.state }} — {{ deployment.git_ref }} ({{ (deployment.git_commit or "")[:8] }})</span>
+          <span>
+            <span class="badge">{{ deployment.state }} — {{ deployment.version_info.deployed_version or deployment.git_ref }} ({{ (deployment.git_commit or "")[:8] }})</span>
+            {% if deployment.version_info.state == "tracked" %}
+              {% if deployment.version_info.status.upgrade_to %}<span class="badge badge-running">upgrade available</span>{% endif %}
+              {% if deployment.version_info.status.update_to %}<span class="badge badge-running">update available</span>{% endif %}
+            {% elif deployment.version_info.state == "unreachable" %}
+              <span class="badge badge-failed">unreachable</span>
+            {% endif %}
+          </span>
         </div>
         <dl>
           <dt>Instance ID</dt><dd>{{ deployment.instance_id }}</dd>

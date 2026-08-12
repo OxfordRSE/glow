@@ -4,6 +4,7 @@ terraform/.terraform/
 src/glow_deploy/gui/static/js/*.js
 src/glow_deploy/gui/static/js/*.js.map
 src/glow_deploy/gui/frontend/node_modules/
+src/glow_deploy/gui/frontend/test-build/
 src/glow_deploy/gui/VERSION
 src/glow_deploy/gui/bin/
 
