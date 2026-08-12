@@ -110,6 +110,13 @@ compose() {
   docker compose --profile odk --env-file "${RUNTIME_ENV}" -f "$WORK_DIR/compose.yml" "$@"
 }
 
+compute_app_version() {
+  step "Determining deployed app version"
+  APP_VERSION="$(git -C "${WORK_DIR}" describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || echo unknown)"
+  export APP_VERSION
+  info "App version: ${APP_VERSION}"
+}
+
 start_stack() {
   step "Building and starting containers"
   cd "${WORK_DIR}"
@@ -240,6 +247,7 @@ main() {
   step "Starting Glow stack activation"
   prepare_data_layout
   generate_runtime_env
+  compute_app_version
   start_stack
   wait_for_odk
   configure_odk

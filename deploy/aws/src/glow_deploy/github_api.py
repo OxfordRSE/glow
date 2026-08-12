@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from glow_deploy import versions
 from glow_deploy.errors import DeployError
 
 _SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
@@ -85,3 +86,18 @@ def resolve_git_commit_via_github(repo_url: str, ref: str, token: str | None = N
             return branch_object["sha"]
 
     raise DeployError(f"could not resolve git ref: {ref}")
+
+
+def list_tags_with_prefix(repo_url: str, prefix: str, timeout: float = 5.0) -> list[str]:
+    """All tags on repo_url starting with prefix, filtered to ones versions.parse
+    accepts. Never raises — feeds page renders and a background thread, so a
+    network hiccup here must never break either."""
+    try:
+        owner, repo = _parse_owner_repo(repo_url)
+        with httpx.Client(base_url=_GITHUB_API, timeout=timeout) as client:
+            response = client.get(f"/repos/{owner}/{repo}/git/matching-refs/tags/{prefix}")
+            response.raise_for_status()
+            refs = [item["ref"].removeprefix("refs/tags/") for item in response.json()]
+        return [ref for ref in refs if versions.parse(ref, prefix) is not None]
+    except Exception:
+        return []

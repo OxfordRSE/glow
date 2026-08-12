@@ -11,7 +11,9 @@ from glow_deploy.gui.app import create_app
 def test_create_app_defaults_to_dev_version_and_skips_update_check(monkeypatch):
     monkeypatch.setattr(secret_store, "load_credentials", lambda profile: None)
     called = []
-    monkeypatch.setattr(update_check, "latest_release_tag", lambda: called.append(True))
+    monkeypatch.setattr(
+        update_check, "latest_release_tag", lambda current_version: called.append(True)
+    )
 
     app = create_app()
 

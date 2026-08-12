@@ -16,8 +16,18 @@ from starlette.testclient import TestClient
 
 from glow_deploy import core, github_api
 from glow_deploy.errors import DeployError
-from glow_deploy.gui import aws_auth, secret_store
+from glow_deploy.gui import aws_auth, deps, secret_store
 from glow_deploy.gui.app import create_app
+
+
+@pytest.fixture(autouse=True)
+def _no_network_version_checks(monkeypatch):
+    """The release-track routes call out to GitHub (cached tag list) and to
+    each deployment's own live API (current version) — keep these tests
+    deterministic and offline by default; individual tests override either
+    with their own monkeypatch as needed."""
+    monkeypatch.setattr(deps, "get_cached_release_tags", lambda request: [])
+    monkeypatch.setattr(core, "get_deployed_version", lambda domain_name, timeout=5.0: None)
 
 
 @pytest.fixture
@@ -440,6 +450,164 @@ def test_update_plan_then_apply_updates(client, monkeypatch):
     assert apply_status["status"] == "succeeded"
     assert len(update_calls) == 2
     assert update_calls[1].dry_run is False
+
+
+def test_new_deployment_plan_falls_back_to_highest_available_version(client, monkeypatch):
+    _sign_in(client)
+    monkeypatch.setattr(deps, "get_cached_release_tags", lambda request: ["v1.0.0", "v1.4.0"])
+    resolved_refs = []
+    monkeypatch.setattr(
+        github_api,
+        "resolve_git_commit_via_github",
+        lambda repo_url, ref: resolved_refs.append(ref) or "c" * 40,
+    )
+    monkeypatch.setattr(core, "provision", lambda config: core.write_line("done"))
+
+    response = client.post(
+        "/deployments/new/plan",
+        data={
+            "domain": "example.com",
+            "git_repo_url": "https://github.com/OxfordRSE/glow.git",
+            "git_ref": "",
+            "git_ref_override": "",
+            "aws_region": "eu-west-2",
+            "app_name": "glow-core",
+            "runner_instance_type": "t3.medium",
+            "runner_root_volume_size_gb": "100",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert resolved_refs == ["v1.4.0"]
+
+
+def test_new_deployment_plan_override_takes_precedence_over_version_select(client, monkeypatch):
+    _sign_in(client)
+    monkeypatch.setattr(deps, "get_cached_release_tags", lambda request: ["v1.4.0"])
+    resolved_refs = []
+    monkeypatch.setattr(
+        github_api,
+        "resolve_git_commit_via_github",
+        lambda repo_url, ref: resolved_refs.append(ref) or "c" * 40,
+    )
+    monkeypatch.setattr(core, "provision", lambda config: core.write_line("done"))
+
+    response = client.post(
+        "/deployments/new/plan",
+        data={
+            "domain": "example.com",
+            "git_repo_url": "https://github.com/OxfordRSE/glow.git",
+            "git_ref": "v1.4.0",
+            "git_ref_override": "my-feature-branch",
+            "aws_region": "eu-west-2",
+            "app_name": "glow-core",
+            "runner_instance_type": "t3.medium",
+            "runner_root_volume_size_gb": "100",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert resolved_refs == ["my-feature-branch"]
+
+
+def test_update_plan_shows_currently_running_and_deploying_in_job_progress(client, monkeypatch):
+    _sign_in(client)
+    _stub_deployment(monkeypatch)
+    monkeypatch.setattr(core, "get_deployed_version", lambda domain_name, timeout=5.0: "v1.2.0")
+    monkeypatch.setattr(
+        github_api, "resolve_git_commit_via_github", lambda repo_url, ref: "d" * 40
+    )
+    monkeypatch.setattr(core, "update", lambda config: core.write_line("done"))
+
+    plan_response = client.post(
+        "/deployments/example.com/update/plan",
+        data={"git_repo_url": "https://github.com/OxfordRSE/glow.git", "git_ref": "v1.4.0"},
+        follow_redirects=False,
+    )
+    plan_job_id = plan_response.headers["location"].removeprefix("/jobs/")
+    _wait_for_job(client, plan_job_id)
+
+    job_page = client.get(f"/jobs/{plan_job_id}")
+    assert "v1.2.0" in job_page.text
+    assert "v1.4.0" in job_page.text
+
+
+def test_deployment_detail_shows_custom_ref_note_for_main_tracked_deployment(client, monkeypatch):
+    _sign_in(client)
+    _stub_deployment(monkeypatch)
+    monkeypatch.setattr(core, "get_deployed_version", lambda domain_name, timeout=5.0: "dev")
+
+    response = client.get("/deployments/example.com")
+
+    assert response.status_code == 200
+    assert "custom ref" in response.text
+    assert "Update available" not in response.text
+    assert "Major upgrade available" not in response.text
+
+
+def test_deployment_detail_shows_unreachable_note_when_api_does_not_respond(client, monkeypatch):
+    _sign_in(client)
+    _stub_deployment(monkeypatch)
+    # autouse fixture already defaults get_deployed_version to None (unreachable)
+
+    response = client.get("/deployments/example.com")
+
+    assert response.status_code == 200
+    assert "Couldn't reach the deployed API" in response.text
+
+
+def test_home_shows_no_update_badge_for_main_tracked_deployment(client, monkeypatch):
+    _sign_in(client)
+    monkeypatch.setattr(
+        core,
+        "list_deployments",
+        lambda session, region: [
+            {
+                "instance_id": "i-123",
+                "state": "running",
+                "domain": "example.com",
+                "git_ref": "main",
+                "git_commit": "a" * 40,
+                "launch_time": "2026-01-01T00:00:00Z",
+            }
+        ],
+    )
+    monkeypatch.setattr(core, "get_cpu_utilization", lambda ids, region, session: {})
+    monkeypatch.setattr(core, "get_deployed_version", lambda domain_name, timeout=5.0: "dev")
+
+    response = client.get("/deployments")
+
+    assert response.status_code == 200
+    assert "update available" not in response.text
+    assert "upgrade available" not in response.text
+
+
+def test_home_shows_update_badge_when_a_newer_version_is_available(client, monkeypatch):
+    _sign_in(client)
+    monkeypatch.setattr(
+        core,
+        "list_deployments",
+        lambda session, region: [
+            {
+                "instance_id": "i-123",
+                "state": "running",
+                "domain": "example.com",
+                "git_ref": "v1.2.0",
+                "git_commit": "a" * 40,
+                "launch_time": "2026-01-01T00:00:00Z",
+            }
+        ],
+    )
+    monkeypatch.setattr(core, "get_cpu_utilization", lambda ids, region, session: {})
+    monkeypatch.setattr(core, "get_deployed_version", lambda domain_name, timeout=5.0: "v1.2.0")
+    monkeypatch.setattr(deps, "get_cached_release_tags", lambda request: ["v1.4.0"])
+
+    response = client.get("/deployments")
+
+    assert response.status_code == 200
+    assert "update available" in response.text
 
 
 def test_logs_route_surfaces_runner_status(client, monkeypatch):

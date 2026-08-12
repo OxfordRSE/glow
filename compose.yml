@@ -20,6 +20,7 @@ services:
       GLOW_DATA_REFRESH_HOURS: ${GLOW_DATA_REFRESH_HOURS:-1}
       GLOW_MIN_N: ${GLOW_MIN_N:-5}
       GLOW_SECRET_KEY: ${GLOW_SECRET_KEY:-change-me-in-production}
+      GLOW_APP_VERSION: ${APP_VERSION:-}
       GLOW_METADATA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-glow}:${POSTGRES_PASSWORD:-change-me-in-production}@api-db:5432/${POSTGRES_DB:-glow}
       GLOW_CORS_ORIGINS: ${GLOW_CORS_ORIGINS:-["http://localhost:3000","http://127.0.0.1:3000"]}
     volumes:

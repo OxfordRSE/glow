@@ -30,6 +30,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
+import httpx
+
 from glow_deploy import binaries, github_api
 from glow_deploy.errors import DeployError
 
@@ -44,6 +46,7 @@ PACKER_DIR = AWS_DEPLOY_DIR / "runner"
 AMI_ID_PATTERN = re.compile(r"ami-[0-9a-fA-F]{8,17}")
 
 DEFAULT_GIT_REPO_URL = "https://github.com/OxfordRSE/glow.git"
+CORE_TAG_PREFIX = "v"
 
 # (message, inline) -> None. `inline` means "overwrite the current line"
 # (spinner-style), matching write_line/write_inline below.
@@ -741,6 +744,18 @@ def get_runner_status(
     }
 
 
+def get_deployed_version(domain_name: str, timeout: float = 5.0) -> str | None:
+    """Live version reported by the deployed API's own root endpoint, or None
+    if unreachable/malformed. Doubles as a lightweight health signal — no
+    response means something more important than a version mismatch."""
+    try:
+        response = httpx.get(f"https://api.{domain_name}/", timeout=timeout)
+        response.raise_for_status()
+        return response.json().get("version")
+    except Exception:
+        return None
+
+
 def get_container_logs(
     instance_id: str,
     domain_name: str,
@@ -1027,6 +1042,20 @@ def update(config: Config) -> None:
         config.session,
     )
     verify_runner_health(instance_id, config.aws_region, config.session)
+
+    # ponytail: a future `terraform apply` on this deployment reverts these
+    # tags to Terraform state's original values — known ceiling, not solved
+    # here. They're also no longer the primary "what version is running"
+    # source (that's the live API via get_deployed_version); this just keeps
+    # them from going stale as the fallback display.
+    ec2 = _client(config.session, "ec2", config.aws_region)
+    ec2.create_tags(
+        Resources=[instance_id],
+        Tags=[
+            {"Key": "GitRef", "Value": config.git_ref},
+            {"Key": "GitCommit", "Value": config.git_commit},
+        ],
+    )
 
     write_line("[deploy] Update complete!")
 

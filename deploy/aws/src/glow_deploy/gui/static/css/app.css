@@ -258,6 +258,12 @@ input[type="number"] {
   color: var(--color-info);
 }
 
+.alert-warn {
+  border-color: var(--color-warn);
+  background: var(--color-warn-bg);
+  color: var(--color-warn);
+}
+
 pre {
   background: var(--color-pending-bg);
   border-radius: var(--radius);

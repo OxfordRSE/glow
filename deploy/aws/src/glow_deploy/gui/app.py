@@ -42,6 +42,7 @@ def create_app() -> FastAPI:
     app.state.sso_token = None
     app.state.current_version = version.CURRENT_VERSION
     app.state.latest_release = None
+    app.state.release_tags_cache = None
     # Set at startup (not left at 0) so the watcher thread doesn't see a stale
     # timestamp and quit before the browser tab's first heartbeat lands.
     app.state.last_heartbeat = time.time()
@@ -108,6 +109,6 @@ def _handle_unexpected_error(request: Request, exc: Exception):
 
 
 def _check_for_update(app: FastAPI) -> None:
-    tag = update_check.latest_release_tag()
-    if tag and tag != app.state.current_version:
+    tag = update_check.latest_release_tag(app.state.current_version)
+    if tag:
         app.state.latest_release = tag
