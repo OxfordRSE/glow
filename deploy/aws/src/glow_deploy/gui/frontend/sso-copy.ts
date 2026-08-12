@@ -1,5 +1,5 @@
 // Clipboard-copy button for the SSO device-flow user code.
-function init(): void {
+export function init(): void {
   const button = document.getElementById("copy-user-code");
   const code = document.getElementById("user-code");
   if (!(button instanceof HTMLButtonElement) || !code) return;
@@ -15,4 +15,4 @@ function init(): void {
   });
 }
 
-init();
+if (!(globalThis as { __TEST__?: boolean }).__TEST__) init();

@@ -110,5 +110,9 @@ async function load(domain: string): Promise<void> {
   }
 }
 
-const domain = domainFromPath();
-if (domain) void load(domain);
+export function init(): void {
+  const domain = domainFromPath();
+  if (domain) void load(domain);
+}
+
+if (!(globalThis as { __TEST__?: boolean }).__TEST__) init();

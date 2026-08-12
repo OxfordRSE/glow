@@ -40,7 +40,7 @@ jobs:
         run: npm run check
 
       - name: Run tests
-        run: npm test
+        run: npx vitest run
 
       - name: Build
         run: npm run build

@@ -7,5 +7,9 @@ function ping(): void {
   void fetch("/heartbeat", { method: "POST", keepalive: true }).catch(() => {});
 }
 
-ping();
-window.setInterval(ping, PING_INTERVAL_MS);
+export function init(): void {
+  ping();
+  window.setInterval(ping, PING_INTERVAL_MS);
+}
+
+if (!(globalThis as { __TEST__?: boolean }).__TEST__) init();

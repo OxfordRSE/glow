@@ -29,8 +29,9 @@ function applyResult(auto: boolean): void {
   if (notice) notice.hidden = !auto;
 }
 
-const domainInput = document.getElementById("domain-input") as HTMLInputElement | null;
-if (domainInput) {
+export function init(): void {
+  const domainInput = document.getElementById("domain-input") as HTMLInputElement | null;
+  if (!domainInput) return;
   let timer: number | undefined;
   domainInput.addEventListener("input", () => {
     const domain = domainInput.value.trim();
@@ -47,3 +48,5 @@ if (domainInput) {
     }, DEBOUNCE_MS);
   });
 }
+
+if (!(globalThis as { __TEST__?: boolean }).__TEST__) init();
