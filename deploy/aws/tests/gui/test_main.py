@@ -19,18 +19,23 @@ def test_free_port_returns_a_bindable_port():
         probe.bind((main._HOST, port))  # must not raise
 
 
-def test_single_instance_lock_returns_none_on_a_second_acquire():
+def test_single_instance_lock_returns_none_on_a_second_acquire(monkeypatch):
+    monkeypatch.setattr(main, "_SINGLE_INSTANCE_LOCK_PORT", 0)
     first = main._acquire_single_instance_lock()
+    monkeypatch.setattr(main, "_SINGLE_INSTANCE_LOCK_PORT", first.getsockname()[1])
     try:
         assert main._acquire_single_instance_lock() is None
     finally:
         first.close()
 
 
-def test_single_instance_lock_can_be_reacquired_after_release():
+def test_single_instance_lock_can_be_reacquired_after_release(monkeypatch):
+    monkeypatch.setattr(main, "_SINGLE_INSTANCE_LOCK_PORT", 0)
     first = main._acquire_single_instance_lock()
+    port = first.getsockname()[1]
     first.close()
 
+    monkeypatch.setattr(main, "_SINGLE_INSTANCE_LOCK_PORT", port)
     second = main._acquire_single_instance_lock()
     assert second is not None
     second.close()

@@ -236,6 +236,7 @@ def test_home_lists_deployments(client, monkeypatch):
             }
         ],
     )
+    monkeypatch.setattr(core, "get_cpu_utilization", lambda ids, region, session: {})
 
     response = client.get("/deployments")
 
