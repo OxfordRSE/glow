@@ -2,13 +2,8 @@ name: Dashboard Check
 
 on:
   push:
-    paths:
-      - 'dashboard/**'
-      - 'api/examples/**'
   pull_request:
-    paths:
-      - 'dashboard/**'
-      - 'api/examples/**'
+  workflow_dispatch:
 
 jobs:
   detect-playwright-version:

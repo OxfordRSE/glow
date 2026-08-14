@@ -2,11 +2,8 @@ name: API Tests
 
 on:
   push:
-    paths:
-      - 'api/**'
   pull_request:
-    paths:
-      - 'api/**'
+  workflow_dispatch:
 
 jobs:
   test:
