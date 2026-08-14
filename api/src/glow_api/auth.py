@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
@@ -74,7 +74,7 @@ async def get_current_user(
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
-    except JWTError:
+    except jwt.PyJWTError:
         raise credentials_exception
 
     user = get_user_by_username(db, token_data.username)
@@ -116,7 +116,7 @@ def get_optional_school_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
             )
-    except JWTError:
+    except jwt.PyJWTError:
         request_context.record_event(
             "auth_assessed", outcome="invalid_token", success=False, school_id=school_id
         )
