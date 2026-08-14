@@ -11,12 +11,26 @@ on:
       - 'api/examples/**'
 
 jobs:
+  detect-playwright-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.detect.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read resolved playwright version from lockfile
+        id: detect
+        run: |
+          version=$(node -p "require('./dashboard/package-lock.json').packages['node_modules/playwright'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
   check:
+    needs: detect-playwright-version
     runs-on: ubuntu-latest
     container:
-      # Make sure to grab the latest version of the Playwright image
-      # https://playwright.dev/docs/docker#pull-the-imagecontainer:
-      image: mcr.microsoft.com/playwright:v1.60.0-noble
+      # Image tag is derived from the playwright version actually resolved in
+      # package-lock.json, so it can't drift out of sync with the installed browsers.
+      image: mcr.microsoft.com/playwright:v${{ needs.detect-playwright-version.outputs.version }}-noble
     defaults:
       run:
         working-directory: dashboard
