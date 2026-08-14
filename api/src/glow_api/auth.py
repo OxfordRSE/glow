@@ -3,13 +3,14 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from glow_api.database import get_db, get_user_by_username
-from glow_api.metadata_models import User
+from glow_api import request_context
+from glow_api.database import get_db, get_school_by_id, get_user_by_username
+from glow_api.metadata_models import School, User
 from glow_api.models import TokenData, UserRead
 from glow_api.settings import settings
 
@@ -81,3 +82,98 @@ async def get_current_user(
         raise credentials_exception
 
     return _user_model_to_read(user)
+
+
+def get_optional_school_user(
+    credentials: HTTPAuthorizationCredentials | None,
+    db: Session,
+    school_id: int,
+) -> tuple[UserRead, School]:
+    """Shared auth check for school-scoped, optionally-authenticated endpoints
+    (/query and /dimensions). Preserves the exact status codes/detail strings
+    both endpoints already used, and emits one 'auth_assessed' timeline event
+    covering every outcome.
+    """
+    if credentials is None:
+        request_context.record_event(
+            "auth_assessed", outcome="no_credentials", success=False, school_id=school_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required for school-scoped queries",
+        )
+
+    try:
+        payload = jwt.decode(
+            credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        username: str | None = payload.get("sub")
+        if username is None:
+            request_context.record_event(
+                "auth_assessed", outcome="invalid_token", success=False, school_id=school_id
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+            )
+    except JWTError:
+        request_context.record_event(
+            "auth_assessed", outcome="invalid_token", success=False, school_id=school_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+
+    user = get_user_by_username(db, username)
+    if user is None or not user.is_active:
+        request_context.record_event(
+            "auth_assessed",
+            outcome="unknown_or_inactive_user",
+            success=False,
+            username=username,
+            school_id=school_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+
+    user_school_ids = [s.id for s in user.schools]
+    if not user.is_admin and school_id not in user_school_ids:
+        request_context.record_event(
+            "auth_assessed",
+            outcome="forbidden",
+            success=False,
+            username=username,
+            is_admin=user.is_admin,
+            school_id=school_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You do not have access to school {school_id}",
+        )
+
+    school = get_school_by_id(db, school_id)
+    if school is None:
+        request_context.record_event(
+            "auth_assessed",
+            outcome="school_not_found",
+            success=False,
+            username=username,
+            school_id=school_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"School {school_id} not found",
+        )
+
+    request_context.record_event(
+        "auth_assessed",
+        outcome="success",
+        success=True,
+        username=username,
+        is_admin=user.is_admin,
+        school_id=school_id,
+    )
+    return _user_model_to_read(user), school

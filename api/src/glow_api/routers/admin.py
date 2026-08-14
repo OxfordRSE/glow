@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from glow_api import request_context
 from glow_api.auth import get_current_user, get_password_hash
 from glow_api.database import (
     create_school,
@@ -74,7 +75,7 @@ def list_all_users(
 )
 def create_new_user(
     payload: UserCreate,
-    _: UserRead = Depends(_require_admin),
+    current_admin: UserRead = Depends(_require_admin),
     db: Session = Depends(get_db),
 ) -> UserRead:
     existing = get_user_by_username(db, payload.username)
@@ -91,6 +92,14 @@ def create_new_user(
         school_ids=payload.school_ids,
         is_admin=payload.is_admin,
     )
+    request_context.record_event(
+        "admin_mutation",
+        action="create_user",
+        target_user_id=user.id,
+        target_username=user.username,
+        actor_username=current_admin.username,
+        actor_id=current_admin.id,
+    )
     return UserRead(
         id=user.id,
         username=user.username,
@@ -105,7 +114,7 @@ def create_new_user(
 def update_existing_user(
     user_id: int,
     payload: UserUpdate,
-    _: UserRead = Depends(_require_admin),
+    current_admin: UserRead = Depends(_require_admin),
     db: Session = Depends(get_db),
 ) -> UserRead:
     user = get_user_by_id(db, user_id)
@@ -122,6 +131,14 @@ def update_existing_user(
         school_ids=payload.school_ids,
         is_active=payload.is_active,
         is_admin=payload.is_admin,
+    )
+    request_context.record_event(
+        "admin_mutation",
+        action="update_user",
+        target_user_id=user_id,
+        actor_username=current_admin.username,
+        actor_id=current_admin.id,
+        fields_changed=list(payload.model_dump(exclude_unset=True).keys()),
     )
     return UserRead(
         id=updated.id,
@@ -150,6 +167,13 @@ def delete_existing_user(
             detail="Cannot delete your own account",
         )
     delete_user(db, user)
+    request_context.record_event(
+        "admin_mutation",
+        action="delete_user",
+        target_user_id=user_id,
+        actor_username=current_admin.username,
+        actor_id=current_admin.id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +211,7 @@ def list_all_schools(
 )
 def create_new_school(
     payload: SchoolCreate,
-    _: UserRead = Depends(_require_admin),
+    current_admin: UserRead = Depends(_require_admin),
     db: Session = Depends(get_db),
 ) -> SchoolRead:
     school = create_school(
@@ -195,6 +219,14 @@ def create_new_school(
         name=payload.name,
         size=payload.size,
         category=payload.category,
+    )
+    request_context.record_event(
+        "admin_mutation",
+        action="create_school",
+        target_school_id=school.id,
+        target_school_name=school.name,
+        actor_username=current_admin.username,
+        actor_id=current_admin.id,
     )
     return SchoolRead(
         id=school.id,
@@ -210,7 +242,7 @@ def create_new_school(
 def update_existing_school(
     school_id: int,
     payload: SchoolUpdate,
-    _: UserRead = Depends(_require_admin),
+    current_admin: UserRead = Depends(_require_admin),
     db: Session = Depends(get_db),
 ) -> SchoolRead:
     school = get_school_by_id(db, school_id)
@@ -237,6 +269,14 @@ def update_existing_school(
             db, updated, payload.statistical_neighbor_ids
         )
 
+    request_context.record_event(
+        "admin_mutation",
+        action="update_school",
+        target_school_id=school_id,
+        actor_username=current_admin.username,
+        actor_id=current_admin.id,
+        fields_changed=list(payload.model_dump(exclude_unset=True).keys()),
+    )
     return SchoolRead(
         id=updated.id,
         name=updated.name,
@@ -250,7 +290,7 @@ def update_existing_school(
 @router.delete("/schools/{school_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_existing_school(
     school_id: int,
-    _: UserRead = Depends(_require_admin),
+    current_admin: UserRead = Depends(_require_admin),
     db: Session = Depends(get_db),
 ) -> None:
     school = get_school_by_id(db, school_id)
@@ -259,6 +299,13 @@ def delete_existing_school(
             status_code=status.HTTP_404_NOT_FOUND, detail="School not found"
         )
     delete_school(db, school)
+    request_context.record_event(
+        "admin_mutation",
+        action="delete_school",
+        target_school_id=school_id,
+        actor_username=current_admin.username,
+        actor_id=current_admin.id,
+    )
 
 
 # ---------------------------------------------------------------------------

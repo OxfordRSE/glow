@@ -33,6 +33,7 @@ prepare_data_layout() {
   mkdir -p "${STATE_DIR}/odk-secrets"
   mkdir -p "${STATE_DIR}/odk-enketo-redis-main"
   mkdir -p "${STATE_DIR}/odk-enketo-redis-cache"
+  mkdir -p "${STATE_DIR}/api-audit-logs"
 
   mkdir -p "${WORK_DIR}/docker-mount-data"
   if [[ ! -L "${WORK_DIR}/docker-mount-data" ]]; then

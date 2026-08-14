@@ -1,17 +1,19 @@
 """Period-oriented multi-variable query endpoint."""
 
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, Response, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
-from sqlalchemy.orm import Session
 
+from glow_api import request_context
+from glow_api.auth import get_optional_school_user
 from glow_api.canonical_query import normalize_query
 from glow_api.query_execution import execute_query, compute_query_etag
 from glow_api.data import DataStore, get_datastore
-from glow_api.database import get_db, get_school_by_id
+from glow_api.database import get_db
 from glow_api.settings import settings
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/query", tags=["query"])
 
@@ -71,6 +73,7 @@ def query_get(
     # Check If-None-Match
     if if_none_match and if_none_match == etag:
         # Data hasn't changed
+        request_context.record_event("query_executed", etag_matched=True, computed=False)
         response.status_code = status.HTTP_304_NOT_MODIFIED
         return {}
 
@@ -79,56 +82,7 @@ def query_get(
 
     # If school_id is provided, check authorization
     if school_id is not None:
-        if credentials is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required for school-scoped queries",
-            )
-
-        # Decode and validate token
-        try:
-            payload = jwt.decode(
-                credentials.credentials,
-                settings.SECRET_KEY,
-                algorithms=[settings.ALGORITHM],
-            )
-            username: str | None = payload.get("sub")
-            if username is None:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Could not validate credentials",
-                )
-        except JWTError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-            )
-
-        # Get user from database
-        from glow_api.database import get_user_by_username
-
-        user = get_user_by_username(db, username)
-        if user is None or not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-            )
-
-        # Check if user has access to the requested school
-        user_school_ids = [s.id for s in user.schools]
-        if not user.is_admin and school_id not in user_school_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"You do not have access to school {school_id}",
-            )
-
-        # Verify school exists
-        school = get_school_by_id(db, school_id)
-        if school is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"School {school_id} not found",
-            )
+        _user, school = get_optional_school_user(credentials, db, school_id)
 
         # Filter data to this school
         df = dfwl.df
@@ -138,6 +92,7 @@ def query_get(
             df = df.iloc[0:0]  # no data loaded yet; nothing belongs to any school
         school_name = school.name
     else:
+        request_context.record_event("auth_assessed", outcome="anonymous", success=None, school_id=None)
         # Dataset-scoped query
         df = dfwl.df
         school_name = None
@@ -158,6 +113,7 @@ def query_get(
     form_metadata = dfwl.metadata
 
     # Execute query
+    _t0 = time.perf_counter()
     result = execute_query(
         df=df,
         query=canonical,
@@ -165,6 +121,15 @@ def query_get(
         observed_periods=observed_periods,
         min_n=settings.MIN_N,
         form_metadata=form_metadata,
+    )
+    request_context.record_event(
+        "query_executed",
+        etag_matched=False,
+        computed=True,
+        duration_s=round(time.perf_counter() - _t0, 4),
+        input_rows=len(df),
+        periods_returned=len(result.get("periods", [])),
+        variables_returned=len(result.get("variables", [])),
     )
 
     return result

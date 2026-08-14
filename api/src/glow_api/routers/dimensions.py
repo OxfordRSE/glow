@@ -3,14 +3,14 @@
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from typing import Optional
 
+from glow_api import request_context
+from glow_api.auth import get_optional_school_user
 from glow_api.data import DataStore, get_datastore
-from glow_api.database import get_db, get_user_by_username, get_school_by_id
+from glow_api.database import get_db
 from glow_api.models import DimensionsResponse, VariableDefinition, DimensionDefinition
-from glow_api.settings import settings
 
 router = APIRouter(tags=["discovery"])
 
@@ -46,55 +46,7 @@ def get_dimensions(
     """
     # If school_id is provided, we need to check authorization
     if school_id is not None:
-        # Must have valid credentials for school-scoped queries
-        if credentials is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required for school-scoped queries",
-            )
-
-        # Decode and validate token
-        try:
-            payload = jwt.decode(
-                credentials.credentials,
-                settings.SECRET_KEY,
-                algorithms=[settings.ALGORITHM],
-            )
-            username: str | None = payload.get("sub")
-            if username is None:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Could not validate credentials",
-                )
-        except JWTError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-            )
-
-        # Get user from database
-        user = get_user_by_username(db, username)
-        if user is None or not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-            )
-
-        # Check if user has access to the requested school
-        user_school_ids = [s.id for s in user.schools]
-        if not user.is_admin and school_id not in user_school_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"You do not have access to school {school_id}",
-            )
-
-        # Verify school exists
-        school = get_school_by_id(db, school_id)
-        if school is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"School {school_id} not found",
-            )
+        _user, school = get_optional_school_user(credentials, db, school_id)
 
         # Get data scoped to this school
         dfwl = datastore.to_frozen()
@@ -104,6 +56,7 @@ def get_dimensions(
         else:
             df = df.iloc[0:0]  # no data loaded yet; nothing belongs to any school
     else:
+        request_context.record_event("auth_assessed", outcome="anonymous", success=None, school_id=None)
         # Dataset-scoped query - use full dataset
         dfwl = datastore.to_frozen()
         df = dfwl.df
@@ -135,6 +88,9 @@ def get_dimensions(
 
             dimension_defs.append(DimensionDefinition(key=dim, type=dim_type))
 
+    request_context.record_event(
+        "dispatch", variables=len(variable_defs), dimensions=len(dimension_defs)
+    )
     return DimensionsResponse(
         school_id=school_id,
         variables=variable_defs,

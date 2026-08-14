@@ -1,81 +1,27 @@
-import logging
-import logging.config
+import os
 from contextlib import asynccontextmanager
 
+import structlog
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from glow_api.auth import authenticate_user, create_access_token
 from glow_api.data import get_datastore
 from glow_api.database import run_migrations, get_db
+from glow_api.logging_config import configure_logging
 from glow_api.models import Token
+from glow_api.request_logging import RequestLoggingMiddleware
 from glow_api.routers import admin, auth, dimensions, me, query, schools
 from glow_api.settings import settings
 
-
-def configure_logging() -> None:
-    """Configure logging for the GLOW API.
-
-    Sets up console logging for:
-    - glow_api: Application logs (configurable via GLOW_LOG_LEVEL)
-    - uvicorn.access: HTTP access logs for each endpoint request (configurable via GLOW_LOG_UVICORN_ACCESS)
-    - uvicorn.error: Uvicorn server logs (configurable via GLOW_LOG_UVICORN)
-
-    All logs output to console (stdout) by default.
-    """
-    logging.config.dictConfig(
-        {
-            "version": 1,
-            "disable_existing_loggers": False,
-            "formatters": {
-                "default": {
-                    "format": "%(asctime)s %(levelname)s [%(name)s] %(message)s",
-                },
-            },
-            "handlers": {
-                "console": {
-                    "class": "logging.StreamHandler",
-                    "formatter": "default",
-                    "stream": "ext://sys.stdout",
-                },
-                "access_console": {
-                    "class": "logging.StreamHandler",
-                    "stream": "ext://sys.stdout",
-                },
-            },
-            "loggers": {
-                "glow_api": {
-                    "handlers": ["console"],
-                    "level": settings.LOG_LEVEL,
-                    "propagate": False,
-                },
-                "uvicorn.access": {
-                    "handlers": ["access_console"],
-                    "level": settings.LOG_UVICORN_ACCESS,
-                    "propagate": False,
-                },
-                "uvicorn.error": {
-                    "handlers": ["console"],
-                    "level": settings.LOG_UVICORN,
-                    "propagate": False,
-                },
-            },
-        }
-    )
-
-
 configure_logging()
+
+logger = structlog.get_logger("glow_api")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    import os
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     logger.info("Starting application lifespan...")
     settings.warn_insecure_defaults()
 
@@ -115,6 +61,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Added after CORSMiddleware so it becomes the outermost user middleware,
+# landing inside Starlette's ServerErrorMiddleware (always outermost) but
+# outside CORS — it sees unhandled exceptions before ServerErrorMiddleware
+# converts them to the generic 500 response.
+app.add_middleware(RequestLoggingMiddleware)
 
 # Include routers
 app.include_router(auth.router)
@@ -136,19 +87,7 @@ def token_alias(
     db: Session = Depends(get_db),
 ) -> Token:
     """Alias for /auth/login for backward compatibility."""
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if user is None:
-        from fastapi import HTTPException, status
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = create_access_token(
-        data={"sub": user.username, "is_admin": user.is_admin}
-    )
-    return Token(access_token=access_token, token_type="bearer")
+    return auth.login(form_data=form_data, db=db)
 
 
 @app.get("/")
