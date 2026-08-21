@@ -368,7 +368,7 @@ if [[ ! -f "${MANIFEST_PATH}" ]]; then
   echo "   To generate and transform canonical mock data:"
   echo ""
   echo "   uvx glow-dummies \\"
-  echo "     --config https://raw.githubusercontent.com/OxfordRSE/glow-dummies/main/examples/glow_model.toml \\"
+  echo "     --config https://raw.githubusercontent.com/OxWRC/glow-dummies/main/examples/glow_model.toml \\"
   echo "     --seed 42 \\"
   echo "     --output csv \\"
   echo "     > data/glow_base.csv"

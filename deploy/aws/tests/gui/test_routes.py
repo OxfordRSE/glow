@@ -279,7 +279,7 @@ def test_new_deployment_plan_then_apply_provisions(client, monkeypatch):
         "/deployments/new/plan",
         data={
             "domain": "example.com",
-            "git_repo_url": "https://github.com/OxfordRSE/glow.git",
+            "git_repo_url": "https://github.com/OxWRC/glow.git",
             "git_ref": "main",
             "aws_region": "eu-west-2",
             "app_name": "glow-core",
@@ -304,7 +304,7 @@ def test_new_deployment_plan_then_apply_provisions(client, monkeypatch):
         "/deployments/new/apply",
         data={
             "domain_name": "example.com",
-            "git_repo_url": "https://github.com/OxfordRSE/glow.git",
+            "git_repo_url": "https://github.com/OxWRC/glow.git",
             "git_ref": "main",
             "git_commit": "c" * 40,
             "aws_region": "eu-west-2",
@@ -336,7 +336,7 @@ def test_new_deployment_plan_surfaces_git_ref_errors(client, monkeypatch):
         "/deployments/new/plan",
         data={
             "domain": "example.com",
-            "git_repo_url": "https://github.com/OxfordRSE/glow.git",
+            "git_repo_url": "https://github.com/OxWRC/glow.git",
             "git_ref": "nonexistent",
             "aws_region": "eu-west-2",
         },
@@ -424,7 +424,7 @@ def test_update_plan_then_apply_updates(client, monkeypatch):
 
     plan_response = client.post(
         "/deployments/example.com/update/plan",
-        data={"git_repo_url": "https://github.com/OxfordRSE/glow.git", "git_ref": "v2"},
+        data={"git_repo_url": "https://github.com/OxWRC/glow.git", "git_ref": "v2"},
         follow_redirects=False,
     )
     assert plan_response.status_code == 303
@@ -437,7 +437,7 @@ def test_update_plan_then_apply_updates(client, monkeypatch):
         "/deployments/example.com/update/apply",
         data={
             "domain_name": "example.com",
-            "git_repo_url": "https://github.com/OxfordRSE/glow.git",
+            "git_repo_url": "https://github.com/OxWRC/glow.git",
             "git_ref": "v2",
             "git_commit": "d" * 40,
             "aws_region": "eu-west-2",
@@ -468,7 +468,7 @@ def test_new_deployment_plan_falls_back_to_highest_available_version(client, mon
         "/deployments/new/plan",
         data={
             "domain": "example.com",
-            "git_repo_url": "https://github.com/OxfordRSE/glow.git",
+            "git_repo_url": "https://github.com/OxWRC/glow.git",
             "git_ref": "",
             "git_ref_override": "",
             "aws_region": "eu-west-2",
@@ -498,7 +498,7 @@ def test_new_deployment_plan_override_takes_precedence_over_version_select(clien
         "/deployments/new/plan",
         data={
             "domain": "example.com",
-            "git_repo_url": "https://github.com/OxfordRSE/glow.git",
+            "git_repo_url": "https://github.com/OxWRC/glow.git",
             "git_ref": "v1.4.0",
             "git_ref_override": "my-feature-branch",
             "aws_region": "eu-west-2",
@@ -524,7 +524,7 @@ def test_update_plan_shows_currently_running_and_deploying_in_job_progress(clien
 
     plan_response = client.post(
         "/deployments/example.com/update/plan",
-        data={"git_repo_url": "https://github.com/OxfordRSE/glow.git", "git_ref": "v1.4.0"},
+        data={"git_repo_url": "https://github.com/OxWRC/glow.git", "git_ref": "v1.4.0"},
         follow_redirects=False,
     )
     plan_job_id = plan_response.headers["location"].removeprefix("/jobs/")

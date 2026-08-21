@@ -287,7 +287,7 @@ glow-dummies → glow_base.csv → transform_mock_data.py → mock_seed/*.csv + 
 
 #### Step 1: Generate Synthetic Data
 
-Use [glow-dummies](https://github.com/OxfordRSE/glow-dummies) to generate realistic base test data:
+Use [glow-dummies](https://github.com/OxWRC/glow-dummies) to generate realistic base test data:
 
 ```bash
 # Install glow-dummies
@@ -295,7 +295,7 @@ pip install glow-dummies
 
 # Generate canonical base data
 glow_dummies \
-  --config https://raw.githubusercontent.com/OxfordRSE/glow-dummies/main/examples/glow_model.toml \
+  --config https://raw.githubusercontent.com/OxWRC/glow-dummies/main/examples/glow_model.toml \
   --seed 42 \
   --output csv \
   > data/glow_base.csv

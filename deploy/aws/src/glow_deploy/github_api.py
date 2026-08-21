@@ -24,7 +24,7 @@ def _parse_owner_repo(repo_url: str) -> tuple[str, str]:
     if "://" in repo_url:
         path = urlparse(repo_url).path
     else:
-        # scp-style, e.g. git@github.com:OxfordRSE/glow.git
+        # scp-style, e.g. git@github.com:OxWRC/glow.git
         path = repo_url.split(":", 1)[-1]
 
     path = path.strip("/")

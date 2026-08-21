@@ -45,7 +45,7 @@ TERRAFORM_DIR = AWS_DEPLOY_DIR / "terraform"
 PACKER_DIR = AWS_DEPLOY_DIR / "runner"
 AMI_ID_PATTERN = re.compile(r"ami-[0-9a-fA-F]{8,17}")
 
-DEFAULT_GIT_REPO_URL = "https://github.com/OxfordRSE/glow.git"
+DEFAULT_GIT_REPO_URL = "https://github.com/OxWRC/glow.git"
 CORE_TAG_PREFIX = "v"
 
 # (message, inline) -> None. `inline` means "overwrite the current line"

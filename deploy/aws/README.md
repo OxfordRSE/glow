@@ -14,7 +14,7 @@ download the packaged GUI instead of installing Python, Terraform, Packer, or
 Docker.
 
 1. Download the build for your OS from the
-   [Releases page](https://github.com/OxfordRSE/glow/releases) — Windows
+   [Releases page](https://github.com/OxWRC/glow/releases) — Windows
    (`.zip`), macOS (`.tar.gz`), or Linux (`.AppImage` or `.tar.gz`).
 2. Run it. It opens a browser tab at `http://127.0.0.1:<port>` — no terminal
    needed.
